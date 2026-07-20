@@ -1,33 +1,34 @@
 /* ============================================================
-   Campus OS — Design System & Styles
-   Mobile-first, light/dark mode, calm premium aesthetic
+   Campus OS — Design System & Multi-Theme Styles
+   Light (Clean), Dark (Slate Obsidian), Glass (Frosted Premium)
    ============================================================ */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
-/* ── CSS Variables ─────────────────────────────────────────── */
-:root {
+/* ── CSS Variables — Default / Dark (Slate Obsidian) ───────── */
+:root,
+[data-theme="dark"] {
   --font: 'Inter', system-ui, -apple-system, sans-serif;
 
-  /* Brand / Accent — Calm Indigo */
-  --accent:        #4f46e5;
-  --accent-light:  #6366f1;
-  --accent-dim:    rgba(79, 70, 229, 0.08);
-  --accent-hover:  #4338ca;
+  /* Brand / Accent */
+  --accent:        #6366f1;
+  --accent-light:  #818cf8;
+  --accent-dim:    rgba(99, 102, 241, 0.15);
+  --accent-hover:  #4f46e5;
 
-  /* Surfaces — Light Slate */
-  --bg:            #f8fafc;
-  --surface:       #ffffff;
-  --surface-2:     #f1f5f9;
-  --border:        #e2e8f0;
-  --border-light:  #f1f5f9;
+  /* Surfaces — Slate Dark */
+  --bg:            #090d16;
+  --surface:       #131b2e;
+  --surface-2:     #1c2640;
+  --border:        rgba(255, 255, 255, 0.08);
+  --border-light:  rgba(255, 255, 255, 0.04);
 
-  /* Text — Light */
-  --text-primary:  #0f172a;
-  --text-secondary:#475569;
-  --text-muted:    #94a3b8;
+  /* Text */
+  --text-primary:  #f8fafc;
+  --text-secondary:#cbd5e1;
+  --text-muted:    #64748b;
 
-  /* Status Colors (Calm Muted Tints) */
+  /* Status Colors */
   --green:  #10b981;
   --yellow: #f59e0b;
   --red:    #ef4444;
@@ -35,9 +36,23 @@
   --purple: #8b5cf6;
   --pink:   #ec4899;
 
-  /* Hero Banner Gradient — Light */
-  --banner-bg: linear-gradient(135deg, #4338ca 0%, #3730a3 50%, #312e81 100%);
+  /* Banner */
+  --banner-bg: linear-gradient(135deg, #1e1b4b 0%, #0f172a 60%, #1e293b 100%);
   --banner-text: #ffffff;
+
+  /* Glass variables (Default off) */
+  --topbar-bg:      var(--surface);
+  --topbar-blur:    none;
+  --sidebar-bg:     var(--surface);
+  --sidebar-blur:   none;
+  --bottomnav-bg:   var(--surface);
+  --bottomnav-blur:  none;
+  --statcard-bg:    var(--surface);
+  --statcard-blur:  none;
+  --modal-bg:       var(--surface);
+  --modal-blur:     none;
+  --fab-bg:         var(--accent);
+  --fab-blur:       none;
 
   /* Layout */
   --sidebar-w: 240px;
@@ -48,32 +63,85 @@
   --radius-xs: 6px;
 
   /* Shadows */
-  --shadow:    0 1px 3px rgba(15, 23, 42, 0.05), 0 4px 12px rgba(15, 23, 42, 0.03);
-  --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.08), 0 12px 24px -4px rgba(15, 23, 42, 0.06);
+  --shadow:    0 2px 8px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.4);
 
   /* Transitions */
   --ease: 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* ── Dark Mode (Rich Slate Obsidian) ────────────────────────── */
-[data-theme="dark"] {
-  --bg:            #090d16;
-  --surface:       #131b2e;
-  --surface-2:     #1c2640;
-  --border:        rgba(255, 255, 255, 0.08);
-  --border-light:  rgba(255, 255, 255, 0.04);
+/* ── Light Theme (Clean Slate) ────────────────────────────── */
+[data-theme="light"] {
+  --bg:            #f8fafc;
+  --surface:       #ffffff;
+  --surface-2:     #f1f5f9;
+  --border:        #e2e8f0;
+  --border-light:  #f1f5f9;
 
-  --text-primary:  #f8fafc;
-  --text-secondary:#cbd5e1;
-  --text-muted:    #64748b;
+  --text-primary:  #0f172a;
+  --text-secondary:#475569;
+  --text-muted:    #94a3b8;
 
-  --accent-dim:    rgba(99, 102, 241, 0.15);
-  --accent-hover:  #818cf8;
+  --accent:        #4f46e5;
+  --accent-light:  #6366f1;
+  --accent-dim:    rgba(79, 70, 229, 0.08);
+  --accent-hover:  #4338ca;
 
-  --banner-bg: linear-gradient(135deg, #1e1b4b 0%, #0f172a 60%, #1e293b 100%);
+  --banner-bg: linear-gradient(135deg, #4338ca 0%, #3730a3 50%, #312e81 100%);
+  --banner-text: #ffffff;
 
-  --shadow:    0 2px 8px rgba(0, 0, 0, 0.25);
-  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --shadow:    0 1px 3px rgba(15, 23, 42, 0.05), 0 4px 12px rgba(15, 23, 42, 0.03);
+  --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.08), 0 12px 24px -4px rgba(15, 23, 42, 0.06);
+}
+
+/* ── Premium Glass Theme (Frosted Ambient Dark) ───────────── */
+[data-theme="glass"] {
+  --bg:            #070b14;
+  --surface:       #111827;       /* Opaque surface for dense content readability */
+  --surface-2:     #1f2937;       /* High-contrast form inputs */
+  --border:        rgba(255, 255, 255, 0.1);
+  --border-light:  rgba(255, 255, 255, 0.05);
+
+  --text-primary:  #f9fafb;
+  --text-secondary:#d1d5db;
+  --text-muted:    #6b7280;
+
+  --accent:        #6366f1;
+  --accent-light:  #818cf8;
+  --accent-dim:    rgba(99, 102, 241, 0.18);
+
+  --banner-bg: linear-gradient(135deg, rgba(30, 27, 75, 0.85) 0%, rgba(15, 23, 42, 0.85) 100%);
+  --banner-text: #ffffff;
+
+  /* Frosted Glass Layers for structural navigation & containers */
+  --topbar-bg:      rgba(15, 23, 42, 0.75);
+  --topbar-blur:    blur(12px) saturate(160%);
+
+  --sidebar-bg:     rgba(15, 23, 42, 0.65);
+  --sidebar-blur:   blur(12px);
+
+  --bottomnav-bg:   rgba(15, 23, 42, 0.8);
+  --bottomnav-blur:  blur(14px);
+
+  --statcard-bg:    rgba(26, 37, 64, 0.55);
+  --statcard-blur:  blur(10px);
+
+  --modal-bg:       rgba(17, 24, 39, 0.92);
+  --modal-blur:     blur(16px);
+
+  --fab-bg:         rgba(99, 102, 241, 0.88);
+  --fab-blur:       blur(8px);
+
+  --shadow:    0 4px 20px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+
+/* Ambient Background Glow for Glass Mode */
+[data-theme="glass"] body {
+  background-image: 
+    radial-gradient(circle at 15% 15%, rgba(99, 102, 241, 0.1) 0%, transparent 40%),
+    radial-gradient(circle at 85% 75%, rgba(14, 165, 233, 0.08) 0%, transparent 40%);
+  background-attachment: fixed;
 }
 
 /* ── Reset & Base ───────────────────────────────────────────── */
@@ -111,7 +179,9 @@ img { display: block; max-width: 100%; }
   align-items: center;
   justify-content: space-between;
   padding: 0 16px;
-  background: var(--surface);
+  background: var(--topbar-bg);
+  backdrop-filter: var(--topbar-blur);
+  -webkit-backdrop-filter: var(--topbar-blur);
   border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;
@@ -140,7 +210,7 @@ img { display: block; max-width: 100%; }
   font-weight: 800;
   font-size: 0.85rem;
   letter-spacing: -0.5px;
-  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
 }
 
 .topbar-search {
@@ -207,7 +277,7 @@ img { display: block; max-width: 100%; }
   font-size: 0.8rem;
   font-weight: 700;
   flex-shrink: 0;
-  box-shadow: 0 2px 6px rgba(79, 70, 229, 0.25);
+  box-shadow: 0 2px 6px rgba(99, 102, 241, 0.25);
 }
 
 /* ── Sidebar (desktop ≥768px) ─────────────────────────────── */
@@ -217,7 +287,9 @@ img { display: block; max-width: 100%; }
   top: var(--topbar-h);
   height: calc(100vh - var(--topbar-h));
   width: var(--sidebar-w);
-  background: var(--surface);
+  background: var(--sidebar-bg);
+  backdrop-filter: var(--sidebar-blur);
+  -webkit-backdrop-filter: var(--sidebar-blur);
   border-right: 1px solid var(--border);
   overflow-y: auto;
   padding: 16px 12px;
@@ -290,7 +362,9 @@ img { display: block; max-width: 100%; }
   position: fixed;
   bottom: 0; left: 0; right: 0;
   height: var(--nav-h);
-  background: var(--surface);
+  background: var(--bottomnav-bg);
+  backdrop-filter: var(--bottomnav-blur);
+  -webkit-backdrop-filter: var(--bottomnav-blur);
   border-top: 1px solid var(--border);
   display: flex;
   align-items: center;
@@ -393,7 +467,9 @@ img { display: block; max-width: 100%; }
 }
 
 .stat-card {
-  background: var(--surface);
+  background: var(--statcard-bg);
+  backdrop-filter: var(--statcard-blur);
+  -webkit-backdrop-filter: var(--statcard-blur);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 16px 14px;
@@ -430,7 +506,7 @@ img { display: block; max-width: 100%; }
   font-weight: 500;
 }
 
-/* ── Greeting Banner (Calm Ambient Slate-Indigo) ──────────────── */
+/* ── Greeting Banner (Calm Ambient Gradient) ──────────────── */
 .greeting-banner {
   background: var(--banner-bg);
   border-radius: var(--radius);
@@ -439,8 +515,8 @@ img { display: block; max-width: 100%; }
   margin-bottom: 20px;
   position: relative;
   overflow: hidden;
-  box-shadow: 0 4px 20px rgba(67, 56, 202, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border);
 }
 
 .greeting-banner::before {
@@ -449,7 +525,7 @@ img { display: block; max-width: 100%; }
   top: -40px; right: -40px;
   width: 160px; height: 160px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.15) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.12) 0%, transparent 70%);
   pointer-events: none;
 }
 
@@ -499,7 +575,7 @@ img { display: block; max-width: 100%; }
   background: var(--accent);
   color: white;
   border-color: var(--accent);
-  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.25);
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.25);
 }
 
 .tt-entry {
@@ -556,7 +632,7 @@ img { display: block; max-width: 100%; }
   flex-shrink: 0;
 }
 
-.type-lecture { background: rgba(79, 70, 229, 0.1); color: var(--accent); }
+.type-lecture { background: rgba(99, 102, 241, 0.1); color: var(--accent); }
 .type-lab     { background: rgba(14, 165, 233, 0.1); color: var(--blue); }
 .type-project { background: rgba(245, 158, 11, 0.1); color: var(--yellow); }
 
@@ -587,6 +663,7 @@ img { display: block; max-width: 100%; }
   border-color: var(--accent);
 }
 
+/* Opaque High-Contrast Task Cards for Text Readability */
 .assignment-card {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -657,7 +734,7 @@ img { display: block; max-width: 100%; }
 
 .due-badge.overdue { background: rgba(239,68,68,0.12); color: var(--red); }
 .due-badge.today   { background: rgba(245,158,11,0.12); color: var(--yellow); }
-.due-badge.soon    { background: rgba(79,70,229,0.12); color: var(--accent); }
+.due-badge.soon    { background: rgba(99,102,241,0.12); color: var(--accent); }
 
 .marks-badge {
   font-size: 0.75rem;
@@ -665,7 +742,6 @@ img { display: block; max-width: 100%; }
   margin-left: auto;
 }
 
-/* Edit & Delete buttons on custom tasks */
 .task-edit-btn,
 .task-delete-btn {
   display: inline-flex;
@@ -702,7 +778,7 @@ img { display: block; max-width: 100%; }
   padding: 10px 14px 10px 38px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
-  background: var(--surface);
+  background: var(--surface-2);
   color: var(--text-primary);
   font-size: 0.9rem;
   font-family: var(--font);
@@ -737,7 +813,7 @@ img { display: block; max-width: 100%; }
   font-size: 0.7rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; flex-shrink: 0;
 }
 .cat-Exam     { background: rgba(239,68,68,0.12);  color: var(--red);    }
-.cat-Event    { background: rgba(79,70,229,0.12); color: var(--accent); }
+.cat-Event    { background: rgba(99,102,241,0.12); color: var(--accent); }
 .cat-Library  { background: rgba(16,185,129,0.12); color: var(--green);  }
 .cat-Academic { background: rgba(245,158,11,0.12); color: var(--yellow); }
 .cat-Sports   { background: rgba(236,72,153,0.12); color: var(--pink);   }
@@ -747,11 +823,11 @@ img { display: block; max-width: 100%; }
 .notice-date    { font-size: 0.78rem; color: var(--text-muted); margin-top: 6px; }
 .notice-preview { font-size: 0.83rem; color: var(--text-secondary); margin-top: 8px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
-/* Notice Detail Modal */
+/* Notice & Form Modals — Frosted Glass Panel */
 .modal-backdrop {
   position: fixed; inset: 0;
-  background: rgba(15, 23, 42, 0.45);
-  backdrop-filter: blur(8px) saturate(180%);
+  background: rgba(8, 13, 26, 0.55);
+  backdrop-filter: blur(8px) saturate(160%);
   z-index: 200;
   display: grid;
   place-items: center;
@@ -762,7 +838,9 @@ img { display: block; max-width: 100%; }
 @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
 
 .modal {
-  background: var(--surface);
+  background: var(--modal-bg);
+  backdrop-filter: var(--modal-blur);
+  -webkit-backdrop-filter: var(--modal-blur);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   max-width: 540px;
@@ -876,35 +954,11 @@ img { display: block; max-width: 100%; }
 .summary-text-main { font-weight: 600; font-size: 0.88rem; }
 .summary-text-sub  { font-size: 0.78rem; color: var(--text-muted); }
 
-/* ── Empty States ───────────────────────────────────────────── */
-.empty-state {
-  text-align: center;
-  padding: 40px 20px;
-  color: var(--text-muted);
-  font-size: 0.85rem;
-  line-height: 1.6;
-}
-
-.empty-state-icon {
-  font-size: 2rem;
-  margin-bottom: 10px;
-  display: block;
-  opacity: 0.7;
-}
-
-.empty-state strong {
-  display: block;
-  font-weight: 600;
-  font-size: 0.9rem;
-  color: var(--text-secondary);
-  margin-bottom: 4px;
-}
-
 /* ── Progress Bar ───────────────────────────────────────────── */
 .progress-bar-wrap { background: var(--surface-2); border-radius: 999px; height: 6px; overflow: hidden; }
 .progress-bar-fill { background: var(--accent); height: 100%; border-radius: 999px; transition: width 0.3s ease; }
 
-/* ── FAB — Floating Add Task Button ─────────────────────────── */
+/* ── FAB — Floating Action Button ────────────────────────────── */
 .fab {
   position: fixed;
   right: 16px;
@@ -914,26 +968,28 @@ img { display: block; max-width: 100%; }
   align-items: center;
   gap: 7px;
   padding: 11px 18px;
-  background: var(--accent);
+  background: var(--fab-bg);
+  backdrop-filter: var(--fab-blur);
+  -webkit-backdrop-filter: var(--fab-blur);
   color: white;
   border-radius: 999px;
   font-size: 0.85rem;
   font-weight: 600;
   font-family: var(--font);
-  box-shadow: 0 4px 16px rgba(79, 70, 229, 0.35);
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.35);
   transition: box-shadow var(--ease), transform var(--ease);
   cursor: pointer;
-  border: none;
+  border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 .fab:hover {
-  box-shadow: 0 6px 20px rgba(79, 70, 229, 0.45);
+  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.45);
   transform: translateY(-1px);
 }
 
 .fab:active { transform: scale(0.97); }
 
-/* ── Form Styles (Add Task modal) ────────────────────────────── */
+/* ── Forms (High Contrast Opaque Inputs for Readability) ───── */
 .add-task-modal { max-width: 460px; }
 
 .modal-header {
@@ -968,6 +1024,7 @@ img { display: block; max-width: 100%; }
 
 .form-label .req { color: var(--red); }
 
+/* Opaque Form Controls to Avoid White-on-Glass Readability Issues */
 .form-input,
 .form-select {
   width: 100%;
@@ -999,6 +1056,8 @@ img { display: block; max-width: 100%; }
   resize: vertical;
   min-height: 72px;
   line-height: 1.5;
+  background: var(--surface-2);
+  color: var(--text-primary);
 }
 
 .form-select {
@@ -1031,7 +1090,6 @@ img { display: block; max-width: 100%; }
 }
 
 .priority-pill input[type="radio"] { display: none; }
-
 .priority-pill:has(input:checked) { border-color: currentColor; background: transparent; }
 
 .priority-pill.priority-high  { color: var(--red); }
@@ -1062,7 +1120,7 @@ img { display: block; max-width: 100%; }
   transition: background var(--ease), transform var(--ease);
   border: none;
   cursor: pointer;
-  box-shadow: 0 2px 6px rgba(79, 70, 229, 0.25);
+  box-shadow: 0 2px 6px rgba(99, 102, 241, 0.25);
 }
 
 .btn-primary:hover { background: var(--accent-hover); }
@@ -1082,17 +1140,6 @@ img { display: block; max-width: 100%; }
 }
 
 .btn-secondary:hover { background: var(--border); }
-
-/* Session task indicator */
-.session-badge {
-  font-size: 0.68rem;
-  font-weight: 600;
-  padding: 2px 7px;
-  border-radius: 999px;
-  background: rgba(79, 70, 229, 0.12);
-  color: var(--accent);
-  border: 1px solid var(--accent-dim);
-}
 
 /* ── Responsive — Desktop ≥768px ──────────────────────────── */
 @media (min-width: 768px) {

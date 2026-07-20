@@ -100,23 +100,37 @@ const state = {
 
 // ── Theme ─────────────────────────────────────────────────────
 function initTheme() {
-  const saved      = localStorage.getItem(KEY_THEME);
+  const saved       = localStorage.getItem(KEY_THEME);
   const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  const theme      = saved || (prefersDark ? 'dark' : 'light');
+  const theme       = saved || (prefersDark ? 'dark' : 'light');
   document.documentElement.setAttribute('data-theme', theme);
   updateThemeIcon(theme);
 }
 
 function toggleTheme() {
-  const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  const current = document.documentElement.getAttribute('data-theme') || 'dark';
+  const themes  = ['dark', 'light', 'glass'];
+  const nextIdx = (themes.indexOf(current) + 1) % themes.length;
+  const next    = themes[nextIdx];
   document.documentElement.setAttribute('data-theme', next);
   localStorage.setItem(KEY_THEME, next);
   updateThemeIcon(next);
 }
 
+function setTheme(theme) {
+  if (!['dark', 'light', 'glass'].includes(theme)) return;
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem(KEY_THEME, theme);
+  updateThemeIcon(theme);
+  renderPage(state.currentPage);
+}
+
 function updateThemeIcon(theme) {
   const icon = document.getElementById('theme-icon');
-  if (icon) icon.innerHTML = theme === 'dark' ? moonSVG() : sunSVG();
+  if (!icon) return;
+  if (theme === 'dark')       icon.innerHTML = moonSVG();
+  else if (theme === 'light') icon.innerHTML = sunSVG();
+  else                        icon.innerHTML = icons.layers();
 }
 
 // ── Routing ───────────────────────────────────────────────────
@@ -238,6 +252,7 @@ const icons = {
   x:           () => svg('<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>'),
   trash:       () => svg('<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>'),
   edit:        () => svg('<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>'),
+  layers:      () => svg('<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>'),
   plus:        () => svg('<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>'),
   save:        () => svg('<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>'),
   link:        () => svg('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>'),
@@ -749,6 +764,24 @@ function renderSettings() {
       </div>
     </div>
 
+    <div class="section-heading">${icons.layers()} Visual Theme</div>
+    <div class="card" style="padding:20px;margin-bottom:20px">
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label">Active Theme</label>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="filter-chip ${document.documentElement.getAttribute('data-theme')==='dark'?'active':''}" onclick="setTheme('dark')">
+            🌙 Dark (Slate)
+          </button>
+          <button class="filter-chip ${document.documentElement.getAttribute('data-theme')==='light'?'active':''}" onclick="setTheme('light')">
+            ☀️ Light (Clean)
+          </button>
+          <button class="filter-chip ${document.documentElement.getAttribute('data-theme')==='glass'?'active':''}" onclick="setTheme('glass')">
+            ✨ Premium Glass
+          </button>
+        </div>
+      </div>
+    </div>
+
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:32px">
       <button class="btn-primary" onclick="saveSettings()" style="display:flex;align-items:center;gap:6px">
         ${icons.save()} Save Changes
@@ -1047,6 +1080,7 @@ window.saveSettings     = saveSettings;
 window.exportData       = exportData;
 window.importData       = importData;
 window.confirmClearTasks = confirmClearTasks;
+window.setTheme         = setTheme;
 
 window.toggleAssignment = (id) => {
   // Custom task
