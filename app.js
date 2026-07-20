@@ -120,12 +120,16 @@ function initFirebase() {
   }
 }
 
-function updateSyncUI() {
+function updateSyncUI(status = null) {
   const label = document.getElementById('sync-label');
   const icon  = document.getElementById('sync-icon');
   if (!label || !icon) return;
 
-  if (currentUser) {
+  if (status === 'denied') {
+    icon.textContent  = '🔒';
+    label.textContent = 'Access Denied';
+    label.style.color = 'var(--red)';
+  } else if (currentUser) {
     icon.textContent  = '⚡';
     label.textContent = 'Synced';
     label.style.color = 'var(--green)';
@@ -138,14 +142,16 @@ function updateSyncUI() {
 
 function loginWithGoogle() {
   if (!auth) {
-    alert("Firebase Auth is running in offline mode. Replace demo keys in app.js with your Firebase project keys.");
+    alert("Firebase Auth is running in offline/local mode. Replace demo keys in app.js with your project credentials.");
     return;
   }
   const provider = new firebase.auth.GoogleAuthProvider();
   auth.signInWithPopup(provider).then(() => {
     updateSyncUI();
   }).catch(err => {
-    alert("Login failed: " + err.message);
+    if (err.code !== 'auth/popup-closed-by-user') {
+      alert("Authentication error: " + err.message);
+    }
   });
 }
 
@@ -159,24 +165,50 @@ function logoutUser() {
   }
 }
 
+function sanitizeTask(t) {
+  if (!t || typeof t !== 'object') return null;
+  return {
+    id:          String(t.id || `c-${Date.now()}`),
+    subject:     String(t.subject || 'General'),
+    code:        String(t.code || 'OTH'),
+    title:       String(t.title || 'Untitled Task').slice(0, 150),
+    description: String(t.description || '—').slice(0, 500),
+    dueDate:     String(t.dueDate || todayStr()),
+    priority:    ['high', 'medium', 'low'].includes(t.priority) ? t.priority : 'medium',
+    status:      t.status === 'submitted' ? 'submitted' : 'pending',
+    marks:       typeof t.marks === 'number' ? Math.max(0, Math.min(100, t.marks)) : 0,
+    isCustom:    true,
+  };
+}
+
 function subscribeUserCloudData(uid) {
-  if (!db) return;
+  if (!db || !uid) return;
   if (cloudUnsubscribe) cloudUnsubscribe();
 
   const userRef = db.collection('users').doc(uid);
   cloudUnsubscribe = userRef.onSnapshot(doc => {
     if (doc.exists) {
-      const data = doc.data();
-      if (data.profile) safeSetStorage(KEY_PROFILE, data.profile);
+      const data = doc.data() || {};
+      if (data.profile && typeof data.profile === 'object') {
+        const cleanProfile = {
+          name:     String(data.profile.name || '').slice(0, 80),
+          college:  String(data.profile.college || '').slice(0, 100),
+          branch:   String(data.profile.branch || '').slice(0, 100),
+          year:     String(data.profile.year || '').slice(0, 50),
+          rollNo:   String(data.profile.rollNo || '').slice(0, 50),
+          examDate: String(data.profile.examDate || '').slice(0, 20),
+        };
+        safeSetStorage(KEY_PROFILE, cleanProfile);
+      }
       if (Array.isArray(data.customTasks)) {
-        state.customTasks = data.customTasks;
+        state.customTasks = data.customTasks.map(sanitizeTask).filter(Boolean);
         safeSetStorage(KEY_CUSTOM_TASKS, state.customTasks);
       }
-      if (data.assignmentStatuses) {
+      if (data.assignmentStatuses && typeof data.assignmentStatuses === 'object') {
         safeSetStorage(KEY_ASSIGNMENTS, data.assignmentStatuses);
         state.assignments = loadAssignments();
       }
-      if (data.theme) {
+      if (data.theme && ['dark', 'light', 'glass'].includes(data.theme)) {
         localStorage.setItem(KEY_THEME, data.theme);
         initTheme();
       }
@@ -189,20 +221,29 @@ function subscribeUserCloudData(uid) {
       pushLocalDataToCloud(uid);
     }
   }, err => {
-    console.warn("Cloud snapshot error:", err);
+    if (err.code === 'permission-denied') {
+      updateSyncUI('denied');
+      console.warn("Firestore access denied by Security Rules.");
+    } else {
+      console.warn("Cloud snapshot error:", err);
+    }
   });
 }
 
 function pushLocalDataToCloud(uid) {
   if (!db || !uid) return;
+  const sanitizedTasks = state.customTasks.map(sanitizeTask).filter(Boolean);
   const payload = {
     profile:            loadProfile(),
-    customTasks:        state.customTasks,
+    customTasks:        sanitizedTasks,
     assignmentStatuses: safeGetStorage(KEY_ASSIGNMENTS, {}),
     theme:              localStorage.getItem(KEY_THEME) || 'glass',
     updatedAt:          firebase.firestore.FieldValue.serverTimestamp()
   };
   db.collection('users').doc(uid).set(payload, { merge: true }).catch(err => {
+    if (err.code === 'permission-denied') {
+      updateSyncUI('denied');
+    }
     console.warn("Cloud push error:", err);
   });
 }
