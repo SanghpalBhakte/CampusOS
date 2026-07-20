@@ -769,14 +769,14 @@ function renderSettings() {
       <div class="form-group" style="margin-bottom:0">
         <label class="form-label">Active Theme</label>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
-          <button class="filter-chip ${document.documentElement.getAttribute('data-theme')==='dark'?'active':''}" onclick="setTheme('dark')">
-            🌙 Dark (Slate)
-          </button>
           <button class="filter-chip ${document.documentElement.getAttribute('data-theme')==='light'?'active':''}" onclick="setTheme('light')">
             ☀️ Light (Clean)
           </button>
+          <button class="filter-chip ${document.documentElement.getAttribute('data-theme')==='dark'?'active':''}" onclick="setTheme('dark')">
+            🌙 Dark (Slate)
+          </button>
           <button class="filter-chip ${document.documentElement.getAttribute('data-theme')==='glass'?'active':''}" onclick="setTheme('glass')">
-            ✨ Premium Glass
+            ✨ Light Glass (Frosted)
           </button>
         </div>
       </div>

@@ -94,53 +94,55 @@
   --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.08), 0 12px 24px -4px rgba(15, 23, 42, 0.06);
 }
 
-/* ── Premium Glass Theme (Frosted Ambient Dark) ───────────── */
+/* ── Premium Light Glass Theme (Frosted Bright Ambient) ─────── */
 [data-theme="glass"] {
-  --bg:            #070b14;
-  --surface:       #111827;       /* Opaque surface for dense content readability */
-  --surface-2:     #1f2937;       /* High-contrast form inputs */
-  --border:        rgba(255, 255, 255, 0.1);
-  --border-light:  rgba(255, 255, 255, 0.05);
+  --bg:            #edf2f9;
+  --surface:       #ffffff;       /* Solid crisp white for task cards, notice cards, subject cards */
+  --surface-2:     #f8fafc;       /* Solid high-contrast input fields */
+  --border:        rgba(203, 213, 225, 0.7);
+  --border-light:  rgba(241, 245, 249, 0.8);
 
-  --text-primary:  #f9fafb;
-  --text-secondary:#d1d5db;
-  --text-muted:    #6b7280;
+  --text-primary:  #0f172a;
+  --text-secondary:#334155;
+  --text-muted:    #64748b;
 
-  --accent:        #6366f1;
-  --accent-light:  #818cf8;
-  --accent-dim:    rgba(99, 102, 241, 0.18);
+  --accent:        #4f46e5;
+  --accent-light:  #6366f1;
+  --accent-dim:    rgba(79, 70, 229, 0.1);
+  --accent-hover:  #4338ca;
 
-  --banner-bg: linear-gradient(135deg, rgba(30, 27, 75, 0.85) 0%, rgba(15, 23, 42, 0.85) 100%);
+  --banner-bg: linear-gradient(135deg, #4338ca 0%, #3730a3 60%, #312e81 100%);
   --banner-text: #ffffff;
 
-  /* Frosted Glass Layers for structural navigation & containers */
-  --topbar-bg:      rgba(15, 23, 42, 0.75);
-  --topbar-blur:    blur(12px) saturate(160%);
+  /* Frosted Glass Layers for structural chrome & containers */
+  --topbar-bg:      rgba(255, 255, 255, 0.75);
+  --topbar-blur:    blur(14px) saturate(180%);
 
-  --sidebar-bg:     rgba(15, 23, 42, 0.65);
-  --sidebar-blur:   blur(12px);
+  --sidebar-bg:     rgba(255, 255, 255, 0.65);
+  --sidebar-blur:   blur(14px);
 
-  --bottomnav-bg:   rgba(15, 23, 42, 0.8);
+  --bottomnav-bg:   rgba(255, 255, 255, 0.8);
   --bottomnav-blur:  blur(14px);
 
-  --statcard-bg:    rgba(26, 37, 64, 0.55);
+  --statcard-bg:    rgba(255, 255, 255, 0.65);
   --statcard-blur:  blur(10px);
 
-  --modal-bg:       rgba(17, 24, 39, 0.92);
-  --modal-blur:     blur(16px);
+  --modal-bg:       rgba(255, 255, 255, 0.88);
+  --modal-blur:     blur(18px);
 
-  --fab-bg:         rgba(99, 102, 241, 0.88);
+  --fab-bg:         rgba(79, 70, 229, 0.9);
   --fab-blur:       blur(8px);
 
-  --shadow:    0 4px 20px rgba(0, 0, 0, 0.35);
-  --shadow-md: 0 12px 32px rgba(0, 0, 0, 0.5);
+  --shadow:    0 4px 16px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 12px 32px rgba(15, 23, 42, 0.1);
 }
 
-/* Ambient Background Glow for Glass Mode */
+/* Bright Pale Ambient Background Gradients */
 [data-theme="glass"] body {
   background-image: 
-    radial-gradient(circle at 15% 15%, rgba(99, 102, 241, 0.1) 0%, transparent 40%),
-    radial-gradient(circle at 85% 75%, rgba(14, 165, 233, 0.08) 0%, transparent 40%);
+    radial-gradient(circle at 10% 10%, rgba(224, 231, 255, 0.75) 0%, transparent 45%),
+    radial-gradient(circle at 90% 85%, rgba(207, 250, 254, 0.6) 0%, transparent 40%),
+    radial-gradient(circle at 50% 50%, rgba(243, 232, 255, 0.3) 0%, transparent 50%);
   background-attachment: fixed;
 }
 
