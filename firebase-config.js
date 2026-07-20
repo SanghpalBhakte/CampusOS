@@ -45,11 +45,11 @@
     // Fallback template declaration (overridden by localStorage or user setup modal)
     window.CAMPUS_OS_FIREBASE_CONFIG = {
       apiKey:            "YOUR_FIREBASE_API_KEY",
-      authDomain:        "campusos-app.firebaseapp.com",
-      projectId:         "campusos-app",
-      storageBucket:     "campusos-app.appspot.com",
+      authDomain:        "campusos-83365.firebaseapp.com",
+      projectId:         "campusos-83365",
+      storageBucket:     "campusos-83365.appspot.com",
       messagingSenderId: "1234567890",
-      appId:             "1:1234567890:web:campusos"
+      appId:             "1:1234567890:web:campusos-83365"
     };
   }
 })();
