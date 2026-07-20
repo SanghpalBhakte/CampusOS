@@ -1,31 +1,32 @@
-const CACHE_NAME = 'campus-os-v1';
-const ASSETS = [
-  './',
-  './index.html',
-  './style.css',
-  './app.js',
-  './data.js',
-  './manifest.json'
-];
+const CACHE_NAME = 'campus-os-v3';
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
-  );
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys().then((keys) => Promise.all(
-      keys.map((k) => k !== CACHE_NAME && caches.delete(k))
+      keys.map((k) => caches.delete(k))
     ))
   );
   self.clients.claim();
 });
 
 self.addEventListener('fetch', (e) => {
+  // Only intercept GET requests
+  if (e.request.method !== 'GET') return;
+
+  // Network-first strategy with cache fallback
   e.respondWith(
-    caches.match(e.request).then((res) => res || fetch(e.request))
+    fetch(e.request)
+      .then((response) => {
+        if (response && response.status === 200 && response.type === 'basic') {
+          const responseClone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(e.request, responseClone));
+        }
+        return response;
+      })
+      .catch(() => caches.match(e.request))
   );
 });
