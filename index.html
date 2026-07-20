@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Campus OS — Your personal college dashboard. Timetable, assignments, notices and resources in one place." />
+  <title>Campus OS — Your College Dashboard</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- PWA & Mobile -->
+  <meta name="theme-color" content="#6366f1" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="manifest" href="manifest.json" />
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%236366f1'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='central' text-anchor='middle' font-family='Inter,system-ui,sans-serif' font-weight='700' font-size='13' fill='white'%3EOS%3C/text%3E%3C/svg%3E">
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div class="app-shell">
+
+  <!-- ── Topbar ──────────────────────────────────────── -->
+  <header class="topbar">
+    <div class="topbar-brand">
+      <div class="logo-icon">OS</div>
+      <span>Campus OS</span>
+    </div>
+
+    <div class="topbar-search">
+      <span class="search-icon">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+      </span>
+      <input type="text" id="global-search" placeholder="Search notices… (press Enter)" autocomplete="off" />
+    </div>
+
+    <div class="topbar-actions">
+      <button class="btn-icon" id="theme-toggle" title="Toggle theme" aria-label="Toggle light/dark mode">
+        <span id="theme-icon">
+          <!-- filled by JS -->
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/>
+            <line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/>
+            <line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+          </svg>
+        </span>
+      </button>
+      <div class="avatar" id="topbar-avatar" title="Your Name">?</div>
+    </div>
+  </header>
+
+  <!-- ── Main Wrapper ────────────────────────────────── -->
+  <div class="main-wrapper">
+
+    <!-- Sidebar (desktop) -->
+    <nav class="sidebar" role="navigation" aria-label="Main navigation">
+      <span class="sidebar-section-label">Main</span>
+
+      <div class="nav-item active" data-nav="dashboard" onclick="navigateTo('dashboard')" id="sidebar-dashboard">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+          <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+        </svg>
+        Dashboard
+      </div>
+
+      <div class="nav-item" data-nav="timetable" onclick="navigateTo('timetable')" id="sidebar-timetable">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/>
+          <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+        </svg>
+        Timetable
+      </div>
+
+      <div class="nav-item" data-nav="assignments" onclick="navigateTo('assignments')" id="sidebar-assignments">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/>
+        </svg>
+        Assignments
+        <span class="nav-badge" id="assign-badge-sidebar">0</span>
+      </div>
+
+      <div class="nav-item" data-nav="notices" onclick="navigateTo('notices')" id="sidebar-notices">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+        </svg>
+        Notices
+      </div>
+
+      <span class="sidebar-section-label">Resources</span>
+
+      <div class="nav-item" data-nav="links" onclick="navigateTo('links')" id="sidebar-links">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+        </svg>
+        Quick Links
+      </div>
+
+      <div class="nav-item" data-nav="summary" onclick="navigateTo('summary')" id="sidebar-summary">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        Daily Summary
+      </div>
+
+      <span class="sidebar-section-label">Account</span>
+
+      <div class="nav-item" data-nav="settings" onclick="navigateTo('settings')" id="sidebar-settings">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+        Settings
+      </div>
+    </nav>
+
+    <!-- Content Area -->
+    <main class="content-area" role="main">
+
+      <!-- Dashboard -->
+      <section id="page-dashboard" class="section-page active" data-page="dashboard" aria-label="Dashboard"></section>
+
+      <!-- Timetable -->
+      <section id="page-timetable" class="section-page" data-page="timetable" aria-label="Timetable"></section>
+
+      <!-- Assignments -->
+      <section id="page-assignments" class="section-page" data-page="assignments" aria-label="Assignments"></section>
+
+      <!-- Notices -->
+      <section id="page-notices" class="section-page" data-page="notices" aria-label="Notices"></section>
+
+      <!-- Quick Links -->
+      <section id="page-links" class="section-page" data-page="links" aria-label="Quick Links"></section>
+
+      <!-- Daily Summary -->
+      <section id="page-summary" class="section-page" data-page="summary" aria-label="Daily Summary"></section>
+
+      <!-- Settings -->
+      <section id="page-settings" class="section-page" data-page="settings" aria-label="Settings"></section>
+
+    </main>
+  </div><!-- /main-wrapper -->
+
+</div><!-- /app-shell -->
+
+<!-- ── Bottom Navigation (mobile) ───────────────────────── -->
+<nav class="bottom-nav" role="navigation" aria-label="Mobile navigation">
+
+  <button class="bottom-nav-item active" data-nav="dashboard" onclick="navigateTo('dashboard')">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+      <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+    </svg>
+    Home
+  </button>
+
+  <button class="bottom-nav-item" data-nav="timetable" onclick="navigateTo('timetable')">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/>
+      <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+    </svg>
+    Classes
+  </button>
+
+  <button class="bottom-nav-item" data-nav="assignments" onclick="navigateTo('assignments')">
+    <div class="bnav-dot"></div>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+      <polyline points="14 2 14 8 20 8"/>
+      <line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/>
+    </svg>
+    Tasks
+  </button>
+
+  <button class="bottom-nav-item" data-nav="notices" onclick="navigateTo('notices')">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+      <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+    </svg>
+    Notices
+  </button>
+
+  <button class="bottom-nav-item" data-nav="settings" onclick="navigateTo('settings')">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+    </svg>
+    Settings
+  </button>
+
+</nav>
+
+<!-- Floating Action Button — Add Task -->
+<button class="fab" onclick="showAddTaskModal()" aria-label="Add new task">
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+  </svg>
+  Add Task
+</button>
+
+<!-- App Script (ES module) -->
+<script type="module" src="app.js"></script>
+
+</body>
+</html>
