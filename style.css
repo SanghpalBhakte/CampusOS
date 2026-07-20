@@ -654,7 +654,8 @@ img { display: block; max-width: 100%; }
   margin-left: auto;
 }
 
-/* Delete button on custom tasks */
+/* Edit & Delete buttons on custom tasks */
+.task-edit-btn,
 .task-delete-btn {
   display: inline-flex;
   align-items: center;
@@ -667,6 +668,11 @@ img { display: block; max-width: 100%; }
   border-radius: 4px;
   transition: color var(--ease), background var(--ease);
   flex-shrink: 0;
+}
+
+.task-edit-btn:hover {
+  color: var(--accent);
+  background: var(--accent-dim);
 }
 
 .task-delete-btn:hover {

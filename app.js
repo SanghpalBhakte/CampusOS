@@ -237,6 +237,7 @@ const icons = {
   graduation:  () => svg('<path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/>'),
   x:           () => svg('<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>'),
   trash:       () => svg('<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>'),
+  edit:        () => svg('<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>'),
   plus:        () => svg('<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>'),
   save:        () => svg('<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>'),
   link:        () => svg('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>'),
@@ -501,7 +502,10 @@ function renderAssignments() {
               ${formatDate(a.dueDate)} · ${label}
             </span>
             <span class="marks-badge">${a.marks > 0 ? a.marks + ' marks' : ''}</span>
-            ${isCustom ? `<button class="task-delete-btn" onclick="deleteCustomTask('${a.id}')" title="Delete task" aria-label="Delete task">${icons.trash()}</button>` : ''}
+            ${isCustom ? `
+              <button class="task-edit-btn" onclick="showAddTaskModal('${a.id}')" title="Edit task" aria-label="Edit task">${icons.edit()}</button>
+              <button class="task-delete-btn" onclick="deleteCustomTask('${a.id}')" title="Delete task" aria-label="Delete task">${icons.trash()}</button>
+            ` : ''}
           </div>
         </div>
       </div>`;
@@ -857,15 +861,22 @@ function confirmClearTasks() {
   renderSettings(); // re-render to update counts
 }
 
-// ── Add Task Modal ────────────────────────────────────────────
-function showAddTaskModal() {
+// ── Add / Edit Task Modal ──────────────────────────────────────
+function showAddTaskModal(editTaskId = null) {
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   const defaultDate = tomorrow.toISOString().split('T')[0];
 
-  const subjectOptions = QUICK_LINKS.map(s =>
-    `<option value="${s.subject}|||${s.code}">${s.subject} (${s.code})</option>`
-  ).join('');
+  const editTask = editTaskId ? state.customTasks.find(t => t.id === editTaskId) : null;
+
+  const subjectOptions = QUICK_LINKS.map(s => {
+    const val = `${s.subject}|||${s.code}`;
+    const selected = editTask && editTask.code === s.code ? 'selected' : '';
+    return `<option value="${val}" ${selected}>${s.subject} (${s.code})</option>`;
+  }).join('');
+
+  const isOther = editTask && !QUICK_LINKS.some(s => s.code === editTask.code);
+  const otherSelected = isOther ? 'selected' : '';
 
   const backdrop = document.createElement('div');
   backdrop.className = 'modal-backdrop';
@@ -873,7 +884,7 @@ function showAddTaskModal() {
   backdrop.innerHTML = `
     <div class="modal add-task-modal" onclick="event.stopPropagation()">
       <div class="modal-header">
-        <h2 class="modal-title">Add New Task</h2>
+        <h2 class="modal-title">${editTask ? 'Edit Task' : 'Add New Task'}</h2>
         <button class="modal-close" onclick="document.getElementById('add-task-backdrop').remove()">${icons.x()}</button>
       </div>
 
@@ -882,45 +893,53 @@ function showAddTaskModal() {
         <select class="form-select" id="task-subject">
           <option value="">Select subject…</option>
           ${subjectOptions}
-          <option value="Other|||OTH">Other</option>
+          <option value="Other|||OTH" ${otherSelected}>Other</option>
         </select>
       </div>
 
       <div class="form-group">
         <label class="form-label">Title <span class="req">*</span></label>
         <input type="text" class="form-input" id="task-title"
-          placeholder="e.g. Assignment 3 — Decision Trees" maxlength="120">
+          placeholder="e.g. Assignment 3 — Decision Trees" maxlength="120"
+          value="${editTask ? editTask.title.replace(/"/g, '&quot;') : ''}">
       </div>
 
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">Due Date <span class="req">*</span></label>
-          <input type="date" class="form-input" id="task-due" value="${defaultDate}">
+          <input type="date" class="form-input" id="task-due" value="${editTask ? editTask.dueDate : defaultDate}">
         </div>
         <div class="form-group">
           <label class="form-label">Marks</label>
-          <input type="number" class="form-input" id="task-marks" placeholder="10" min="1" max="100">
+          <input type="number" class="form-input" id="task-marks" placeholder="10" min="0" max="100"
+            value="${editTask && editTask.marks ? editTask.marks : ''}">
         </div>
       </div>
 
       <div class="form-group">
         <label class="form-label">Priority</label>
         <div class="priority-pills">
-          <label class="priority-pill priority-high"><input type="radio" name="task-priority" value="high"> High</label>
-          <label class="priority-pill priority-medium"><input type="radio" name="task-priority" value="medium" checked> Medium</label>
-          <label class="priority-pill priority-low"><input type="radio" name="task-priority" value="low"> Low</label>
+          <label class="priority-pill priority-high">
+            <input type="radio" name="task-priority" value="high" ${editTask && editTask.priority === 'high' ? 'checked' : ''}> High
+          </label>
+          <label class="priority-pill priority-medium">
+            <input type="radio" name="task-priority" value="medium" ${!editTask || editTask.priority === 'medium' ? 'checked' : ''}> Medium
+          </label>
+          <label class="priority-pill priority-low">
+            <input type="radio" name="task-priority" value="low" ${editTask && editTask.priority === 'low' ? 'checked' : ''}> Low
+          </label>
         </div>
       </div>
 
       <div class="form-group">
         <label class="form-label">Description</label>
         <textarea class="form-input form-textarea" id="task-desc"
-          placeholder="Submission instructions, marks breakdown, etc."></textarea>
+          placeholder="Submission instructions, marks breakdown, etc.">${editTask ? editTask.description : ''}</textarea>
       </div>
 
       <div class="form-actions">
         <button class="btn-secondary" onclick="document.getElementById('add-task-backdrop').remove()">Cancel</button>
-        <button class="btn-primary" onclick="submitAddTask()">Add Task</button>
+        <button class="btn-primary" onclick="submitAddTask(${editTask ? `'${editTask.id}'` : ''})">${editTask ? 'Save Changes' : 'Add Task'}</button>
       </div>
     </div>
   `;
@@ -936,7 +955,7 @@ function showAddTaskModal() {
   backdrop.addEventListener('remove', () => document.removeEventListener('keydown', escHandler));
 }
 
-function submitAddTask() {
+function submitAddTask(editTaskId = null) {
   const subjectEl  = document.getElementById('task-subject');
   const titleEl    = document.getElementById('task-title');
   const dueEl      = document.getElementById('task-due');
@@ -954,26 +973,36 @@ function submitAddTask() {
 
   const [subject, code] = subjectEl.value.split('|||');
 
-  const task = {
-    id:          `c-${Date.now()}`,
-    subject,
-    code,
-    title:       titleEl.value.trim(),
-    description: descEl.value.trim() || '—',
-    dueDate:     dueEl.value,
-    priority:    priorityEl?.value || 'medium',
-    status:      'pending',
-    marks:       parseInt(marksEl.value) || 0,
-    isCustom:    true,              // custom = fully owned by user
-  };
+  if (editTaskId) {
+    const task = state.customTasks.find(t => t.id === editTaskId);
+    if (task) {
+      task.subject     = subject;
+      task.code        = code;
+      task.title       = titleEl.value.trim();
+      task.description = descEl.value.trim() || '—';
+      task.dueDate     = dueEl.value;
+      task.priority    = priorityEl?.value || 'medium';
+      task.marks       = parseInt(marksEl.value) || 0;
+    }
+  } else {
+    const task = {
+      id:          `c-${Date.now()}`,
+      subject,
+      code,
+      title:       titleEl.value.trim(),
+      description: descEl.value.trim() || '—',
+      dueDate:     dueEl.value,
+      priority:    priorityEl?.value || 'medium',
+      status:      'pending',
+      marks:       parseInt(marksEl.value) || 0,
+      isCustom:    true,
+    };
+    state.customTasks.push(task);
+  }
 
-  state.customTasks.push(task);
-  saveCustomTasks();               // persist to localStorage
-
+  saveCustomTasks();
   document.getElementById('add-task-backdrop')?.remove();
-  state.assignFilter        = 'all';
-  state.assignSubjectFilter = 'all';
-  navigate('assignments');
+  renderPage(state.currentPage);
   updateNavBadges();
 }
 
