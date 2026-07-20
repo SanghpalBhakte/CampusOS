@@ -43,7 +43,11 @@
       <input type="text" id="global-search" placeholder="Search notices… (press Enter)" autocomplete="off" />
     </div>
 
-    <div class="topbar-actions">
+  <div class="topbar-actions">
+      <button class="btn-icon" id="sync-status-btn" onclick="navigateTo('settings')" title="Cloud Sync Status" aria-label="Cloud sync status" style="font-size:0.75rem;width:auto;padding:0 8px;gap:4px">
+        <span id="sync-icon">☁️</span>
+        <span id="sync-label" class="text-xs text-muted">Local</span>
+      </button>
       <button class="btn-icon" id="theme-toggle" title="Toggle theme" aria-label="Toggle light/dark mode">
         <span id="theme-icon">
           <!-- filled by JS -->
@@ -56,7 +60,7 @@
           </svg>
         </span>
       </button>
-      <div class="avatar" id="topbar-avatar" title="Your Name">?</div>
+      <div class="avatar" id="topbar-avatar" onclick="navigateTo('settings')" title="Your Profile" style="cursor:pointer">?</div>
     </div>
   </header>
 
@@ -213,6 +217,11 @@
   </svg>
   Add Task
 </button>
+
+<!-- Firebase Web SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
 <!-- App Script (ES module) -->
 <script type="module" src="app.js"></script>

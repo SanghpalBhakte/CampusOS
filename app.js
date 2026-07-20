@@ -76,6 +76,141 @@ function saveAssignments() {
   const map = {};
   state.assignments.forEach(a => { map[a.id] = a.status; });
   safeSetStorage(KEY_ASSIGNMENTS, map);
+  syncToCloud();
+}
+
+// ── Firebase Configuration & Cloud Sync ───────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyDemoCampusOSKeyForLocalStorageSync",
+  authDomain: "campus-os-app.firebaseapp.com",
+  projectId: "campus-os-app",
+  storageBucket: "campus-os-app.appspot.com",
+  messagingSenderId: "1234567890",
+  appId: "1:1234567890:web:demo"
+};
+
+let db = null;
+let auth = null;
+let currentUser = null;
+let cloudUnsubscribe = null;
+
+function initFirebase() {
+  if (typeof firebase !== 'undefined' && firebase.apps) {
+    try {
+      if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+      }
+      auth = firebase.auth();
+      db   = firebase.firestore();
+
+      db.enablePersistence({ synchronizeTabs: true }).catch(() => {});
+
+      auth.onAuthStateChanged(user => {
+        currentUser = user;
+        updateSyncUI();
+        if (user) {
+          subscribeUserCloudData(user.uid);
+        } else {
+          if (cloudUnsubscribe) { cloudUnsubscribe(); cloudUnsubscribe = null; }
+        }
+      });
+    } catch (e) {
+      console.warn("Firebase initialized in local-only mode:", e);
+    }
+  }
+}
+
+function updateSyncUI() {
+  const label = document.getElementById('sync-label');
+  const icon  = document.getElementById('sync-icon');
+  if (!label || !icon) return;
+
+  if (currentUser) {
+    icon.textContent  = '⚡';
+    label.textContent = 'Synced';
+    label.style.color = 'var(--green)';
+  } else {
+    icon.textContent  = '☁️';
+    label.textContent = 'Local';
+    label.style.color = 'var(--text-muted)';
+  }
+}
+
+function loginWithGoogle() {
+  if (!auth) {
+    alert("Firebase Auth is running in offline mode. Replace demo keys in app.js with your Firebase project keys.");
+    return;
+  }
+  const provider = new firebase.auth.GoogleAuthProvider();
+  auth.signInWithPopup(provider).then(() => {
+    updateSyncUI();
+  }).catch(err => {
+    alert("Login failed: " + err.message);
+  });
+}
+
+function logoutUser() {
+  if (auth) {
+    auth.signOut().then(() => {
+      currentUser = null;
+      updateSyncUI();
+      renderPage(state.currentPage);
+    });
+  }
+}
+
+function subscribeUserCloudData(uid) {
+  if (!db) return;
+  if (cloudUnsubscribe) cloudUnsubscribe();
+
+  const userRef = db.collection('users').doc(uid);
+  cloudUnsubscribe = userRef.onSnapshot(doc => {
+    if (doc.exists) {
+      const data = doc.data();
+      if (data.profile) safeSetStorage(KEY_PROFILE, data.profile);
+      if (Array.isArray(data.customTasks)) {
+        state.customTasks = data.customTasks;
+        safeSetStorage(KEY_CUSTOM_TASKS, state.customTasks);
+      }
+      if (data.assignmentStatuses) {
+        safeSetStorage(KEY_ASSIGNMENTS, data.assignmentStatuses);
+        state.assignments = loadAssignments();
+      }
+      if (data.theme) {
+        localStorage.setItem(KEY_THEME, data.theme);
+        initTheme();
+      }
+      updateTopbarProfile();
+      updateNavBadges();
+      if (['settings', 'assignments', 'dashboard'].includes(state.currentPage)) {
+        renderPage(state.currentPage);
+      }
+    } else {
+      pushLocalDataToCloud(uid);
+    }
+  }, err => {
+    console.warn("Cloud snapshot error:", err);
+  });
+}
+
+function pushLocalDataToCloud(uid) {
+  if (!db || !uid) return;
+  const payload = {
+    profile:            loadProfile(),
+    customTasks:        state.customTasks,
+    assignmentStatuses: safeGetStorage(KEY_ASSIGNMENTS, {}),
+    theme:              localStorage.getItem(KEY_THEME) || 'glass',
+    updatedAt:          firebase.firestore.FieldValue.serverTimestamp()
+  };
+  db.collection('users').doc(uid).set(payload, { merge: true }).catch(err => {
+    console.warn("Cloud push error:", err);
+  });
+}
+
+function syncToCloud() {
+  if (currentUser) {
+    pushLocalDataToCloud(currentUser.uid);
+  }
 }
 
 // ── Custom Tasks (fully persisted) ────────────────────────────
@@ -85,6 +220,7 @@ function loadCustomTasks() {
 
 function saveCustomTasks() {
   safeSetStorage(KEY_CUSTOM_TASKS, state.customTasks);
+  syncToCloud();
 }
 
 // ── State ─────────────────────────────────────────────────────
@@ -725,6 +861,24 @@ function renderSettings() {
       </div>
     </div>
 
+    <div class="section-heading">${icons.user()} Account & Cloud Sync</div>
+    <div class="card" style="padding:20px;margin-bottom:16px">
+      <div style="display:flex;align-items:center;justify-space-between;gap:12px;flex-wrap:wrap">
+        <div>
+          <div style="font-weight:600;font-size:0.95rem">${currentUser ? (currentUser.displayName || currentUser.email || 'Cloud User') : 'Local Storage Mode'}</div>
+          <div style="font-size:0.8rem;color:var(--text-muted);margin-top:2px">
+            ${currentUser ? `Cross-device sync active · UID: ${currentUser.uid.slice(0, 8)}…` : 'Sign in with Google to sync tasks & profile across phone and laptop.'}
+          </div>
+        </div>
+        <div>
+          ${currentUser ? 
+            `<button class="btn-secondary" onclick="logoutUser()" style="color:var(--red);border-color:rgba(239,68,68,0.35)">Sign Out</button>` : 
+            `<button class="btn-primary" onclick="loginWithGoogle()" style="display:flex;align-items:center;gap:6px">🌐 Sign In with Google</button>`
+          }
+        </div>
+      </div>
+    </div>
+
     <div class="section-heading">${icons.user()} Profile</div>
     <div class="card" style="padding:20px;margin-bottom:16px">
       <div class="form-row">
@@ -833,6 +987,7 @@ function saveSettings() {
 
   // Refresh topbar avatar / name
   updateTopbarProfile();
+  syncToCloud();
 }
 
 function exportData() {
@@ -1081,6 +1236,8 @@ window.exportData       = exportData;
 window.importData       = importData;
 window.confirmClearTasks = confirmClearTasks;
 window.setTheme         = setTheme;
+window.loginWithGoogle  = loginWithGoogle;
+window.logoutUser       = logoutUser;
 
 window.toggleAssignment = (id) => {
   // Custom task
@@ -1145,6 +1302,9 @@ function init() {
   const hash = window.location.hash.replace('#', '') || 'dashboard';
   navigate(hash);
   updateNavBadges();
+
+  // Initialize Firebase Auth & Firestore sync
+  initFirebase();
 
   // Register PWA Service Worker for offline support
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
