@@ -1,7 +1,6 @@
 // ============================================================
 // Campus OS — Personal Data
-// Fill in YOUR details via the Settings page — no code needed.
-// This file only provides the default fallbacks.
+// Timetable & Quick Links updated with your official schedule.
 // ============================================================
 
 // Default profile — overridden by Settings (localStorage)
@@ -14,133 +13,118 @@ export const STUDENT = {
 };
 
 // ── Timetable ─────────────────────────────────────────────────
-// Replace with YOUR actual weekly schedule.
 // Days: 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
 export const TIMETABLE = {
   1: [ // Monday
-    { time: "09:00", end: "10:00", subject: "Machine Learning",          code: "ML-401", room: "LT-7",       teacher: "Dr. Ananya Roy",    type: "lecture" },
-    { time: "10:00", end: "11:00", subject: "Probability & Statistics",  code: "ST-401", room: "LT-2",       teacher: "Dr. Pradeep Verma", type: "lecture" },
-    { time: "11:15", end: "12:15", subject: "Data Mining & Warehousing", code: "DM-402", room: "LT-6",       teacher: "Dr. Kavya Sharma",  type: "lecture" },
-    { time: "12:15", end: "13:15", subject: "Computer Vision",           code: "CV-403", room: "LT-7",       teacher: "Prof. S. Iyer",     type: "lecture" },
-    { time: "14:00", end: "16:00", subject: "ML Lab",                   code: "ML-402", room: "AI Lab-1",   teacher: "Dr. Ananya Roy",    type: "lab"     },
+    { time: "10:00", end: "11:00", subject: "DEMP",                   code: "DEMP",   room: "LT-1",  teacher: "Prof. VAK",        type: "lecture" },
+    { time: "11:00", end: "12:00", subject: "Data Structures (DS)",   code: "DS",     room: "LT-2",  teacher: "Prof. VJM",        type: "lecture" },
+    { time: "12:45", end: "13:45", subject: "Art of Public Speaking", code: "OE-1",   room: "OE-1",  teacher: "Faculty",          type: "lecture" },
+    { time: "13:45", end: "14:45", subject: "Art of Public Speaking", code: "OE-1",   room: "OE-1",  teacher: "Faculty",          type: "lecture" },
+    { time: "15:00", end: "17:00", subject: "Modern Data Management", code: "MDM",    room: "LT-3",  teacher: "Faculty",          type: "lecture" },
   ],
   2: [ // Tuesday
-    { time: "09:00", end: "10:00", subject: "Python for Data Science",   code: "PY-404", room: "LT-4",       teacher: "Ms. Deepika Nair",  type: "lecture" },
-    { time: "10:00", end: "11:00", subject: "Machine Learning",          code: "ML-401", room: "LT-7",       teacher: "Dr. Ananya Roy",    type: "lecture" },
-    { time: "11:15", end: "12:15", subject: "Probability & Statistics",  code: "ST-401", room: "LT-2",       teacher: "Dr. Pradeep Verma", type: "lecture" },
-    { time: "14:00", end: "16:00", subject: "Data Mining Lab",           code: "DM-403", room: "AI Lab-2",   teacher: "Dr. Kavya Sharma",  type: "lab"     },
+    { time: "10:00", end: "12:00", subject: "DS / WD / DEMP Lab",     code: "LAB",    room: "AI-A2 / C2 / D2", teacher: "Lab Instructors", type: "lab" },
+    { time: "12:45", end: "13:45", subject: "Personality Dev",        code: "OE-2",   room: "OE-2",  teacher: "Faculty",          type: "lecture" },
+    { time: "13:45", end: "14:45", subject: "Personality Dev",        code: "OE-2",   room: "OE-2",  teacher: "Faculty",          type: "lecture" },
   ],
   3: [ // Wednesday
-    { time: "09:00", end: "10:00", subject: "Computer Vision",           code: "CV-403", room: "LT-7",       teacher: "Prof. S. Iyer",     type: "lecture" },
-    { time: "10:00", end: "11:00", subject: "Data Mining & Warehousing", code: "DM-402", room: "LT-6",       teacher: "Dr. Kavya Sharma",  type: "lecture" },
-    { time: "11:15", end: "12:15", subject: "Machine Learning",          code: "ML-401", room: "LT-7",       teacher: "Dr. Ananya Roy",    type: "lecture" },
-    { time: "12:15", end: "13:15", subject: "Environmental Science",     code: "ES-401", room: "LT-1",       teacher: "Dr. B. Mathur",     type: "lecture" },
-    { time: "14:00", end: "16:00", subject: "Python Lab",                code: "PY-405", room: "AI Lab-3",   teacher: "Ms. Deepika Nair",  type: "lab"     },
+    { time: "10:00", end: "12:00", subject: "Community Engagement",   code: "CE-01",  room: "AI-C2,D2", teacher: "Coordinator",    type: "project" },
+    { time: "12:45", end: "13:45", subject: "Data Structures (DS)",   code: "DS",     room: "LT-2",  teacher: "Prof. VJM",        type: "lecture" },
+    { time: "13:45", end: "14:45", subject: "DEMP",                   code: "DEMP",   room: "LT-1",  teacher: "Prof. VAK",        type: "lecture" },
+    { time: "15:00", end: "17:00", subject: "DEMP / DS / WD Lab",     code: "LAB",    room: "AI-A2 / B2 / D2", teacher: "Lab Instructors", type: "lab" },
   ],
   4: [ // Thursday
-    { time: "09:00", end: "10:00", subject: "Probability & Statistics",  code: "ST-401", room: "LT-2",       teacher: "Dr. Pradeep Verma", type: "lecture" },
-    { time: "10:00", end: "11:00", subject: "Computer Vision",           code: "CV-403", room: "LT-7",       teacher: "Prof. S. Iyer",     type: "lecture" },
-    { time: "11:15", end: "12:15", subject: "Data Mining & Warehousing", code: "DM-402", room: "LT-6",       teacher: "Dr. Kavya Sharma",  type: "lecture" },
-    { time: "14:00", end: "16:00", subject: "Env. Science Lab",          code: "ES-402", room: "Env. Lab",   teacher: "Dr. B. Mathur",     type: "lab"     },
+    { time: "10:00", end: "12:00", subject: "DEMP / DS / WD Lab",     code: "LAB",    room: "AI-B2 / C2 / A2", teacher: "Lab Instructors", type: "lab" },
+    { time: "12:45", end: "14:45", subject: "Community Engagement",   code: "CE-01",  room: "AI-A2,B2,C2,D2", teacher: "Coordinator", type: "project" },
   ],
   5: [ // Friday
-    { time: "09:00", end: "10:00", subject: "Python for Data Science",   code: "PY-404", room: "LT-4",       teacher: "Ms. Deepika Nair",  type: "lecture" },
-    { time: "10:00", end: "11:00", subject: "Probability & Statistics",  code: "ST-401", room: "LT-2",       teacher: "Dr. Pradeep Verma", type: "lecture" },
-    { time: "11:15", end: "13:15", subject: "Minor Project",             code: "MP-401", room: "Seminar Hall",teacher: "Dr. Ananya Roy",   type: "project" },
+    { time: "10:00", end: "12:00", subject: "DEMP / WD / DS Lab",     code: "LAB",    room: "AI-C2 / B2 / D2", teacher: "Lab Instructors", type: "lab" },
+    { time: "12:45", end: "13:45", subject: "PBST (Prob & Stats)",    code: "PBST",   room: "LT-1",  teacher: "Prof. SDJ",        type: "lecture" },
+    { time: "13:45", end: "14:45", subject: "Constitution of India",  code: "COI",    room: "LT-2",  teacher: "Faculty",          type: "lecture" },
+    { time: "15:00", end: "17:00", subject: "Community Engagement",   code: "CE-01",  room: "AI-A2,B2", teacher: "Coordinator",    type: "project" },
   ],
-  6: [], // Saturday — free
+  6: [ // Saturday
+    { time: "10:00", end: "11:00", subject: "PBST (Prob & Stats)",    code: "PBST",   room: "LT-1",  teacher: "Prof. SDJ",        type: "lecture" },
+    { time: "11:00", end: "12:00", subject: "Constitution of India",  code: "COI",    room: "LT-2",  teacher: "Faculty",          type: "lecture" },
+    { time: "12:45", end: "13:45", subject: "BMFA",                   code: "BMFA",   room: "LT-3",  teacher: "Faculty",          type: "lecture" },
+    { time: "13:45", end: "14:45", subject: "BMFA / SF-32",           code: "BMFA",   room: "SF-32", teacher: "Faculty",          type: "lecture" },
+  ],
   0: [], // Sunday — free
 };
 
 // ── Assignments ───────────────────────────────────────────────
-// Start fresh — add your real assignments via the "Add Task" button.
 export const ASSIGNMENTS = [];
 
 // ── Notices ───────────────────────────────────────────────────
-// Replace with your college's current notices.
 export const NOTICES = [
   {
     id: "n1",
     title: "End-Semester Examination — Set Your Exam Date",
     category: "Exam",
     date: new Date().toISOString().split('T')[0],
-    content: "Go to Settings and enter your end-semester exam date. A live countdown will appear on your dashboard. Check your university portal for the official date sheet.",
+    content: "Go to Settings and enter your end-semester exam date. A live countdown will appear on your dashboard.",
     important: true,
   },
   {
     id: "n2",
-    title: "NPTEL Enrollment — July Batch Open for AI & DS Students",
+    title: "Timetable Updated for Sem 4",
     category: "Academic",
-    date: new Date(Date.now() - 86400000 * 2).toISOString().split('T')[0],
-    content: "NPTEL has opened enrollment for the July batch. Recommended courses for AI & DS students: 'Machine Learning' (IIT Kharagpur), 'Deep Learning' (IIT Ropar), 'Python for Data Science' (IIT Madras). Certificates count for internal credit transfer. Enroll at nptel.ac.in.",
-    important: false,
-  },
-  {
-    id: "n3",
-    title: "Add Your College Notices Here",
-    category: "General",
-    date: new Date(Date.now() - 86400000 * 4).toISOString().split('T')[0],
-    content: "Open data.js and replace the NOTICES array with your college's actual notices, or add them manually here. You can also delete these placeholder entries.",
+    date: new Date().toISOString().split('T')[0],
+    content: "Your weekly timetable has been configured with DS, DEMP, WD, PBST, MDM, COI, and Community Engagement modules.",
     important: false,
   },
 ];
 
 // ── Quick Links ───────────────────────────────────────────────
-// AI & Data Science focused resources
 export const QUICK_LINKS = [
   {
-    subject: "Machine Learning",
-    code: "ML-401",
+    subject: "Data Structures",
+    code: "DS",
     color: "#6366f1",
     resources: [
-      { label: "Andrew Ng — ML Course",   url: "https://www.coursera.org/specializations/machine-learning-introduction", icon: "video"     },
-      { label: "fast.ai Practical ML",    url: "https://www.fast.ai/",                                                    icon: "code"      },
-      { label: "Scikit-learn Docs",       url: "https://scikit-learn.org/stable/",                                        icon: "book-open" },
-      { label: "Kaggle Learn",            url: "https://www.kaggle.com/learn",                                            icon: "graduation-cap" },
+      { label: "GFG DSA Sheet",         url: "https://www.geeksforgeeks.org/dsa-sheet-by-love-babbar/", icon: "list" },
+      { label: "Striver's SDE Sheet",   url: "https://takeuforward.org/interviews/strivers-sde-sheet-top-coding-interview-problems/", icon: "code" },
+      { label: "Visualgo",              url: "https://visualgo.net/en", icon: "eye" },
     ],
   },
   {
-    subject: "Data Mining & Warehousing",
-    code: "DM-402",
+    subject: "Digital Electronics & Microprocessors",
+    code: "DEMP",
     color: "#0ea5e9",
     resources: [
-      { label: "NPTEL Data Mining",       url: "https://nptel.ac.in/courses/106105174",                                   icon: "video"     },
-      { label: "Orange Data Mining",      url: "https://orangedatamining.com/",                                           icon: "cpu"       },
-      { label: "UCI ML Repository",       url: "https://archive.ics.uci.edu/",                                            icon: "database"  },
-      { label: "KDnuggets",              url: "https://www.kdnuggets.com/",                                               icon: "book-open" },
+      { label: "NPTEL Digital Circuits", url: "https://nptel.ac.in/courses/108105132", icon: "video" },
+      { label: "8085 Microprocessor Notes", url: "https://www.geeksforgeeks.org/microprocessor-tutorial/", icon: "book-open" },
+      { label: "Circuit Simulator",     url: "https://www.falstad.com/circuit/", icon: "cpu" },
     ],
   },
   {
-    subject: "Python for Data Science",
-    code: "PY-404",
+    subject: "Web Development",
+    code: "WD",
     color: "#10b981",
     resources: [
-      { label: "NumPy Documentation",     url: "https://numpy.org/doc/",                                                  icon: "book-open" },
-      { label: "Pandas Documentation",    url: "https://pandas.pydata.org/docs/",                                         icon: "book-open" },
-      { label: "Real Python",             url: "https://realpython.com/",                                                  icon: "code"      },
-      { label: "Google Colab",            url: "https://colab.research.google.com/",                                      icon: "cpu"       },
+      { label: "MDN Web Docs",          url: "https://developer.mozilla.org/", icon: "book-open" },
+      { label: "W3Schools HTML/CSS/JS", url: "https://www.w3schools.com/", icon: "code" },
+      { label: "Frontend Mentor",       url: "https://www.frontendmentor.io/", icon: "graduation-cap" },
     ],
   },
   {
     subject: "Probability & Statistics",
-    code: "ST-401",
+    code: "PBST",
     color: "#f59e0b",
     resources: [
-      { label: "StatQuest (YouTube)",     url: "https://www.youtube.com/@statquest",                                      icon: "video"     },
-      { label: "Seeing Theory",           url: "https://seeing-theory.brown.edu/",                                        icon: "eye"       },
-      { label: "NPTEL Prob & Stats",      url: "https://nptel.ac.in/courses/111104079",                                   icon: "video"     },
-      { label: "Khan Academy — Stats",    url: "https://www.khanacademy.org/math/statistics-probability",                 icon: "graduation-cap" },
+      { label: "StatQuest (YouTube)",   url: "https://www.youtube.com/@statquest", icon: "video" },
+      { label: "Seeing Theory",         url: "https://seeing-theory.brown.edu/", icon: "eye" },
+      { label: "Khan Academy Stats",    url: "https://www.khanacademy.org/math/statistics-probability", icon: "graduation-cap" },
     ],
   },
   {
-    subject: "Computer Vision",
-    code: "CV-403",
+    subject: "Modern Data Management",
+    code: "MDM",
     color: "#ec4899",
     resources: [
-      { label: "CS231n — Stanford",       url: "https://cs231n.stanford.edu/",                                            icon: "graduation-cap" },
-      { label: "OpenCV Documentation",    url: "https://docs.opencv.org/",                                                icon: "book-open" },
-      { label: "Papers With Code",        url: "https://paperswithcode.com/",                                             icon: "list"      },
-      { label: "Roboflow Blog",           url: "https://blog.roboflow.com/",                                               icon: "eye"       },
+      { label: "NPTEL DBMS",            url: "https://nptel.ac.in/courses/106105175", icon: "video" },
+      { label: "SQLZoo Practice",       url: "https://sqlzoo.net/", icon: "database" },
+      { label: "MongoDB University",    url: "https://learn.mongodb.com/", icon: "database" },
     ],
   },
 ];
