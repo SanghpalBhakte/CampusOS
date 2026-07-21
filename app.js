@@ -234,7 +234,11 @@ const GeminiService = {
     const key = this.getGroqKey();
     if (!key) throw new Error('No Groq API key configured.');
 
-    const groqModels = [this.GROQ_MODEL, ...(this.GROQ_FALLBACK_MODELS || [])];
+    const groqModels = [
+      'llama-3.2-11b-vision-preview',
+      'llama-3.2-90b-vision-preview',
+      'llama-3.2-11b-text-preview'
+    ];
     let lastError = null;
 
     for (const gModel of groqModels) {
@@ -252,10 +256,13 @@ const GeminiService = {
               role: 'user',
               content: [
                 {
+                  type: 'text',
+                  text: promptText
+                },
+                {
                   type: 'image_url',
                   image_url: { url: `data:${mimeType};base64,${base64Data}` }
-                },
-                { type: 'text', text: promptText }
+                }
               ]
             }],
             temperature: 0.1,
@@ -266,7 +273,8 @@ const GeminiService = {
         if (!response.ok) {
           const errObj = await response.json().catch(() => ({}));
           const rawMsg = errObj.error?.message || `HTTP ${response.status} from Groq model ${gModel}`;
-          throw new Error(friendlyGeminiError(response.status, rawMsg));
+          console.error(`[Groq Error] HTTP ${response.status} (${gModel}):`, errObj);
+          throw new Error(`Groq (${gModel}): ${rawMsg}`);
         }
 
         const resData = await response.json();
@@ -297,7 +305,7 @@ const GeminiService = {
         return await this.callGroqVision(base64Data, mimeType, promptText);
       } catch (err) {
         groqError = err;
-        console.warn('[VisionService] Groq failed, falling back to Gemini:', err.message);
+        console.error('[VisionService] Groq attempt failed:', err.message);
       }
     }
 
@@ -309,7 +317,6 @@ const GeminiService = {
 
     const models = this.getModelsList();
     let lastError = null;
-
 
     for (const model of models) {
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
@@ -360,6 +367,11 @@ const GeminiService = {
         lastError = err;
         console.warn(`[GeminiService] Model attempt ${model} failed:`, err.message || err);
       }
+    }
+
+    // If Gemini failed with quota error, surface the Groq error if available so user knows why Groq failed
+    if (groqError) {
+      throw new Error(`Groq Error: ${groqError.message}. (Gemini Fallback: ${lastError?.message || 'Quota Exceeded'})`);
     }
 
     throw lastError || new Error('All AI vision providers unavailable. Please try again later.');
