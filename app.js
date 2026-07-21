@@ -201,9 +201,9 @@ function updateSyncUI(status = null) {
 // ── Vision AI Service (Groq primary → Gemini fallback) ────────
 // To swap models: change GROQ_MODEL or MODEL here only.
 const GeminiService = {
-  // Groq (primary — 7,000 req/day free, Qwen & Llama models)
-  GROQ_MODEL: 'qwen/qwen3.6-27b',
-  GROQ_FALLBACK_MODELS: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'],
+  // Groq (primary — 7,000 req/day free, Llama vision models)
+  GROQ_MODEL: 'llama-3.2-11b-vision-preview',
+  GROQ_FALLBACK_MODELS: ['llama-3.2-90b-vision-preview'],
 
   // Gemini (fallback chain)
   MODEL: 'gemini-2.5-flash',
@@ -235,9 +235,8 @@ const GeminiService = {
     if (!key) throw new Error('No Groq API key configured.');
 
     const groqModels = [
-      'qwen/qwen3.6-27b',
-      'llama-3.3-70b-versatile',
-      'llama-3.1-8b-instant'
+      'llama-3.2-11b-vision-preview',
+      'llama-3.2-90b-vision-preview'
     ];
     let lastError = null;
 
