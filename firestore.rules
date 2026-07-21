@@ -14,7 +14,7 @@ service cloud.firestore {
       // Write access only for authenticated owner matching the document UID with payload validation
       allow write: if request.auth != null 
                   && request.auth.uid == userId
-                  && request.resource.data.keys().hasOnly(['profile', 'customTasks', 'assignmentStatuses', 'theme', 'updatedAt']);
+                  && request.resource.data.keys().hasOnly(['profile', 'customTasks', 'customTimetable', 'assignmentStatuses', 'theme', 'updatedAt']);
     }
   }
 }

@@ -6,10 +6,12 @@
 import { STUDENT, TIMETABLE, ASSIGNMENTS, NOTICES, QUICK_LINKS } from './data.js';
 
 // ── localStorage Keys ─────────────────────────────────────────
-const KEY_PROFILE      = 'cos_profile';
-const KEY_ASSIGNMENTS  = 'cos_assignments';
-const KEY_CUSTOM_TASKS = 'cos_custom_tasks';
-const KEY_THEME        = 'cos_theme';
+const KEY_PROFILE          = 'cos_profile';
+const KEY_ASSIGNMENTS      = 'cos_assignments';
+const KEY_CUSTOM_TASKS     = 'cos_custom_tasks';
+const KEY_CUSTOM_TIMETABLE = 'cos_custom_timetable';
+const KEY_GEMINI_KEY       = 'cos_gemini_key';
+const KEY_THEME            = 'cos_theme';
 
 // ── Safe Storage Helpers ─────────────────────────────────────
 function safeGetStorage(key, fallback = null) {
@@ -229,6 +231,325 @@ function clearFirebaseConfig() {
   location.reload();
 }
 
+// ── Gemini Timetable Image Extractor ─────────────────────────
+function showGeminiKeyModal(onSuccess) {
+  const savedKey = localStorage.getItem(KEY_GEMINI_KEY) || '';
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  backdrop.id = 'gemini-key-backdrop';
+  backdrop.innerHTML = `
+    <div class="modal" onclick="event.stopPropagation()" style="max-width:440px">
+      <div class="modal-header">
+        <h2 class="modal-title">Gemini API Key Required</h2>
+        <button class="modal-close" onclick="document.getElementById('gemini-key-backdrop').remove()">${icons.x()}</button>
+      </div>
+      <div style="font-size:0.83rem;color:var(--text-secondary);margin-bottom:14px;line-height:1.5">
+        To scan and extract timetables from photos, paste a free Gemini API Key from 
+        <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:underline">Google AI Studio</a>.
+      </div>
+      <div class="form-group">
+        <label class="form-label">Gemini API Key <span class="req">*</span></label>
+        <input type="password" class="form-input" id="g-api-key" placeholder="AIzaSy..." value="${savedKey}">
+      </div>
+      <div class="form-actions">
+        <button class="btn-secondary" onclick="document.getElementById('gemini-key-backdrop').remove()">Cancel</button>
+        <button class="btn-primary" onclick="saveGeminiKey()">Save & Continue</button>
+      </div>
+    </div>
+  `;
+  backdrop.addEventListener('click', () => backdrop.remove());
+  document.body.appendChild(backdrop);
+
+  window.saveGeminiKey = function() {
+    const k = (document.getElementById('g-api-key').value || '').trim();
+    if (!k) { alert("Please enter a valid Gemini API key."); return; }
+    localStorage.setItem(KEY_GEMINI_KEY, k);
+    document.getElementById('gemini-key-backdrop')?.remove();
+    if (typeof onSuccess === 'function') onSuccess();
+  };
+}
+
+function showTimetableLoadingModal(msg = "Analyzing photo...") {
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  backdrop.id = 'tt-loading-backdrop';
+  backdrop.innerHTML = `
+    <div class="modal" style="max-width:360px;text-align:center;padding:32px 24px">
+      <div style="font-size:2rem;margin-bottom:12px;animation:spin 1.5s linear infinite">✨</div>
+      <div style="font-weight:700;font-size:1rem;margin-bottom:6px">${msg}</div>
+      <div style="font-size:0.8rem;color:var(--text-muted)">Extracting weekly schedule using Gemini Vision AI...</div>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+}
+
+async function extractTimetableFromImage(base64Data, mimeType, apiKey) {
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+
+  const schemaInstruction = `Extract all weekly college class timetable entries from this image.
+Return JSON matching this exact structure:
+{
+  "schedule": [
+    {
+      "day": "Mon" | "Tue" | "Wed" | "Thu" | "Fri" | "Sat",
+      "time": "10:00",
+      "end": "11:00",
+      "subject": "Data Structures",
+      "code": "DS",
+      "room": "LT-2",
+      "teacher": "Prof. Name",
+      "type": "lecture" | "lab" | "project",
+      "isUncertain": false
+    }
+  ]
+}
+
+Rules:
+1. Day must be one of: Mon, Tue, Wed, Thu, Fri, Sat.
+2. time and end must be 24-hour HH:MM format (e.g. 09:00, 10:30, 14:00).
+3. If any entry has blurry, cropped, ambiguous, or uncertain text, DO NOT GUESS. Set "isUncertain": true for that entry.
+4. Extract every valid lecture, lab, or tutorial entry visible.`;
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{
+        parts: [
+          { text: schemaInstruction },
+          { inlineData: { mimeType: mimeType, data: base64Data } }
+        ]
+      }],
+      generationConfig: {
+        responseMimeType: "application/json",
+        temperature: 0.1
+      }
+    })
+  });
+
+  if (!response.ok) {
+    const errObj = await response.json().catch(() => ({}));
+    throw new Error(errObj.error?.message || `Gemini API returned status ${response.status}`);
+  }
+
+  const resData = await response.json();
+  const text = resData.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+  return JSON.parse(text);
+}
+
+function triggerTimetableImport() {
+  const apiKey = localStorage.getItem(KEY_GEMINI_KEY) || '';
+  if (!apiKey) {
+    showGeminiKeyModal(() => selectTimetableFile());
+    return;
+  }
+  selectTimetableFile();
+}
+
+function selectTimetableFile() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.onchange = handleTimetableImageUpload;
+  input.click();
+}
+
+function handleTimetableImageUpload(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  const apiKey = localStorage.getItem(KEY_GEMINI_KEY) || '';
+  if (!apiKey) {
+    showGeminiKeyModal(() => selectTimetableFile());
+    return;
+  }
+
+  showTimetableLoadingModal("Scanning timetable photo...");
+
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    try {
+      const resultUrl  = e.target.result;
+      const mimeType   = resultUrl.split(';')[0].split(':')[1] || 'image/jpeg';
+      const base64Data = resultUrl.split(',')[1];
+
+      const result = await extractTimetableFromImage(base64Data, mimeType, apiKey);
+      document.getElementById('tt-loading-backdrop')?.remove();
+
+      if (!result.schedule || !Array.isArray(result.schedule) || !result.schedule.length) {
+        alert("No clear timetable schedule detected in image. Please try a clearer photo.");
+        return;
+      }
+
+      showTimetablePreviewModal(result.schedule);
+    } catch (err) {
+      document.getElementById('tt-loading-backdrop')?.remove();
+      alert("Extraction failed: " + err.message);
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+let pendingExtractedSchedule = [];
+
+function showTimetablePreviewModal(schedule) {
+  pendingExtractedSchedule = JSON.parse(JSON.stringify(schedule));
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  backdrop.id = 'tt-preview-backdrop';
+
+  renderTimetablePreviewModalContent(backdrop);
+  document.body.appendChild(backdrop);
+}
+
+function renderTimetablePreviewModalContent(backdrop) {
+  const uncertainCount = pendingExtractedSchedule.filter(x => x.isUncertain).length;
+
+  const rowsHtml = pendingExtractedSchedule.map((item, idx) => `
+    <tr class="${item.isUncertain ? 'preview-row-uncertain' : ''}">
+      <td>
+        <select class="form-select" style="padding:4px 6px;font-size:0.8rem" onchange="updatePreviewEntry(${idx}, 'day', this.value)">
+          ${['Mon','Tue','Wed','Thu','Fri','Sat'].map(d => `<option value="${d}" ${item.day===d?'selected':''}>${d}</option>`).join('')}
+        </select>
+      </td>
+      <td>
+        <input type="text" class="form-input" style="padding:4px 4px;font-size:0.8rem;width:55px" value="${item.time || '10:00'}" onchange="updatePreviewEntry(${idx}, 'time', this.value)">
+        -
+        <input type="text" class="form-input" style="padding:4px 4px;font-size:0.8rem;width:55px" value="${item.end || '11:00'}" onchange="updatePreviewEntry(${idx}, 'end', this.value)">
+      </td>
+      <td>
+        <input type="text" class="form-input" style="padding:4px 6px;font-size:0.8rem" value="${item.subject || ''}" placeholder="Subject" onchange="updatePreviewEntry(${idx}, 'subject', this.value)">
+      </td>
+      <td>
+        <input type="text" class="form-input" style="padding:4px 6px;font-size:0.8rem;width:65px" value="${item.code || ''}" placeholder="Code" onchange="updatePreviewEntry(${idx}, 'code', this.value)">
+      </td>
+      <td>
+        <input type="text" class="form-input" style="padding:4px 6px;font-size:0.8rem;width:65px" value="${item.room || ''}" placeholder="Room" onchange="updatePreviewEntry(${idx}, 'room', this.value)">
+      </td>
+      <td>
+        <select class="form-select" style="padding:4px 6px;font-size:0.8rem;width:80px" onchange="updatePreviewEntry(${idx}, 'type', this.value)">
+          <option value="lecture" ${item.type==='lecture'?'selected':''}>Lecture</option>
+          <option value="lab" ${item.type==='lab'?'selected':''}>Lab</option>
+          <option value="project" ${item.type==='project'?'selected':''}>Project</option>
+        </select>
+      </td>
+      <td style="text-align:center">
+        ${item.isUncertain ? '<span class="uncertain-badge" title="Uncertain AI entry — please check">⚠️ Review</span>' : '✓'}
+      </td>
+      <td>
+        <button class="task-delete-btn" onclick="removePreviewEntry(${idx})">${icons.trash()}</button>
+      </td>
+    </tr>
+  `).join('');
+
+  backdrop.innerHTML = `
+    <div class="modal" onclick="event.stopPropagation()" style="max-width:780px;width:95%">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title">Extracted Timetable Preview</h2>
+          <div style="font-size:0.8rem;color:var(--text-muted);margin-top:2px">
+            ${pendingExtractedSchedule.length} classes extracted ${uncertainCount > 0 ? `· <span style="color:var(--yellow);font-weight:600">${uncertainCount} entries marked for review</span>` : ''}
+          </div>
+        </div>
+        <button class="modal-close" onclick="document.getElementById('tt-preview-backdrop').remove()">${icons.x()}</button>
+      </div>
+
+      <div style="overflow-x:auto;max-height:360px;margin-bottom:16px;border:1px solid var(--border);border-radius:var(--radius-sm)">
+        <table class="preview-table">
+          <thead>
+            <tr>
+              <th>Day</th>
+              <th>Time</th>
+              <th>Subject</th>
+              <th>Code</th>
+              <th>Room</th>
+              <th>Type</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+        </table>
+      </div>
+
+      <div style="display:flex;justify-space-between;align-items:center;flex-wrap:wrap;gap:10px">
+        <button class="btn-secondary" onclick="addPreviewEntry()" style="font-size:0.8rem;display:flex;align-items:center;gap:4px">
+          ${icons.plus()} Add Class Row
+        </button>
+
+        <div style="display:flex;gap:10px">
+          <button class="btn-secondary" onclick="document.getElementById('tt-preview-backdrop').remove()">Cancel</button>
+          <button class="btn-primary" onclick="confirmSaveExtractedTimetable()">Confirm & Save Schedule</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+window.updatePreviewEntry = function(idx, key, val) {
+  if (pendingExtractedSchedule[idx]) {
+    pendingExtractedSchedule[idx][key] = val;
+    if (key !== 'isUncertain') pendingExtractedSchedule[idx].isUncertain = false;
+  }
+};
+
+window.removePreviewEntry = function(idx) {
+  pendingExtractedSchedule.splice(idx, 1);
+  const backdrop = document.getElementById('tt-preview-backdrop');
+  if (backdrop) renderTimetablePreviewModalContent(backdrop);
+};
+
+window.addPreviewEntry = function() {
+  pendingExtractedSchedule.push({
+    day: 'Mon',
+    time: '10:00',
+    end: '11:00',
+    subject: 'New Subject',
+    code: 'SUB',
+    room: 'LT-1',
+    teacher: 'Faculty',
+    type: 'lecture',
+    isUncertain: false
+  });
+  const backdrop = document.getElementById('tt-preview-backdrop');
+  if (backdrop) renderTimetablePreviewModalContent(backdrop);
+};
+
+window.confirmSaveExtractedTimetable = function() {
+  if (!pendingExtractedSchedule.length) {
+    alert("Timetable schedule is empty.");
+    return;
+  }
+
+  const dayMap = { "Mon": 1, "Tue": 2, "Wed": 3, "Thu": 4, "Fri": 5, "Sat": 6 };
+  const newTT = { 1: [], 2: [], 3: [], 4: [], 5: [], 6: [], 0: [] };
+
+  pendingExtractedSchedule.forEach(item => {
+    const dayNum = dayMap[item.day] || 1;
+    newTT[dayNum].push({
+      time:    item.time || '10:00',
+      end:     item.end || '11:00',
+      subject: item.subject || 'Class',
+      code:    item.code || 'SUB',
+      room:    item.room || 'LT-1',
+      teacher: item.teacher || 'Faculty',
+      type:    item.type || 'lecture',
+    });
+  });
+
+  Object.keys(newTT).forEach(d => {
+    newTT[d].sort((a,b) => timeToMinutes(a.time) - timeToMinutes(b.time));
+  });
+
+  saveTimetable(newTT);
+  document.getElementById('tt-preview-backdrop')?.remove();
+  alert("Timetable imported and saved successfully!");
+  renderPage(state.currentPage);
+};
+
 function loginWithGoogle() {
   if (!auth || !getFirebaseConfig()) {
     showFirebaseSetupModal();
@@ -298,6 +619,9 @@ function subscribeUserCloudData(uid) {
         state.customTasks = data.customTasks.map(sanitizeTask).filter(Boolean);
         safeSetStorage(KEY_CUSTOM_TASKS, state.customTasks);
       }
+      if (data.customTimetable && typeof data.customTimetable === 'object') {
+        safeSetStorage(KEY_CUSTOM_TIMETABLE, data.customTimetable);
+      }
       if (data.assignmentStatuses && typeof data.assignmentStatuses === 'object') {
         safeSetStorage(KEY_ASSIGNMENTS, data.assignmentStatuses);
         state.assignments = loadAssignments();
@@ -330,6 +654,7 @@ function pushLocalDataToCloud(uid) {
   const payload = {
     profile:            loadProfile(),
     customTasks:        sanitizedTasks,
+    customTimetable:    safeGetStorage(KEY_CUSTOM_TIMETABLE, null),
     assignmentStatuses: safeGetStorage(KEY_ASSIGNMENTS, {}),
     theme:              localStorage.getItem(KEY_THEME) || 'glass',
     updatedAt:          firebase.firestore.FieldValue.serverTimestamp()
@@ -485,8 +810,32 @@ function overdueCount() {
   return allTasks().filter(a => a.status === 'pending' && a.dueDate < today).length;
 }
 
+// ── Dynamic Timetable Loading ─────────────────────────────────
+function loadTimetable() {
+  const saved = safeGetStorage(KEY_CUSTOM_TIMETABLE, null);
+  if (saved && typeof saved === 'object') return saved;
+  return TIMETABLE;
+}
+
+function isCustomTimetableActive() {
+  return !!safeGetStorage(KEY_CUSTOM_TIMETABLE, null);
+}
+
+function saveTimetable(ttMap) {
+  safeSetStorage(KEY_CUSTOM_TIMETABLE, ttMap);
+  syncToCloud();
+}
+
+function resetTimetableToDefault() {
+  if (!confirm("Reset timetable back to official Sem 4 default schedule?")) return;
+  localStorage.removeItem(KEY_CUSTOM_TIMETABLE);
+  syncToCloud();
+  renderPage(state.currentPage);
+}
+
 function todayClasses() {
-  return (TIMETABLE[new Date().getDay()] || []).length;
+  const tt = loadTimetable();
+  return (tt[new Date().getDay()] || []).length;
 }
 
 // ── SVG Icons ─────────────────────────────────────────────────
@@ -551,9 +900,14 @@ function renderDashboard() {
   const overdue  = overdueCount();
   const classes  = todayClasses();
 
-  const dayClasses = TIMETABLE[now.getDay()] || [];
+  const total          = allTasks().length;
+  const submittedCount = allTasks().filter(a => a.status === 'submitted').length;
+  const progress       = total === 0 ? 0 : Math.round((submittedCount / total) * 100);
+
+  const liveTT     = loadTimetable();
+  const dayClasses = liveTT[now.getDay()] || [];
   const currentMin = currentTimeMinutes();
-  const nextClass  = dayClasses.find(c => timeToMinutes(c.time) > currentMin);
+  const nextClass  = dayClasses.find(c => timeToMinutes(c.time || '10:00') > currentMin);
 
   const total          = allTasks().length;
   const submittedCount = allTasks().filter(a => a.status === 'submitted').length;
@@ -688,11 +1042,13 @@ function renderDashboard() {
 
 // ── Timetable ─────────────────────────────────────────────────
 function renderTimetable() {
-  const el      = document.getElementById('page-timetable');
-  const today   = new Date().getDay();
-  const day     = state.ttDay;
-  const classes = TIMETABLE[day] || [];
+  const el         = document.getElementById('page-timetable');
+  const today      = new Date().getDay();
+  const day        = state.ttDay;
+  const liveTT     = loadTimetable();
+  const classes    = liveTT[day] || [];
   const currentMin = currentTimeMinutes();
+  const isCustom   = isCustomTimetableActive();
 
   const tabs = [1,2,3,4,5,6,0].map(d => `
     <button class="tt-tab ${d===day?'active':''}" onclick="setTTDay(${d})">${DAY_SHORT[d]}${d===today?' ·':''}</button>
@@ -703,8 +1059,8 @@ function renderTimetable() {
     content = `<div class="card" style="text-align:center;padding:40px;color:var(--text-muted);border-style:dashed">🏖️ No classes — enjoy the day!</div>`;
   } else {
     content = classes.map(c => {
-      const startMin  = timeToMinutes(c.time);
-      const endMin    = timeToMinutes(c.end);
+      const startMin  = timeToMinutes(c.time || '10:00');
+      const endMin    = timeToMinutes(c.end || '11:00');
       const isCurrent = day === today && currentMin >= startMin && currentMin < endMin;
       const isPast    = day === today && currentMin >= endMin;
       return `
@@ -718,7 +1074,7 @@ function renderTimetable() {
             <div class="tt-subject">${c.subject}</div>
             <div class="tt-meta">${c.code} &nbsp;·&nbsp; ${c.room} &nbsp;·&nbsp; ${c.teacher}</div>
           </div>
-          <span class="type-badge type-${c.type}">${c.type}</span>
+          <span class="type-badge type-${c.type || 'lecture'}">${c.type || 'lecture'}</span>
         </div>`;
     }).join('');
   }
@@ -727,7 +1083,16 @@ function renderTimetable() {
     <div class="page-header">
       <div>
         <div class="page-title">Timetable</div>
-        <div class="page-subtitle">${classes.length} class${classes.length!==1?'es':''} on ${DAY_NAMES[day]}</div>
+        <div class="page-subtitle">${classes.length} class${classes.length!==1?'es':''} on ${DAY_NAMES[day]} ${isCustom ? '· (Custom Imported Schedule)' : ''}</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn-primary" onclick="triggerTimetableImport()" style="display:flex;align-items:center;gap:6px;font-size:0.8rem;padding:7px 14px">
+          📷 Import from Photo
+        </button>
+        ${isCustom ? `
+          <button class="btn-secondary" onclick="resetTimetableToDefault()" style="font-size:0.8rem;padding:7px 12px;color:var(--text-muted)">
+            Reset Default
+          </button>` : ''}
       </div>
     </div>
     <div class="tt-day-tabs">${tabs}</div>
@@ -1376,6 +1741,8 @@ window.logoutUser       = logoutUser;
 window.showFirebaseSetupModal = showFirebaseSetupModal;
 window.saveFirebaseConfig  = saveFirebaseConfig;
 window.clearFirebaseConfig = clearFirebaseConfig;
+window.triggerTimetableImport = triggerTimetableImport;
+window.resetTimetableToDefault = resetTimetableToDefault;
 
 window.toggleAssignment = (id) => {
   // Custom task
