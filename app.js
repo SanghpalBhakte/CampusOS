@@ -461,124 +461,361 @@ function preprocessImageForOCR(base64Data, mimeType) {
         data[i + 1] = clamped;
         data[i + 2] = clamped;
       }
+      
+      // Margin Trimming
+      let top = 0, bottom = height - 1, left = 0, right = width - 1;
+      const threshold = 240;
+      
+      // Top
+      for (let y = 0; y < height; y++) {
+        let darkPixels = 0;
+        for (let x = 0; x < width; x++) {
+          if (data[(y * width + x) * 4] < threshold) darkPixels++;
+        }
+        if (darkPixels > width * 0.01) { top = y; break; }
+      }
+      // Bottom
+      for (let y = height - 1; y >= top; y--) {
+        let darkPixels = 0;
+        for (let x = 0; x < width; x++) {
+          if (data[(y * width + x) * 4] < threshold) darkPixels++;
+        }
+        if (darkPixels > width * 0.01) { bottom = y; break; }
+      }
+      // Left
+      for (let x = 0; x < width; x++) {
+        let darkPixels = 0;
+        for (let y = top; y <= bottom; y++) {
+          if (data[(y * width + x) * 4] < threshold) darkPixels++;
+        }
+        if (darkPixels > (bottom - top) * 0.01) { left = x; break; }
+      }
+      // Right
+      for (let x = width - 1; x >= left; x--) {
+        let darkPixels = 0;
+        for (let y = top; y <= bottom; y++) {
+          if (data[(y * width + x) * 4] < threshold) darkPixels++;
+        }
+        if (darkPixels > (bottom - top) * 0.01) { right = x; break; }
+      }
+      
+      // Add a small padding back
+      const padding = 20;
+      top = Math.max(0, top - padding);
+      bottom = Math.min(height - 1, bottom + padding);
+      left = Math.max(0, left - padding);
+      right = Math.min(width - 1, right + padding);
+      
+      const trimW = right - left + 1;
+      const trimH = bottom - top + 1;
+      
+      // We need to re-put the data and then crop
       ctx.putImageData(imageData, 0, 0);
-      resolve(canvas.toDataURL(mimeType, 0.9));
+      
+      const trimmedCanvas = document.createElement('canvas');
+      trimmedCanvas.width = trimW;
+      trimmedCanvas.height = trimH;
+      const trimmedCtx = trimmedCanvas.getContext('2d');
+      trimmedCtx.drawImage(canvas, left, top, trimW, trimH, 0, 0, trimW, trimH);
+      
+      resolve(trimmedCanvas.toDataURL(mimeType, 0.9));
     };
     img.onerror = () => reject(new Error("Failed to load image for preprocessing"));
     img.src = `data:${mimeType};base64,${base64Data}`;
   });
 }
 
-function parseTimetableDeterministically(ocrText) {
-  const schedule = [];
-  let confidence = 0;
-  const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-  const textLower = ocrText.toLowerCase();
+function cleanupTimetableDomain(rawText) {
+  let remaining = rawText.replace(/\b(?:class|lecture|time|day|period)\b/gi, '').trim();
   
-  days.forEach(d => {
-    if (textLower.includes(d)) confidence += 10;
-  });
+  // Extract room
+  let room = '';
+  const roomMatch = remaining.match(/\b(LT-?\d+|Room\s*\d+|L-?\d+)\b/i);
+  if (roomMatch) {
+    room = roomMatch[1];
+    remaining = remaining.replace(roomMatch[0], '').trim();
+  }
   
-  const timeRegex = /\b([0-1]?[0-9]|2[0-3])[:.][0-5][0-9]\b/g;
-  const times = textLower.match(timeRegex);
-  if (times && times.length > 2) confidence += 20;
+  // Extract teacher
+  let teacher = '';
+  const teacherMatch = remaining.match(/\b(Prof\.?\s+\w+|Dr\.?\s+\w+)\b/i);
+  if (teacherMatch) {
+    teacher = teacherMatch[1];
+    remaining = remaining.replace(teacherMatch[0], '').trim();
+  }
+  
+  // Extract course code
+  let code = '';
+  const codeMatch = remaining.match(/\b([A-Z]{2,4}-?\d{3,4})\b/i);
+  if (codeMatch) {
+    code = codeMatch[1];
+    remaining = remaining.replace(codeMatch[0], '').trim();
+  }
+  
+  // Extract type
+  let type = 'lecture';
+  if (remaining.toLowerCase().includes('lab')) {
+    type = 'lab';
+    remaining = remaining.replace(/\blab\b/i, '').trim();
+  } else if (remaining.toLowerCase().match(/\btutorial|tut\b/i)) {
+    type = 'tutorial';
+    remaining = remaining.replace(/\btutorial|tut\b/i, '').trim();
+  }
+  
+  const timeRegex = /\b([0-1]?[0-9]|2[0-3])[:.]([0-5][0-9])\s*(?:-|to|~)\s*([0-1]?[0-9]|2[0-3])[:.]([0-5][0-9])\b/i;
+  remaining = remaining.replace(timeRegex, '').trim();
+  
+  // Clean junk (numbers only, pure symbols)
+  let subject = remaining.replace(/[^a-zA-Z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
+  if (/^\d+$/.test(subject) || subject.length < 2) subject = '';
+  
+  subject = subject || 'Unknown Subject';
+  const isUncertain = subject === 'Unknown Subject' || !room;
+  
+  return { subject, room, teacher, code, type, isUncertain };
+}
 
-  console.log(`[TimetableParser] OCR raw text length: ${ocrText.length}`);
-  
-  let currentDay = 'Mon';
-  const lines = ocrText.split('\n').map(l => l.trim()).filter(Boolean);
-  
+function parseTimetableFromGrid(ocrData) {
+  let confidence = 0;
+  const schedule = [];
   let parsedCount = 0;
   let rejectedCount = 0;
   
-  for (const line of lines) {
-    const lineLower = line.toLowerCase();
-    
-    // Check if line is a day header
-    const foundDay = days.find(d => lineLower.startsWith(d) || lineLower === d);
-    if (foundDay) {
-      currentDay = foundDay.charAt(0).toUpperCase() + foundDay.slice(1);
-      if (currentDay === 'Thu') currentDay = 'Thu';
-      continue;
+  if (!ocrData || !ocrData.words || ocrData.words.length === 0) {
+    console.log("[GeometricParser] No words found in OCR data.");
+    return { schedule, confidence: 0, ambiguous: true };
+  }
+  
+  console.log(`[GeometricParser] OCR words count: ${ocrData.words.length}`);
+  
+  // 1. Clean and filter words
+  const words = ocrData.words.map(w => ({
+    text: w.text.trim(),
+    bbox: w.bbox,
+    conf: w.confidence,
+    cx: (w.bbox.x0 + w.bbox.x1) / 2,
+    cy: (w.bbox.y0 + w.bbox.y1) / 2
+  })).filter(w => w.text.length > 0);
+  
+  // 2. Group into rows by Y overlap
+  const rows = [];
+  words.sort((a, b) => a.bbox.y0 - b.bbox.y0);
+  
+  for (const word of words) {
+    let added = false;
+    for (const row of rows) {
+      const rowY0 = row.reduce((sum, w) => sum + w.bbox.y0, 0) / row.length;
+      const rowY1 = row.reduce((sum, w) => sum + w.bbox.y1, 0) / row.length;
+      
+      const overlap = Math.max(0, Math.min(word.bbox.y1, rowY1) - Math.max(word.bbox.y0, rowY0));
+      const wordHeight = word.bbox.y1 - word.bbox.y0;
+      
+      if (overlap / wordHeight > 0.4) {
+        row.push(word);
+        added = true;
+        break;
+      }
     }
-    
-    // Try to extract time range: e.g. 10:00 - 11:00 or 10.00 to 11.00
-    const rangeRegex = /\b([0-1]?[0-9]|2[0-3])[:.]([0-5][0-9])\s*(?:-|to|~)\s*([0-1]?[0-9]|2[0-3])[:.]([0-5][0-9])\b/i;
-    const match = line.match(rangeRegex);
-    
-    if (match) {
-      const startH = match[1].padStart(2, '0');
-      const startM = match[2];
-      const endH = match[3].padStart(2, '0');
-      const endM = match[4];
-      
-      const timeStr = `${startH}:${startM}`;
-      const endStr = `${endH}:${endM}`;
-      
-      // Remove the time string from line to extract remaining info
-      let remaining = line.replace(match[0], '').trim();
-      
-      // Extract room (e.g. LT-2, Room 404, L-12)
-      let room = '';
-      const roomMatch = remaining.match(/\b(LT-?\d+|Room\s*\d+|L-?\d+)\b/i);
-      if (roomMatch) {
-        room = roomMatch[1];
-        remaining = remaining.replace(roomMatch[0], '').trim();
-      }
-      
-      // Extract teacher (e.g. Prof. Name, Dr. Smith)
-      let teacher = '';
-      const teacherMatch = remaining.match(/\b(Prof\.?\s+\w+|Dr\.?\s+\w+)\b/i);
-      if (teacherMatch) {
-        teacher = teacherMatch[1];
-        remaining = remaining.replace(teacherMatch[0], '').trim();
-      }
-      
-      // Extract course code (e.g. CS301, MAT-101)
-      let code = '';
-      const codeMatch = remaining.match(/\b([A-Z]{2,4}-?\d{3,4})\b/i);
-      if (codeMatch) {
-        code = codeMatch[1];
-        remaining = remaining.replace(codeMatch[0], '').trim();
-      }
-      
-      // Extract type (lecture, lab, tutorial)
-      let type = 'lecture';
-      if (remaining.toLowerCase().includes('lab')) {
-        type = 'lab';
-        remaining = remaining.replace(/\blab\b/i, '').trim();
-      } else if (remaining.toLowerCase().includes('tutorial') || remaining.toLowerCase().includes('tut')) {
-        type = 'tutorial';
-        remaining = remaining.replace(/\btutorial|tut\b/i, '').trim();
-      }
-      
-      const subject = remaining.replace(/[^a-zA-Z0-9 ]/g, '').replace(/\s+/g, ' ').trim() || 'Unknown Subject';
-      
-      const isUncertain = subject === 'Unknown Subject' || !room || remaining.length < 3;
-      
-      schedule.push({
-        day: currentDay,
-        time: timeStr,
-        end: endStr,
-        subject: subject,
-        code: code,
-        room: room,
-        teacher: teacher,
-        type: type,
-        isUncertain: isUncertain
-      });
-      parsedCount++;
-      confidence += 5; // Boost confidence for every successfully parsed row
-    } else {
-      console.log(`[TimetableParser] Rejected row (no valid time range): ${line}`);
-      rejectedCount++;
+    if (!added) {
+      rows.push([word]);
     }
   }
-
-  console.log(`[TimetableParser] Parsed rows: ${parsedCount} | Rejected rows: ${rejectedCount}`);
-  console.log(`[TimetableParser] Deterministic parser confidence: ${confidence}/100. Final schedule length: ${schedule.length}`);
   
-  return { schedule, confidence, ambiguous: rejectedCount > parsedCount };
+  rows.forEach(r => r.sort((a, b) => a.bbox.x0 - b.bbox.x0));
+  
+  console.log(`[GeometricParser] Detected ${rows.length} visual rows.`);
+  if (rows.length > 3) confidence += 20;
+
+  // 3. Cluster columns by X centers
+  const xCenters = words.map(w => w.cx).sort((a, b) => a - b);
+  const cols = [];
+  let currentCol = [xCenters[0]];
+  for (let i = 1; i < xCenters.length; i++) {
+    if (xCenters[i] - xCenters[i-1] < 40) {
+      currentCol.push(xCenters[i]);
+    } else {
+      cols.push(currentCol.reduce((a, b) => a + b, 0) / currentCol.length);
+      currentCol = [xCenters[i]];
+    }
+  }
+  cols.push(currentCol.reduce((a, b) => a + b, 0) / currentCol.length);
+  console.log(`[GeometricParser] Detected ${cols.length} logical columns.`);
+  if (cols.length > 4) confidence += 10;
+
+  // Assign cell indices to words
+  const grid = [];
+  for (let i = 0; i < rows.length; i++) {
+    const rowWords = rows[i];
+    const gridRow = new Array(cols.length).fill('');
+    
+    for (const w of rowWords) {
+      let closestColIdx = 0;
+      let minDiff = Infinity;
+      for (let j = 0; j < cols.length; j++) {
+        const diff = Math.abs(w.cx - cols[j]);
+        if (diff < minDiff) {
+          minDiff = diff;
+          closestColIdx = j;
+        }
+      }
+      gridRow[closestColIdx] = gridRow[closestColIdx] ? gridRow[closestColIdx] + ' ' + w.text : w.text;
+    }
+    grid.push(gridRow);
+  }
+
+  // 4. Determine Orientation (Rows = Days or Cols = Days)
+  const dayNames = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  
+  let dayColIdx = -1;
+  let dayRowIdx = -1;
+  
+  for (let c = 0; c < cols.length; c++) {
+    let dayCount = 0;
+    for (let r = 0; r < rows.length; r++) {
+      const cellText = grid[r][c].toLowerCase();
+      if (dayNames.some(d => cellText.includes(d))) dayCount++;
+    }
+    if (dayCount >= 3) { dayColIdx = c; break; }
+  }
+  
+  if (dayColIdx === -1) {
+    for (let r = 0; r < rows.length; r++) {
+      let dayCount = 0;
+      for (let c = 0; c < cols.length; c++) {
+        const cellText = grid[r][c].toLowerCase();
+        if (dayNames.some(d => cellText.includes(d))) dayCount++;
+      }
+      if (dayCount >= 3) { dayRowIdx = r; break; }
+    }
+  }
+  
+  const orientation = dayColIdx !== -1 ? 'Time-by-Day' : (dayRowIdx !== -1 ? 'Day-by-Time' : 'Unknown');
+  console.log(`[GeometricParser] Chosen orientation: ${orientation}`);
+  
+  if (orientation !== 'Unknown') confidence += 30;
+
+  const timeRegex = /\b([0-1]?[0-9]|2[0-3])[:.]([0-5][0-9])\s*(?:-|to|~)\s*([0-1]?[0-9]|2[0-3])[:.]([0-5][0-9])\b/i;
+  
+  // 5. Parse Schedule based on orientation
+  if (orientation === 'Time-by-Day') {
+    let timeRowIdx = 0;
+    let maxTimes = 0;
+    for (let r = 0; r < Math.min(3, rows.length); r++) {
+      let timeCount = 0;
+      for (let c = 0; c < cols.length; c++) {
+        if (grid[r][c].match(timeRegex)) timeCount++;
+      }
+      if (timeCount > maxTimes) { maxTimes = timeCount; timeRowIdx = r; }
+    }
+    
+    for (let r = 0; r < rows.length; r++) {
+      const dayCell = grid[r][dayColIdx].toLowerCase();
+      const matchedDay = dayNames.find(d => dayCell.includes(d));
+      if (!matchedDay) continue;
+      
+      const dayStr = matchedDay.slice(0,3);
+      const cleanDay = dayStr.charAt(0).toUpperCase() + dayStr.slice(1);
+      
+      for (let c = 0; c < cols.length; c++) {
+        if (c === dayColIdx) continue;
+        const cellText = grid[r][c];
+        if (!cellText || cellText.length < 3) continue;
+        
+        let timeStr = '', endStr = '';
+        const tMatch = grid[timeRowIdx][c].match(timeRegex);
+        if (tMatch) {
+          timeStr = `${tMatch[1].padStart(2, '0')}:${tMatch[2]}`;
+          endStr = `${tMatch[3].padStart(2, '0')}:${tMatch[4]}`;
+        } else {
+          const localTMatch = cellText.match(timeRegex);
+          if (localTMatch) {
+            timeStr = `${localTMatch[1].padStart(2, '0')}:${localTMatch[2]}`;
+            endStr = `${localTMatch[3].padStart(2, '0')}:${localTMatch[4]}`;
+          }
+        }
+        
+        if (!timeStr) {
+          console.log(`[GeometricParser] Rejected cell at r=${r} c=${c} due to missing time.`);
+          rejectedCount++;
+          continue;
+        }
+        
+        const { subject, room, teacher, code, type, isUncertain } = cleanupTimetableDomain(cellText);
+        if (subject && subject !== 'Unknown Subject') {
+          schedule.push({ day: cleanDay, time: timeStr, end: endStr, subject, room, teacher, code, type, isUncertain });
+          parsedCount++;
+          confidence += 2;
+        } else {
+          console.log(`[GeometricParser] Rejected cell at r=${r} c=${c} due to invalid subject/junk text.`);
+          rejectedCount++;
+        }
+      }
+    }
+  } else if (orientation === 'Day-by-Time') {
+    let timeColIdx = 0;
+    let maxTimes = 0;
+    for (let c = 0; c < Math.min(3, cols.length); c++) {
+      let timeCount = 0;
+      for (let r = 0; r < rows.length; r++) {
+        if (grid[r][c].match(timeRegex)) timeCount++;
+      }
+      if (timeCount > maxTimes) { maxTimes = timeCount; timeColIdx = c; }
+    }
+    
+    for (let r = 0; r < rows.length; r++) {
+      let timeStr = '', endStr = '';
+      const tMatch = grid[r][timeColIdx].match(timeRegex);
+      if (tMatch) {
+        timeStr = `${tMatch[1].padStart(2, '0')}:${tMatch[2]}`;
+        endStr = `${tMatch[3].padStart(2, '0')}:${tMatch[4]}`;
+      }
+      
+      for (let c = 0; c < cols.length; c++) {
+        if (c === timeColIdx) continue;
+        
+        const dayCell = grid[dayRowIdx][c].toLowerCase();
+        const matchedDay = dayNames.find(d => dayCell.includes(d));
+        if (!matchedDay) continue;
+        
+        const dayStr = matchedDay.slice(0,3);
+        const cleanDay = dayStr.charAt(0).toUpperCase() + dayStr.slice(1);
+        
+        const cellText = grid[r][c];
+        if (!cellText || cellText.length < 3) continue;
+        
+        let localTimeStr = timeStr, localEndStr = endStr;
+        if (!localTimeStr) {
+          const localTMatch = cellText.match(timeRegex);
+          if (localTMatch) {
+            localTimeStr = `${localTMatch[1].padStart(2, '0')}:${localTMatch[2]}`;
+            localEndStr = `${localTMatch[3].padStart(2, '0')}:${localTMatch[4]}`;
+          }
+        }
+        
+        if (!localTimeStr) {
+          console.log(`[GeometricParser] Rejected cell at r=${r} c=${c} due to missing time.`);
+          rejectedCount++;
+          continue;
+        }
+        
+        const { subject, room, teacher, code, type, isUncertain } = cleanupTimetableDomain(cellText);
+        if (subject && subject !== 'Unknown Subject') {
+          schedule.push({ day: cleanDay, time: localTimeStr, end: localEndStr, subject, room, teacher, code, type, isUncertain });
+          parsedCount++;
+          confidence += 2;
+        } else {
+          console.log(`[GeometricParser] Rejected cell at r=${r} c=${c} due to invalid subject/junk text.`);
+          rejectedCount++;
+        }
+      }
+    }
+  } else {
+    console.log('[GeometricParser] Unknown orientation. Falling back to linear raw text scanning is skipped.');
+  }
+  
+  confidence = Math.min(100, Math.round(confidence));
+  console.log(`[GeometricParser] Final confidence: ${confidence}/100. Parsed: ${parsedCount}, Rejected: ${rejectedCount}`);
+  return { schedule, confidence, ambiguous: rejectedCount > parsedCount || confidence < 40 };
 }
 
 async function extractTimetableFromImage(base64Data, mimeType) {
@@ -628,17 +865,19 @@ Rules:
   const hasGeminiKey = !!window.CAMPUS_OS_GEMINI_KEY;
 
   if (!hasGroqKey && !hasGeminiKey) {
-    console.log("[ExtractionPipeline] AI Repair skipped (no API key). Using deterministic output.");
+    console.log("[ExtractionPipeline] AI Repair skipped (no API key). Using geometric structural output.");
     // Return what we have, even if schedule is empty. We pass confidence up to the UI.
     return deterministicResult;
   }
 
   try {
+    updateTimetableLoadingModal("Repairing partial rows with AI...");
+    const rawOcrText = ocrResult.data.text; // Use raw text for AI context
     const aiResult = await AIService.generateContentFromText(rawOcrText, schemaInstruction);
     return { ...aiResult, confidence: deterministicResult.confidence };
   } catch (err) {
     console.warn("[ExtractionPipeline] AI Repair failed:", err);
-    console.log("[ExtractionPipeline] Falling back to deterministic output due to AI failure.");
+    console.log("[ExtractionPipeline] Falling back to geometric output due to AI failure.");
     return deterministicResult;
   }
 }
