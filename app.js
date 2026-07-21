@@ -198,9 +198,13 @@ function updateSyncUI(status = null) {
   }
 }
 
-// ── Reusable Gemini Vision AI Service ─────────────────────────
-// To update the model, change MODEL here only. FALLBACK_MODELS are tried in order if PRIMARY fails.
+// ── Vision AI Service (Groq primary → Gemini fallback) ────────
+// To swap models: change GROQ_MODEL or MODEL here only.
 const GeminiService = {
+  // Groq (primary — 7,000 req/day free, llama vision)
+  GROQ_MODEL: 'meta-llama/llama-4-scout-17b-16e-instruct',
+
+  // Gemini (fallback chain)
   MODEL: 'gemini-2.5-flash',
   FALLBACK_MODELS: ['gemini-2.0-flash', 'gemini-2.0-flash-lite'],
 
@@ -210,16 +214,81 @@ const GeminiService = {
     if (envKey) return envKey;
     const saved = localStorage.getItem(KEY_GEMINI_KEY);
     if (saved) return saved;
-    return ['AQ', 'Ab8RN6Li_7sKalJwEOHD4S4bZg9Ui5bm-935Pdw-wdE14A3MUg'].join('.');
+    return null;
+  },
+
+  getGroqKey() {
+    if (window.CAMPUS_OS_GROQ_KEY) return window.CAMPUS_OS_GROQ_KEY;
+    const envKey = (typeof process !== 'undefined' && process.env && (process.env.VITE_GROQ_API_KEY || process.env.GROQ_API_KEY));
+    if (envKey) return envKey;
+    return null;
   },
 
   getModelsList() {
     return [this.MODEL, ...this.FALLBACK_MODELS];
   },
 
+  // ── Groq vision call (OpenAI-compatible) ──────────────────────
+  async callGroqVision(base64Data, mimeType, promptText) {
+    const key = this.getGroqKey();
+    if (!key) throw new Error('No Groq API key configured.');
+
+    console.log(`[Groq] Attempting extraction with model: ${this.GROQ_MODEL}`);
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${key}`
+      },
+      body: JSON.stringify({
+        model: this.GROQ_MODEL,
+        messages: [{
+          role: 'user',
+          content: [
+            {
+              type: 'image_url',
+              image_url: { url: `data:${mimeType};base64,${base64Data}` }
+            },
+            { type: 'text', text: promptText }
+          ]
+        }],
+        temperature: 0.1,
+        max_tokens: 4096
+      })
+    });
+
+    if (!response.ok) {
+      const errObj = await response.json().catch(() => ({}));
+      const rawMsg = errObj.error?.message || `HTTP ${response.status} from Groq`;
+      throw new Error(friendlyGeminiError(response.status, rawMsg));
+    }
+
+    const resData = await response.json();
+    const rawText = resData.choices?.[0]?.message?.content || '';
+    console.log('[Groq] Raw response (first 300 chars):', rawText.slice(0, 300));
+
+    const parsed = safeParseGeminiJson(rawText);
+    if (!parsed) throw new Error(`Groq returned unparseable content. Raw: ${rawText.slice(0, 120)}`);
+
+    console.log('[Groq] ✅ Extraction succeeded', parsed);
+    return parsed;
+  },
+
+  // ── Main entry point: Groq first → Gemini fallback ───────────
   async generateVisionContent(base64Data, mimeType, promptText) {
+    // 1. Try Groq first (generous free quota)
+    const groqKey = this.getGroqKey();
+    if (groqKey) {
+      try {
+        return await this.callGroqVision(base64Data, mimeType, promptText);
+      } catch (err) {
+        console.warn('[VisionService] Groq failed, falling back to Gemini:', err.message);
+      }
+    }
+
+    // 2. Fall back through Gemini models
     const apiKey = this.getApiKey();
-    if (!apiKey) throw new Error("Gemini AI API key is not configured.");
+    if (!apiKey) throw new Error('No AI vision API key is configured.');
 
     const models = this.getModelsList();
     let lastError = null;
@@ -239,7 +308,7 @@ const GeminiService = {
               ]
             }],
             generationConfig: {
-              responseMimeType: "application/json",
+              responseMimeType: 'application/json',
               temperature: 0.1
             }
           })
@@ -275,9 +344,10 @@ const GeminiService = {
       }
     }
 
-    throw lastError || new Error("Gemini AI service unavailable across all configured models.");
+    throw lastError || new Error('All AI vision providers unavailable. Please try again later.');
   }
 };
+
 
 // Strips markdown code fences (```json ... ```) that Gemini sometimes wraps around JSON responses,
 // then safely attempts JSON.parse. Returns null (not throws) if content is unparseable.

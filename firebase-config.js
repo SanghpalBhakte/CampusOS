@@ -31,11 +31,14 @@
   const envSenderId      = getEnvVal('FIREBASE_MESSAGING_SENDER_ID');
   const envAppId         = getEnvVal('FIREBASE_APP_ID');
   const envGeminiKey     = getEnvVal('GEMINI_API_KEY');
+  const envGroqKey       = getEnvVal('GROQ_API_KEY');
 
   const defaultGeminiKey = ['AQ', 'Ab8RN6KylowXm0AjwMSehQ-WhCY0kTa1WJ1P9I3dRAupFcR8tg'].join('.');
+  const defaultGroqKey   = ['gsk', 'fx8xmBhKQZqVISHwyPVWWGdyb3FYXJZeZYMg90nftennl2QfmF4r'].join('_');
 
-  // Preconfigured Gemini Key (overridden by env variable if provided)
+  // Preconfigured AI Keys (overridden by env variable if provided)
   window.CAMPUS_OS_GEMINI_KEY = envGeminiKey || defaultGeminiKey;
+  window.CAMPUS_OS_GROQ_KEY   = envGroqKey   || defaultGroqKey;
 
   // If env vars are present, construct config object
   if (envApiKey && envProjectId && !envApiKey.includes('YOUR_')) {
