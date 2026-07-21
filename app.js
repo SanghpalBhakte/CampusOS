@@ -483,8 +483,102 @@ function parseTimetableDeterministically(ocrText) {
   const times = textLower.match(timeRegex);
   if (times && times.length > 2) confidence += 20;
 
-  console.log(`[TimetableParser] Deterministic parser confidence: ${confidence}/100. Ambiguous: ${true}`);
-  return { schedule: [], confidence, ambiguous: true };
+  console.log(`[TimetableParser] OCR raw text length: ${ocrText.length}`);
+  
+  let currentDay = 'Mon';
+  const lines = ocrText.split('\n').map(l => l.trim()).filter(Boolean);
+  
+  let parsedCount = 0;
+  let rejectedCount = 0;
+  
+  for (const line of lines) {
+    const lineLower = line.toLowerCase();
+    
+    // Check if line is a day header
+    const foundDay = days.find(d => lineLower.startsWith(d) || lineLower === d);
+    if (foundDay) {
+      currentDay = foundDay.charAt(0).toUpperCase() + foundDay.slice(1);
+      if (currentDay === 'Thu') currentDay = 'Thu';
+      continue;
+    }
+    
+    // Try to extract time range: e.g. 10:00 - 11:00 or 10.00 to 11.00
+    const rangeRegex = /\b([0-1]?[0-9]|2[0-3])[:.]([0-5][0-9])\s*(?:-|to|~)\s*([0-1]?[0-9]|2[0-3])[:.]([0-5][0-9])\b/i;
+    const match = line.match(rangeRegex);
+    
+    if (match) {
+      const startH = match[1].padStart(2, '0');
+      const startM = match[2];
+      const endH = match[3].padStart(2, '0');
+      const endM = match[4];
+      
+      const timeStr = `${startH}:${startM}`;
+      const endStr = `${endH}:${endM}`;
+      
+      // Remove the time string from line to extract remaining info
+      let remaining = line.replace(match[0], '').trim();
+      
+      // Extract room (e.g. LT-2, Room 404, L-12)
+      let room = '';
+      const roomMatch = remaining.match(/\b(LT-?\d+|Room\s*\d+|L-?\d+)\b/i);
+      if (roomMatch) {
+        room = roomMatch[1];
+        remaining = remaining.replace(roomMatch[0], '').trim();
+      }
+      
+      // Extract teacher (e.g. Prof. Name, Dr. Smith)
+      let teacher = '';
+      const teacherMatch = remaining.match(/\b(Prof\.?\s+\w+|Dr\.?\s+\w+)\b/i);
+      if (teacherMatch) {
+        teacher = teacherMatch[1];
+        remaining = remaining.replace(teacherMatch[0], '').trim();
+      }
+      
+      // Extract course code (e.g. CS301, MAT-101)
+      let code = '';
+      const codeMatch = remaining.match(/\b([A-Z]{2,4}-?\d{3,4})\b/i);
+      if (codeMatch) {
+        code = codeMatch[1];
+        remaining = remaining.replace(codeMatch[0], '').trim();
+      }
+      
+      // Extract type (lecture, lab, tutorial)
+      let type = 'lecture';
+      if (remaining.toLowerCase().includes('lab')) {
+        type = 'lab';
+        remaining = remaining.replace(/\blab\b/i, '').trim();
+      } else if (remaining.toLowerCase().includes('tutorial') || remaining.toLowerCase().includes('tut')) {
+        type = 'tutorial';
+        remaining = remaining.replace(/\btutorial|tut\b/i, '').trim();
+      }
+      
+      const subject = remaining.replace(/[^a-zA-Z0-9 ]/g, '').replace(/\s+/g, ' ').trim() || 'Unknown Subject';
+      
+      const isUncertain = subject === 'Unknown Subject' || !room || remaining.length < 3;
+      
+      schedule.push({
+        day: currentDay,
+        time: timeStr,
+        end: endStr,
+        subject: subject,
+        code: code,
+        room: room,
+        teacher: teacher,
+        type: type,
+        isUncertain: isUncertain
+      });
+      parsedCount++;
+      confidence += 5; // Boost confidence for every successfully parsed row
+    } else {
+      console.log(`[TimetableParser] Rejected row (no valid time range): ${line}`);
+      rejectedCount++;
+    }
+  }
+
+  console.log(`[TimetableParser] Parsed rows: ${parsedCount} | Rejected rows: ${rejectedCount}`);
+  console.log(`[TimetableParser] Deterministic parser confidence: ${confidence}/100. Final schedule length: ${schedule.length}`);
+  
+  return { schedule, confidence, ambiguous: rejectedCount > parsedCount };
 }
 
 async function extractTimetableFromImage(base64Data, mimeType) {
