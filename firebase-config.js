@@ -8,10 +8,14 @@
   // Helper to extract env values across different frameworks safely
   function getEnvVal(key) {
     // 1. Vite environment variables
+    // (Commented out: 'import.meta' causes SyntaxError in non-module script tags.
+    // If using Vite, configure it to replace process.env or window.ENV instead.)
+    /*
     if (typeof import.meta !== 'undefined' && import.meta.env) {
       if (import.meta.env[`VITE_${key}`]) return import.meta.env[`VITE_${key}`];
       if (import.meta.env[key]) return import.meta.env[key];
     }
+    */
     // 2. Next.js / Webpack process environment variables
     if (typeof process !== 'undefined' && process.env) {
       if (process.env[`NEXT_PUBLIC_${key}`]) return process.env[`NEXT_PUBLIC_${key}`];
