@@ -37,14 +37,19 @@ function safeSetStorage(key, val) {
 // ── Profile (read from localStorage, fallback to data.js) ─────
 function loadProfile() {
   const saved = safeGetStorage(KEY_PROFILE, {}) || {};
+  const nameVal = (saved.name && saved.name !== STUDENT.name) ? saved.name : '';
   return {
-    name:     saved.name     ?? STUDENT.name,
+    name:     nameVal,
     college:  saved.college  ?? STUDENT.college,
     branch:   saved.branch   ?? STUDENT.branch,
     year:     saved.year     ?? STUDENT.year,
     rollNo:   saved.rollNo   ?? STUDENT.rollNo,
     examDate: saved.examDate ?? '',
   };
+}
+
+function getDisplayName() {
+  return (liveProfile.name && liveProfile.name.trim()) ? liveProfile.name.trim() : 'Your Name';
 }
 
 // Mutable live profile — updated on settings save without page reload
@@ -61,10 +66,11 @@ function getInitials(name) {
 
 function updateTopbarProfile() {
   liveProfile = loadProfile();
+  const nameToDisplay = getDisplayName();
   const av = document.getElementById('topbar-avatar');
   if (av) {
-    av.textContent = getInitials(liveProfile.name);
-    av.title       = liveProfile.name;
+    av.textContent = getInitials(nameToDisplay);
+    av.title       = nameToDisplay;
   }
 }
 
@@ -187,41 +193,13 @@ function updateSyncUI(status = null) {
 }
 
 // ── Gemini Timetable Image Extractor ─────────────────────────
-function showGeminiKeyModal(onSuccess) {
-  const savedKey = localStorage.getItem(KEY_GEMINI_KEY) || '';
-  const backdrop = document.createElement('div');
-  backdrop.className = 'modal-backdrop';
-  backdrop.id = 'gemini-key-backdrop';
-  backdrop.innerHTML = `
-    <div class="modal" onclick="event.stopPropagation()" style="max-width:440px">
-      <div class="modal-header">
-        <h2 class="modal-title">Gemini API Key Required</h2>
-        <button class="modal-close" onclick="document.getElementById('gemini-key-backdrop').remove()">${icons.x()}</button>
-      </div>
-      <div style="font-size:0.83rem;color:var(--text-secondary);margin-bottom:14px;line-height:1.5">
-        To scan and extract timetables from photos, paste a free Gemini API Key from 
-        <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:underline">Google AI Studio</a>.
-      </div>
-      <div class="form-group">
-        <label class="form-label">Gemini API Key <span class="req">*</span></label>
-        <input type="password" class="form-input" id="g-api-key" placeholder="AIzaSy..." value="${savedKey}">
-      </div>
-      <div class="form-actions">
-        <button class="btn-secondary" onclick="document.getElementById('gemini-key-backdrop').remove()">Cancel</button>
-        <button class="btn-primary" onclick="saveGeminiKey()">Save & Continue</button>
-      </div>
-    </div>
-  `;
-  backdrop.addEventListener('click', () => backdrop.remove());
-  document.body.appendChild(backdrop);
-
-  window.saveGeminiKey = function() {
-    const k = (document.getElementById('g-api-key').value || '').trim();
-    if (!k) { alert("Please enter a valid Gemini API key."); return; }
-    localStorage.setItem(KEY_GEMINI_KEY, k);
-    document.getElementById('gemini-key-backdrop')?.remove();
-    if (typeof onSuccess === 'function') onSuccess();
-  };
+function getGeminiApiKey() {
+  if (window.CAMPUS_OS_GEMINI_KEY) return window.CAMPUS_OS_GEMINI_KEY;
+  const envKey = (typeof process !== 'undefined' && process.env && (process.env.VITE_GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY || process.env.GEMINI_API_KEY));
+  if (envKey) return envKey;
+  const saved = localStorage.getItem(KEY_GEMINI_KEY);
+  if (saved) return saved;
+  return getFirebaseConfig()?.apiKey || '';
 }
 
 function showTimetableLoadingModal(msg = "Analyzing photo...") {
@@ -293,11 +271,6 @@ Rules:
 }
 
 function triggerTimetableImport() {
-  const apiKey = localStorage.getItem(KEY_GEMINI_KEY) || '';
-  if (!apiKey) {
-    showGeminiKeyModal(() => selectTimetableFile());
-    return;
-  }
   selectTimetableFile();
 }
 
@@ -313,9 +286,9 @@ function handleTimetableImageUpload(event) {
   const file = event.target.files?.[0];
   if (!file) return;
 
-  const apiKey = localStorage.getItem(KEY_GEMINI_KEY) || '';
+  const apiKey = getGeminiApiKey();
   if (!apiKey) {
-    showGeminiKeyModal(() => selectTimetableFile());
+    alert("Gemini AI service is not available.");
     return;
   }
 
@@ -1022,8 +995,9 @@ function renderDashboard() {
     }
   }
 
-  // Profile setup prompt (shown when name is still default)
-  const needsSetup = liveProfile.name === STUDENT.name && STUDENT.name === 'Your Name';
+  // Profile setup prompt (shown when name is still default/empty)
+  const displayName = getDisplayName();
+  const needsSetup = !liveProfile.name || liveProfile.name === 'Your Name';
   const setupBanner = needsSetup ? `
     <div class="card" style="margin-bottom:20px;display:flex;align-items:center;gap:12px;background:var(--accent-dim);border-color:var(--accent)">
       <div style="color:var(--accent);flex-shrink:0">${icons.user()}</div>
@@ -1035,7 +1009,7 @@ function renderDashboard() {
 
   el.innerHTML = `
     <div class="greeting-banner">
-      <div class="greeting-text">${greetingWord()}, ${liveProfile.name.split(' ')[0]}! 👋</div>
+      <div class="greeting-text">${greetingWord()}, ${displayName.split(' ')[0]}! 👋</div>
       <div class="greeting-sub">${liveProfile.branch} · ${liveProfile.year}</div>
       <div class="greeting-date">
         ${svg('<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>', 14)}
@@ -1468,7 +1442,7 @@ function renderSettings() {
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">Full Name</label>
-          <input type="text" class="form-input" id="s-name" value="${p.name}" placeholder="Your full name">
+          <input type="text" class="form-input" id="s-name" value="${p.name.replace(/"/g, '&quot;')}" placeholder="Your Name">
         </div>
         <div class="form-group">
           <label class="form-label">Roll Number</label>

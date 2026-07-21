@@ -30,6 +30,11 @@
   const envStorageBucket = getEnvVal('FIREBASE_STORAGE_BUCKET');
   const envSenderId      = getEnvVal('FIREBASE_MESSAGING_SENDER_ID');
   const envAppId         = getEnvVal('FIREBASE_APP_ID');
+  const envGeminiKey     = getEnvVal('GEMINI_API_KEY');
+
+  if (envGeminiKey) {
+    window.CAMPUS_OS_GEMINI_KEY = envGeminiKey;
+  }
 
   // If env vars are present, construct config object
   if (envApiKey && envProjectId && !envApiKey.includes('YOUR_')) {
