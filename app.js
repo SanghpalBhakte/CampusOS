@@ -596,48 +596,51 @@ function sanitizeTask(t) {
   };
 }
 
+let lastCloudPayloadHash = null;
+
+function calculatePayloadHash(data) {
+  try {
+    return JSON.stringify({
+      p: data.profile,
+      t: data.customTasks?.length,
+      tt: data.customTimetable ? Object.keys(data.customTimetable).length : 0,
+      a: data.assignmentStatuses,
+      tm: data.theme
+    });
+  } catch (e) {
+    return null;
+  }
+}
+
 function subscribeUserCloudData(uid) {
   if (!db || !uid) return;
   if (cloudUnsubscribe) cloudUnsubscribe();
 
   const userRef = db.collection('users').doc(uid);
-  cloudUnsubscribe = userRef.onSnapshot(doc => {
-    if (doc.exists) {
-      const data = doc.data() || {};
-      if (data.profile && typeof data.profile === 'object') {
-        const cleanProfile = {
-          name:     String(data.profile.name || '').slice(0, 80),
-          college:  String(data.profile.college || '').slice(0, 100),
-          branch:   String(data.profile.branch || '').slice(0, 100),
-          year:     String(data.profile.year || '').slice(0, 50),
-          rollNo:   String(data.profile.rollNo || '').slice(0, 50),
-          examDate: String(data.profile.examDate || '').slice(0, 20),
-        };
-        safeSetStorage(KEY_PROFILE, cleanProfile);
-      }
-      if (Array.isArray(data.customTasks)) {
-        state.customTasks = data.customTasks.map(sanitizeTask).filter(Boolean);
-        safeSetStorage(KEY_CUSTOM_TASKS, state.customTasks);
-      }
-      if (data.customTimetable && typeof data.customTimetable === 'object') {
-        safeSetStorage(KEY_CUSTOM_TIMETABLE, data.customTimetable);
-      }
-      if (data.assignmentStatuses && typeof data.assignmentStatuses === 'object') {
-        safeSetStorage(KEY_ASSIGNMENTS, data.assignmentStatuses);
-        state.assignments = loadAssignments();
-      }
-      if (data.theme && ['dark', 'light', 'glass'].includes(data.theme)) {
-        localStorage.setItem(KEY_THEME, data.theme);
-        initTheme();
-      }
-      updateTopbarProfile();
-      updateNavBadges();
-      if (['settings', 'assignments', 'dashboard'].includes(state.currentPage)) {
-        renderPage(state.currentPage);
-      }
-    } else {
-      pushLocalDataToCloud(uid);
+
+  // Cache-First Read: Immediate IndexedDB cache hit (0ms UI latency, 0 server reads)
+  userRef.get({ source: 'cache' }).then(doc => {
+    if (doc && doc.exists) {
+      applyCloudDataToLocalState(doc.data());
     }
+  }).catch(() => {});
+
+  // Server Listener with metadata echo filter
+  cloudUnsubscribe = userRef.onSnapshot({ includeMetadataChanges: false }, doc => {
+    if (!doc || !doc.exists) {
+      pushLocalDataToCloud(uid);
+      return;
+    }
+
+    // Skip parsing and UI re-renders on local pending write echo events
+    if (doc.metadata && doc.metadata.hasPendingWrites) return;
+
+    const data = doc.data() || {};
+    const currentHash = calculatePayloadHash(data);
+    if (currentHash && currentHash === lastCloudPayloadHash) return;
+    lastCloudPayloadHash = currentHash;
+
+    applyCloudDataToLocalState(data);
   }, err => {
     if (err.code === 'permission-denied') {
       updateSyncUI('denied');
@@ -646,6 +649,41 @@ function subscribeUserCloudData(uid) {
       console.warn("Cloud snapshot error:", err);
     }
   });
+}
+
+function applyCloudDataToLocalState(data) {
+  if (!data || typeof data !== 'object') return;
+  if (data.profile && typeof data.profile === 'object') {
+    const cleanProfile = {
+      name:     String(data.profile.name || '').slice(0, 80),
+      college:  String(data.profile.college || '').slice(0, 100),
+      branch:   String(data.profile.branch || '').slice(0, 100),
+      year:     String(data.profile.year || '').slice(0, 50),
+      rollNo:   String(data.profile.rollNo || '').slice(0, 50),
+      examDate: String(data.profile.examDate || '').slice(0, 20),
+    };
+    safeSetStorage(KEY_PROFILE, cleanProfile);
+  }
+  if (Array.isArray(data.customTasks)) {
+    state.customTasks = data.customTasks.map(sanitizeTask).filter(Boolean);
+    safeSetStorage(KEY_CUSTOM_TASKS, state.customTasks);
+  }
+  if (data.customTimetable && typeof data.customTimetable === 'object') {
+    safeSetStorage(KEY_CUSTOM_TIMETABLE, data.customTimetable);
+  }
+  if (data.assignmentStatuses && typeof data.assignmentStatuses === 'object') {
+    safeSetStorage(KEY_ASSIGNMENTS, data.assignmentStatuses);
+    state.assignments = loadAssignments();
+  }
+  if (data.theme && ['dark', 'light', 'glass'].includes(data.theme)) {
+    localStorage.setItem(KEY_THEME, data.theme);
+    initTheme();
+  }
+  updateTopbarProfile();
+  updateNavBadges();
+  if (['settings', 'assignments', 'dashboard'].includes(state.currentPage)) {
+    renderPage(state.currentPage);
+  }
 }
 
 let syncDebounceTimer = null;
@@ -696,6 +734,16 @@ function loadCustomTasks() {
 }
 
 function saveCustomTasks() {
+  // Prune completed tasks older than 14 days to minimize document size and Firestore read/write overhead
+  const fourteenDaysAgo = new Date();
+  fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+  const cutoffStr = `${fourteenDaysAgo.getFullYear()}-${String(fourteenDaysAgo.getMonth()+1).padStart(2,'0')}-${String(fourteenDaysAgo.getDate()).padStart(2,'0')}`;
+
+  state.customTasks = state.customTasks.filter(t => {
+    if (t.status === 'submitted' && t.dueDate < cutoffStr) return false;
+    return true;
+  });
+
   safeSetStorage(KEY_CUSTOM_TASKS, state.customTasks);
   syncToCloud();
 }
