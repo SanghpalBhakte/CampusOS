@@ -197,17 +197,69 @@ function updateSyncUI(status = null) {
   }
 }
 
-// ── Gemini Timetable Image Extractor ─────────────────────────
-const DEFAULT_GEMINI_KEY = ['AQ', 'Ab8RN6Li_7sKalJwEOHD4S4bZg9Ui5bm-935Pdw-wdE14A3MUg'].join('.');
+// ── Reusable Gemini Vision AI Service ─────────────────────────
+const GeminiService = {
+  PRIMARY_MODEL: 'gemini-1.5-flash',
+  FALLBACK_MODELS: ['gemini-2.0-flash-exp', 'gemini-1.5-flash-8b'],
 
-function getGeminiApiKey() {
-  if (window.CAMPUS_OS_GEMINI_KEY) return window.CAMPUS_OS_GEMINI_KEY;
-  const envKey = (typeof process !== 'undefined' && process.env && (process.env.VITE_GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY || process.env.GEMINI_API_KEY));
-  if (envKey) return envKey;
-  const saved = localStorage.getItem(KEY_GEMINI_KEY);
-  if (saved) return saved;
-  return DEFAULT_GEMINI_KEY;
-}
+  getApiKey() {
+    if (window.CAMPUS_OS_GEMINI_KEY) return window.CAMPUS_OS_GEMINI_KEY;
+    const envKey = (typeof process !== 'undefined' && process.env && (process.env.VITE_GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY || process.env.GEMINI_API_KEY));
+    if (envKey) return envKey;
+    const saved = localStorage.getItem(KEY_GEMINI_KEY);
+    if (saved) return saved;
+    return ['AQ', 'Ab8RN6Li_7sKalJwEOHD4S4bZg9Ui5bm-935Pdw-wdE14A3MUg'].join('.');
+  },
+
+  getModelsList() {
+    return [this.PRIMARY_MODEL, ...this.FALLBACK_MODELS];
+  },
+
+  async generateVisionContent(base64Data, mimeType, promptText) {
+    const apiKey = this.getApiKey();
+    if (!apiKey) throw new Error("Gemini AI API key is not configured.");
+
+    const models = this.getModelsList();
+    let lastError = null;
+
+    for (const model of models) {
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                { text: promptText },
+                { inlineData: { mimeType: mimeType, data: base64Data } }
+              ]
+            }],
+            generationConfig: {
+              responseMimeType: "application/json",
+              temperature: 0.1
+            }
+          })
+        });
+
+        if (!response.ok) {
+          const errObj = await response.json().catch(() => ({}));
+          throw new Error(errObj.error?.message || `HTTP ${response.status} from ${model}`);
+        }
+
+        const resData = await response.json();
+        const text = resData.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+        return JSON.parse(text);
+      } catch (err) {
+        lastError = err;
+        console.warn(`[GeminiService] Model attempt ${model} failed:`, err);
+      }
+    }
+
+    throw lastError || new Error("Gemini AI service unavailable across all configured models.");
+  }
+};
 
 function showTimetableLoadingModal(msg = "Analyzing photo...") {
   const backdrop = document.createElement('div');
@@ -223,14 +275,8 @@ function showTimetableLoadingModal(msg = "Analyzing photo...") {
   document.body.appendChild(backdrop);
 }
 
-async function extractTimetableFromImage(base64Data, mimeType, apiKey) {
-  const models = ['gemini-1.5-flash', 'gemini-2.0-flash-exp', 'gemini-1.5-flash-8b'];
-  let lastError = null;
-
-  for (const model of models) {
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-
-    const schemaInstruction = `Extract all weekly college class timetable entries from this image.
+async function extractTimetableFromImage(base64Data, mimeType) {
+  const schemaInstruction = `Extract all weekly college class timetable entries from this image.
 Return JSON matching this exact structure:
 {
   "schedule": [
@@ -254,39 +300,7 @@ Rules:
 3. If any entry has blurry, cropped, ambiguous, or uncertain text, DO NOT GUESS. Set "isUncertain": true for that entry.
 4. Extract every valid lecture, lab, or tutorial entry visible.`;
 
-    try {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              { text: schemaInstruction },
-              { inlineData: { mimeType: mimeType, data: base64Data } }
-            ]
-          }],
-          generationConfig: {
-            responseMimeType: "application/json",
-            temperature: 0.1
-          }
-        })
-      });
-
-      if (!response.ok) {
-        const errObj = await response.json().catch(() => ({}));
-        throw new Error(errObj.error?.message || `Status ${response.status} from ${model}`);
-      }
-
-      const resData = await response.json();
-      const text = resData.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
-      return JSON.parse(text);
-    } catch (err) {
-      lastError = err;
-      console.warn(`Gemini extraction attempt with model ${model} failed:`, err);
-    }
-  }
-
-  throw lastError || new Error("Gemini AI extraction service failed. Please check your image or internet connection.");
+  return await GeminiService.generateVisionContent(base64Data, mimeType, schemaInstruction);
 }
 
 function triggerTimetableImport() {
@@ -305,12 +319,6 @@ function handleTimetableImageUpload(event) {
   const file = event.target.files?.[0];
   if (!file) return;
 
-  const apiKey = getGeminiApiKey();
-  if (!apiKey) {
-    alert("Gemini AI service is not available.");
-    return;
-  }
-
   showTimetableLoadingModal("Scanning timetable photo...");
 
   const reader = new FileReader();
@@ -320,7 +328,7 @@ function handleTimetableImageUpload(event) {
       const mimeType   = resultUrl.split(';')[0].split(':')[1] || 'image/jpeg';
       const base64Data = resultUrl.split(',')[1];
 
-      const result = await extractTimetableFromImage(base64Data, mimeType, apiKey);
+      const result = await extractTimetableFromImage(base64Data, mimeType);
       document.getElementById('tt-loading-backdrop')?.remove();
 
       if (!result.schedule || !Array.isArray(result.schedule) || !result.schedule.length) {
