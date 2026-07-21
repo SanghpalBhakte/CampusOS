@@ -813,14 +813,29 @@ function navigate(page) {
 }
 
 function renderPage(page) {
-  switch (page) {
-    case 'dashboard':   renderDashboard();   break;
-    case 'timetable':   renderTimetable();   break;
-    case 'assignments': renderAssignments(); break;
-    case 'notices':     renderNotices();     break;
-    case 'links':       renderLinks();       break;
-    case 'summary':     renderSummary();     break;
-    case 'settings':    renderSettings();    break;
+  try {
+    switch (page) {
+      case 'dashboard':   renderDashboard();   break;
+      case 'timetable':   renderTimetable();   break;
+      case 'assignments': renderAssignments(); break;
+      case 'notices':     renderNotices();     break;
+      case 'links':       renderLinks();       break;
+      case 'summary':     renderSummary();     break;
+      case 'settings':    renderSettings();    break;
+    }
+  } catch (err) {
+    console.error(`Error rendering page [${page}]:`, err);
+    const targetEl = document.getElementById(`page-${page}`);
+    if (targetEl) {
+      targetEl.innerHTML = `
+        <div class="card" style="text-align:center;padding:40px 20px;margin-top:20px;border-left:3px solid var(--red)">
+          <div style="font-size:2rem;margin-bottom:10px">⚠️</div>
+          <div style="font-weight:700;font-size:1.05rem;margin-bottom:6px">Unable to render section</div>
+          <div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:16px">${err.message || 'An unexpected rendering error occurred.'}</div>
+          <button class="btn-primary" onclick="location.reload()" style="font-size:0.85rem">Reload Campus OS</button>
+        </div>
+      `;
+    }
   }
 }
 
@@ -973,10 +988,6 @@ function renderDashboard() {
   const dayClasses = liveTT[now.getDay()] || [];
   const currentMin = currentTimeMinutes();
   const nextClass  = dayClasses.find(c => timeToMinutes(c.time || '10:00') > currentMin);
-
-  const total          = allTasks().length;
-  const submittedCount = allTasks().filter(a => a.status === 'submitted').length;
-  const progress       = total === 0 ? 0 : Math.round((submittedCount / total) * 100);
 
   // Exam countdown
   let countdownHTML = '';
