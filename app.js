@@ -831,13 +831,17 @@ const DAY_SHORT   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 function formatDate(dateStr) {
+  if (!dateStr) return '';
   const d = new Date(dateStr + 'T00:00:00');
+  if (isNaN(d.getTime())) return String(dateStr);
   return `${d.getDate()} ${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
 }
 
 function dueDaysLeft(dateStr) {
+  if (!dateStr) return 0;
   const now = new Date(); now.setHours(0,0,0,0);
   const due = new Date(dateStr + 'T00:00:00');
+  if (isNaN(due.getTime())) return 0;
   return Math.round((due - now) / 86400000);
 }
 
@@ -852,8 +856,10 @@ function currentTimeMinutes() {
 }
 
 function timeToMinutes(t) {
-  const [h, m] = t.split(':').map(Number);
-  return h * 60 + m;
+  if (!t || typeof t !== 'string') return 0;
+  const parts = t.split(':').map(Number);
+  if (parts.length < 2 || isNaN(parts[0]) || isNaN(parts[1])) return 0;
+  return parts[0] * 60 + parts[1];
 }
 
 function greetingWord() {
@@ -2015,8 +2021,8 @@ function init() {
   initTheme();
   updateTopbarProfile();
 
-  document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
-  document.getElementById('global-search').addEventListener('keydown', e => {
+  document.getElementById('theme-toggle')?.addEventListener('click', toggleTheme);
+  document.getElementById('global-search')?.addEventListener('keydown', e => {
     if (e.key === 'Enter') handleGlobalSearch(e.target.value);
   });
 
