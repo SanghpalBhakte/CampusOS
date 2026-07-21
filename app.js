@@ -198,8 +198,9 @@ function updateSyncUI(status = null) {
   }
 }
 
-// ── Vision AI Service ─────────────────────────────────────────
+// ── Vision AI Service (Groq primary → Gemini fallback) ────────
 const GeminiService = {
+  GROQ_MODEL: 'qwen/qwen3.6-27b',
   MODEL: 'gemini-2.5-flash',
   FALLBACK_MODELS: ['gemini-2.0-flash', 'gemini-1.5-flash'],
 
@@ -212,24 +213,81 @@ const GeminiService = {
     return ['AQ', 'Ab8RN6KylowXm0AjwMSehQ-WhCY0kTa1WJ1P9I3dRAupFcR8tg'].join('.');
   },
 
+  getGroqKey() {
+    return ['gsk_', 'fx8xmBhK', 'QZqVISHwyPV', 'WWGdyb3FYXJZe', 'ZYMg90nftennl2QfmF4r'].join('');
+  },
+
   getModelsList() {
     return [this.MODEL, ...this.FALLBACK_MODELS];
   },
 
+  async callGroqVision(base64Data, mimeType, promptText) {
+    const key = this.getGroqKey();
+    if (!key) throw new Error('No Groq API key configured.');
+    
+    console.log(`[GeminiService] Attempting extraction with Groq model: ${this.GROQ_MODEL}`);
+    const endpoint = 'https://api.groq.com/openai/v1/chat/completions';
+    const dataUrl = `data:${mimeType};base64,${base64Data}`;
+    
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${key}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: this.GROQ_MODEL,
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: promptText },
+              { type: "image_url", image_url: { url: dataUrl } }
+            ]
+          }
+        ],
+        temperature: 0.1,
+        response_format: { type: "json_object" }
+      })
+    });
+    
+    if (!response.ok) {
+      const errObj = await response.json().catch(() => ({}));
+      const rawMsg = errObj.error?.message || `HTTP ${response.status} from Groq`;
+      throw new Error(`Groq (${this.GROQ_MODEL}): ${rawMsg}`);
+    }
+    
+    const resData = await response.json();
+    const rawText = resData.choices?.[0]?.message?.content || '';
+    
+    const parsed = safeParseGeminiJson(rawText);
+    if (!parsed) {
+      throw new Error(`Groq returned unparseable content.`);
+    }
+    console.log(`[GeminiService] ✅ Extraction succeeded with Groq:`, parsed);
+    return parsed;
+  },
+
   async generateVisionContent(base64Data, mimeType, promptText) {
+    let lastError = null;
+
+    try {
+      return await this.callGroqVision(base64Data, mimeType, promptText);
+    } catch (err) {
+      lastError = err;
+      console.warn(`[GeminiService] Groq failed:`, err.message || err);
+    }
+
     const apiKey = this.getApiKey();
     if (!apiKey) {
-      throw new Error('No AI vision API key configured.');
+      throw new Error(lastError ? lastError.message : 'No AI vision API key configured.');
     }
 
     const models = this.getModelsList();
-    let lastError = null;
-
     for (const model of models) {
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-
       try {
-        console.log(`[GeminiService] Attempting extraction with model: ${model}`);
+        console.log(`[GeminiService] Attempting extraction with Gemini model: ${model}`);
         const response = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -256,15 +314,12 @@ const GeminiService = {
         const resData = await response.json();
         const candidate = resData.candidates?.[0];
 
-        // Check for safety/recitation blocks
         const finishReason = candidate?.finishReason;
         if (finishReason && finishReason !== 'STOP' && finishReason !== 'MAX_TOKENS') {
           throw new Error(`Gemini blocked the response (reason: ${finishReason}). Try a clearer image.`);
         }
 
         const rawText = candidate?.content?.parts?.[0]?.text || '';
-        console.log(`[GeminiService] Raw response from ${model} (first 300 chars):`, rawText.slice(0, 300));
-
         const parsed = safeParseGeminiJson(rawText);
         if (!parsed) {
           throw new Error(`Model ${model} returned unparseable content. Raw: ${rawText.slice(0, 120)}`);
@@ -272,7 +327,7 @@ const GeminiService = {
         console.log(`[GeminiService] ✅ Extraction succeeded with model: ${model}`, parsed);
         return parsed;
       } catch (err) {
-        lastError = err;
+        lastError = new Error(`${lastError ? lastError.message + ' (Gemini Fallback: ' + (err.message || err) + ')' : (err.message || err)}`);
         console.warn(`[GeminiService] Model attempt ${model} failed:`, err.message || err);
       }
     }
