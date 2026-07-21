@@ -201,7 +201,7 @@ function updateSyncUI(status = null) {
 // ── Reusable Gemini Vision AI Service ─────────────────────────
 // To update the model, change MODEL here only. FALLBACK_MODELS are tried in order if PRIMARY fails.
 const GeminiService = {
-  MODEL: 'gemini-2.5-flash-preview-05-20',
+  MODEL: 'gemini-2.5-flash',
   FALLBACK_MODELS: ['gemini-2.0-flash', 'gemini-2.0-flash-lite'],
 
   getApiKey() {
