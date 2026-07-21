@@ -224,7 +224,7 @@ function showTimetableLoadingModal(msg = "Analyzing photo...") {
 }
 
 async function extractTimetableFromImage(base64Data, mimeType, apiKey) {
-  const models = ['gemini-2.5-flash', 'gemini-1.5-flash'];
+  const models = ['gemini-1.5-flash', 'gemini-2.0-flash-exp', 'gemini-1.5-flash-8b'];
   let lastError = null;
 
   for (const model of models) {
@@ -331,7 +331,10 @@ function handleTimetableImageUpload(event) {
       showTimetablePreviewModal(result.schedule);
     } catch (err) {
       document.getElementById('tt-loading-backdrop')?.remove();
-      alert("Extraction failed: " + err.message);
+      console.warn("Timetable extraction error:", err);
+      if (confirm(`Image extraction failed: ${err.message || 'Unable to scan schedule from image'}.\n\nWould you like to open the manual timetable editor to enter your schedule instead?`)) {
+        showTimetableEntryModal(state.ttDay, null);
+      }
     }
   };
   reader.readAsDataURL(file);
