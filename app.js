@@ -1119,9 +1119,14 @@ function renderTimetable() {
 
   let content = '';
   if (!classes.length) {
-    content = `<div class="card" style="text-align:center;padding:40px;color:var(--text-muted);border-style:dashed">🏖️ No classes — enjoy the day!</div>`;
+    content = `<div class="card" style="text-align:center;padding:40px;color:var(--text-muted);border-style:dashed">
+      🏖️ No classes on ${DAY_NAMES[day]} — enjoy the day!
+      <div style="margin-top:12px">
+        <button class="btn-primary" onclick="showTimetableEntryModal(${day}, null)" style="font-size:0.8rem;padding:6px 14px">+ Add Class Entry</button>
+      </div>
+    </div>`;
   } else {
-    content = classes.map(c => {
+    content = classes.map((c, idx) => {
       const startMin  = timeToMinutes(c.time || '10:00');
       const endMin    = timeToMinutes(c.end || '11:00');
       const isCurrent = day === today && currentMin >= startMin && currentMin < endMin;
@@ -1133,11 +1138,17 @@ function renderTimetable() {
             <div class="tt-time-end">${c.end}</div>
           </div>
           <div class="tt-divider"></div>
-          <div class="tt-info">
+          <div class="tt-info" style="flex:1;min-width:0">
             <div class="tt-subject">${c.subject}</div>
             <div class="tt-meta">${c.code} &nbsp;·&nbsp; ${c.room} &nbsp;·&nbsp; ${c.teacher}</div>
+            ${c.notes ? `<div style="font-size:0.78rem;color:var(--yellow);margin-top:3px;display:flex;align-items:center;gap:4px">📌 ${c.notes}</div>` : ''}
           </div>
-          <span class="type-badge type-${c.type || 'lecture'}">${c.type || 'lecture'}</span>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span class="type-badge type-${c.type || 'lecture'}">${c.type || 'lecture'}</span>
+            <button class="task-delete-btn" onclick="showTimetableEntryModal(${day}, ${idx})" title="Edit class entry" style="padding:4px 6px">
+              ${icons.edit()}
+            </button>
+          </div>
         </div>`;
     }).join('');
   }
@@ -1146,11 +1157,14 @@ function renderTimetable() {
     <div class="page-header">
       <div>
         <div class="page-title">Timetable</div>
-        <div class="page-subtitle">${classes.length} class${classes.length!==1?'es':''} on ${DAY_NAMES[day]} ${isCustom ? '· (Custom Imported Schedule)' : ''}</div>
+        <div class="page-subtitle">${classes.length} class${classes.length!==1?'es':''} on ${DAY_NAMES[day]} ${isCustom ? '· (Customized Schedule)' : ''}</div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn-primary" onclick="triggerTimetableImport()" style="display:flex;align-items:center;gap:6px;font-size:0.8rem;padding:7px 14px">
-          📷 Import from Photo
+        <button class="btn-primary" onclick="showTimetableEntryModal(${day}, null)" style="display:flex;align-items:center;gap:6px;font-size:0.8rem;padding:7px 14px">
+          ${icons.plus()} Add Class
+        </button>
+        <button class="btn-secondary" onclick="triggerTimetableImport()" style="display:flex;align-items:center;gap:6px;font-size:0.8rem;padding:7px 14px">
+          📷 Scan Photo
         </button>
         ${isCustom ? `
           <button class="btn-secondary" onclick="resetTimetableToDefault()" style="font-size:0.8rem;padding:7px 12px;color:var(--text-muted)">
@@ -1162,6 +1176,142 @@ function renderTimetable() {
     ${content}
     ${day===today&&classes.length?'<div class="text-xs text-muted" style="margin-top:12px;text-align:center">Highlighted = current class &nbsp;|&nbsp; Faded = past</div>':''}
   `;
+}
+
+function showTimetableEntryModal(day = state.ttDay, idx = null) {
+  const tt = loadTimetable();
+  const dayClasses = tt[day] || [];
+  const item = (idx !== null && dayClasses[idx]) ? dayClasses[idx] : null;
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  backdrop.id = 'tt-entry-modal-backdrop';
+
+  const dayOptions = [1,2,3,4,5,6,0].map(d => 
+    `<option value="${d}" ${d == day ? 'selected' : ''}>${DAY_NAMES[d]}</option>`
+  ).join('');
+
+  backdrop.innerHTML = `
+    <div class="modal" onclick="event.stopPropagation()" style="max-width:480px">
+      <div class="modal-header">
+        <h2 class="modal-title">${item ? 'Edit Class Entry' : 'Add Class Entry'}</h2>
+        <button class="modal-close" onclick="document.getElementById('tt-entry-modal-backdrop').remove()">${icons.x()}</button>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Day <span class="req">*</span></label>
+        <select class="form-select" id="tte-day">${dayOptions}</select>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Start Time <span class="req">*</span></label>
+          <input type="text" class="form-input" id="tte-time" placeholder="e.g. 10:00" value="${item ? item.time || '' : '10:00'}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">End Time <span class="req">*</span></label>
+          <input type="text" class="form-input" id="tte-end" placeholder="e.g. 11:00" value="${item ? item.end || '' : '11:00'}">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Subject Name <span class="req">*</span></label>
+          <input type="text" class="form-input" id="tte-subject" placeholder="e.g. Data Structures" value="${item ? (item.subject || '').replace(/"/g, '&quot;') : ''}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Subject Code</label>
+          <input type="text" class="form-input" id="tte-code" placeholder="e.g. DS" value="${item ? (item.code || '').replace(/"/g, '&quot;') : ''}">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Room / Hall</label>
+          <input type="text" class="form-input" id="tte-room" placeholder="e.g. LT-1" value="${item ? (item.room || '').replace(/"/g, '&quot;') : ''}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Faculty / Teacher</label>
+          <input type="text" class="form-input" id="tte-teacher" placeholder="e.g. Prof. VJM" value="${item ? (item.teacher || '').replace(/"/g, '&quot;') : ''}">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Class Type</label>
+        <select class="form-select" id="tte-type">
+          <option value="lecture" ${item && item.type === 'lecture' ? 'selected' : ''}>Lecture</option>
+          <option value="lab" ${item && item.type === 'lab' ? 'selected' : ''}>Lab</option>
+          <option value="project" ${item && item.type === 'project' ? 'selected' : ''}>Project / Workshop</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Notes / Exception (Optional)</label>
+        <input type="text" class="form-input" id="tte-notes" placeholder="e.g. Room changed to SF-32 on 24 Oct" value="${item ? (item.notes || '').replace(/"/g, '&quot;') : ''}">
+      </div>
+
+      <div class="form-actions">
+        ${item ? `<button class="btn-secondary" onclick="deleteTimetableEntry(${day}, ${idx})" style="color:var(--red);margin-right:auto">Delete Entry</button>` : ''}
+        <button class="btn-secondary" onclick="document.getElementById('tt-entry-modal-backdrop').remove()">Cancel</button>
+        <button class="btn-primary" onclick="saveTimetableEntry(${day}, ${idx !== null ? idx : 'null'})">Save Class</button>
+      </div>
+    </div>
+  `;
+
+  backdrop.addEventListener('click', () => backdrop.remove());
+  document.body.appendChild(backdrop);
+}
+
+function saveTimetableEntry(oldDay, idx) {
+  const newDay   = parseInt(document.getElementById('tte-day').value);
+  const time     = (document.getElementById('tte-time').value || '10:00').trim();
+  const end      = (document.getElementById('tte-end').value || '11:00').trim();
+  const subject  = (document.getElementById('tte-subject').value || '').trim();
+  const code     = (document.getElementById('tte-code').value || '').trim() || 'SUB';
+  const room     = (document.getElementById('tte-room').value || '').trim() || '—';
+  const teacher  = (document.getElementById('tte-teacher').value || '').trim() || '—';
+  const type     = document.getElementById('tte-type').value || 'lecture';
+  const notes    = (document.getElementById('tte-notes').value || '').trim();
+
+  if (!subject) {
+    alert("Please enter a subject name.");
+    return;
+  }
+
+  const tt = JSON.parse(JSON.stringify(loadTimetable()));
+  if (!tt[newDay]) tt[newDay] = [];
+
+  const entry = { time, end, subject, code, room, teacher, type };
+  if (notes) entry.notes = notes;
+
+  if (idx !== null && oldDay === newDay && tt[oldDay]?.[idx]) {
+    tt[oldDay][idx] = entry;
+  } else {
+    if (idx !== null && tt[oldDay]?.[idx]) {
+      tt[oldDay].splice(idx, 1);
+    }
+    tt[newDay].push(entry);
+  }
+
+  Object.keys(tt).forEach(d => {
+    tt[d].sort((a,b) => timeToMinutes(a.time) - timeToMinutes(b.time));
+  });
+
+  saveTimetable(tt);
+  document.getElementById('tt-entry-modal-backdrop')?.remove();
+  state.ttDay = newDay;
+  renderTimetable();
+}
+
+function deleteTimetableEntry(day, idx) {
+  if (!confirm("Delete this class entry?")) return;
+  const tt = JSON.parse(JSON.stringify(loadTimetable()));
+  if (tt[day]?.[idx]) {
+    tt[day].splice(idx, 1);
+    saveTimetable(tt);
+  }
+  document.getElementById('tt-entry-modal-backdrop')?.remove();
+  renderTimetable();
 }
 
 // ── Assignments ───────────────────────────────────────────────
@@ -1804,8 +1954,11 @@ window.setTheme         = setTheme;
 window.loginWithGoogle  = loginWithGoogle;
 window.loginWithGoogleRedirect = loginWithGoogleRedirect;
 window.logoutUser       = logoutUser;
-window.triggerTimetableImport = triggerTimetableImport;
+window.triggerTimetableImport  = triggerTimetableImport;
 window.resetTimetableToDefault = resetTimetableToDefault;
+window.showTimetableEntryModal = showTimetableEntryModal;
+window.saveTimetableEntry      = saveTimetableEntry;
+window.deleteTimetableEntry    = deleteTimetableEntry;
 
 window.toggleAssignment = (id) => {
   // Custom task
