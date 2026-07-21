@@ -199,8 +199,8 @@ function updateSyncUI(status = null) {
 
 // ── Reusable Gemini Vision AI Service ─────────────────────────
 const GeminiService = {
-  PRIMARY_MODEL: 'gemini-1.5-flash',
-  FALLBACK_MODELS: ['gemini-2.0-flash-exp', 'gemini-1.5-flash-8b'],
+  PRIMARY_MODEL: 'gemini-2.0-flash',
+  FALLBACK_MODELS: ['gemini-1.5-flash'],
 
   getApiKey() {
     if (window.CAMPUS_OS_GEMINI_KEY) return window.CAMPUS_OS_GEMINI_KEY;
@@ -332,7 +332,9 @@ function handleTimetableImageUpload(event) {
       document.getElementById('tt-loading-backdrop')?.remove();
 
       if (!result.schedule || !Array.isArray(result.schedule) || !result.schedule.length) {
-        alert("No clear timetable schedule detected in image. Please try a clearer photo.");
+        document.getElementById('tt-loading-backdrop')?.remove();
+        alert("No clear timetable schedule detected in image. Opening manual editor...");
+        showTimetableEntryModal(state.ttDay, null);
         return;
       }
 
@@ -340,9 +342,8 @@ function handleTimetableImageUpload(event) {
     } catch (err) {
       document.getElementById('tt-loading-backdrop')?.remove();
       console.warn("Timetable extraction error:", err);
-      if (confirm(`Image extraction failed: ${err.message || 'Unable to scan schedule from image'}.\n\nWould you like to open the manual timetable editor to enter your schedule instead?`)) {
-        showTimetableEntryModal(state.ttDay, null);
-      }
+      // Automatic non-blocking fallback to manual timetable editor
+      showTimetableEntryModal(state.ttDay, null);
     }
   };
   reader.readAsDataURL(file);
