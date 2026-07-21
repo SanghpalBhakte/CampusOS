@@ -1,32 +1,54 @@
-const CACHE_NAME = 'campus-os-v3';
+const CACHE_NAME = 'campus-os-v4';
+const PRECACHE_ASSETS = [
+  './',
+  './index.html',
+  './style.css',
+  './app.js',
+  './data.js',
+  './firebase-config.js',
+  './manifest.json'
+];
 
 self.addEventListener('install', (e) => {
+  e.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_ASSETS))
+  );
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (e) => {
   e.waitUntil(
-    caches.keys().then((keys) => Promise.all(
-      keys.map((k) => caches.delete(k))
-    ))
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+    )
   );
   self.clients.claim();
 });
 
 self.addEventListener('fetch', (e) => {
-  // Only intercept GET requests
   if (e.request.method !== 'GET') return;
 
-  // Network-first strategy with cache fallback
+  const url = new URL(e.request.url);
+
+  // Skip Firebase Firestore / Auth API traffic from SW caching
+  if (url.hostname.includes('googleapis.com') || url.hostname.includes('firebase')) {
+    return;
+  }
+
+  // Stale-While-Revalidate for app shell & static assets
   e.respondWith(
-    fetch(e.request)
-      .then((response) => {
-        if (response && response.status === 200 && response.type === 'basic') {
-          const responseClone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(e.request, responseClone));
-        }
-        return response;
-      })
-      .catch(() => caches.match(e.request))
+    caches.match(e.request).then((cachedResponse) => {
+      const fetchPromise = fetch(e.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+            const clone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(e.request, clone));
+          }
+          return networkResponse;
+        })
+        .catch(() => cachedResponse);
+
+      return cachedResponse || fetchPromise;
+    })
   );
 });

@@ -648,6 +648,8 @@ function subscribeUserCloudData(uid) {
   });
 }
 
+let syncDebounceTimer = null;
+
 function pushLocalDataToCloud(uid) {
   if (!db || !uid) return;
   const sanitizedTasks = state.customTasks.map(sanitizeTask).filter(Boolean);
@@ -668,10 +670,25 @@ function pushLocalDataToCloud(uid) {
 }
 
 function syncToCloud() {
-  if (currentUser) {
+  if (!currentUser) return;
+  clearTimeout(syncDebounceTimer);
+  syncDebounceTimer = setTimeout(() => {
     pushLocalDataToCloud(currentUser.uid);
-  }
+  }, 2500);
 }
+
+// Pause active cloud listener when tab is hidden to save Firestore read quota
+document.addEventListener('visibilitychange', () => {
+  if (!currentUser || !db) return;
+  if (document.hidden) {
+    if (cloudUnsubscribe) {
+      cloudUnsubscribe();
+      cloudUnsubscribe = null;
+    }
+  } else {
+    subscribeUserCloudData(currentUser.uid);
+  }
+});
 
 // ── Custom Tasks (fully persisted) ────────────────────────────
 function loadCustomTasks() {
