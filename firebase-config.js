@@ -44,7 +44,7 @@
   } else if (!window.CAMPUS_OS_FIREBASE_CONFIG) {
     // Fallback template declaration (overridden by localStorage or user setup modal)
     window.CAMPUS_OS_FIREBASE_CONFIG = {
-      apiKey:            "YOUR_FIREBASE_API_KEY",
+      apiKey:            "AIzaSyD1st-UB9NbBme9z-8M0upwJ0ndQrr8J2E",
       authDomain:        "campusos-83365.firebaseapp.com",
       projectId:         "campusos-83365",
       storageBucket:     "campusos-83365.appspot.com",
