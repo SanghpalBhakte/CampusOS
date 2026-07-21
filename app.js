@@ -37,9 +37,10 @@ function safeSetStorage(key, val) {
 // ── Profile (read from localStorage, fallback to data.js) ─────
 function loadProfile() {
   const saved = safeGetStorage(KEY_PROFILE, {}) || {};
-  const nameVal = (saved.name && saved.name !== STUDENT.name) ? saved.name : '';
+  const savedName = (saved.name || '').trim();
+  const isDefaultName = !savedName || savedName.toLowerCase() === 'your name';
   return {
-    name:     nameVal,
+    name:     isDefaultName ? '' : savedName,
     college:  saved.college  ?? STUDENT.college,
     branch:   saved.branch   ?? STUDENT.branch,
     year:     saved.year     ?? STUDENT.year,
@@ -49,7 +50,11 @@ function loadProfile() {
 }
 
 function getDisplayName() {
-  return (liveProfile.name && liveProfile.name.trim()) ? liveProfile.name.trim() : 'Your Name';
+  const nameVal = (liveProfile.name || '').trim();
+  if (nameVal && nameVal.toLowerCase() !== 'your name') {
+    return nameVal;
+  }
+  return 'Your Name';
 }
 
 // Mutable live profile — updated on settings save without page reload
@@ -1527,8 +1532,10 @@ function renderSettings() {
 }
 
 function saveSettings() {
+  const rawName = (document.getElementById('s-name').value || '').trim();
+  const nameToSave = (rawName.toLowerCase() === 'your name') ? '' : rawName;
   const profile = {
-    name:     (document.getElementById('s-name').value     || '').trim(),
+    name:     nameToSave,
     college:  (document.getElementById('s-college').value  || '').trim(),
     branch:   (document.getElementById('s-branch').value   || '').trim(),
     year:     (document.getElementById('s-year').value     || '').trim(),
