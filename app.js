@@ -82,6 +82,15 @@ function saveAssignments() {
 }
 
 // ── Firebase Configuration & Cloud Sync ───────────────────────
+const DEFAULT_FIREBASE_CONFIG = {
+  apiKey:            "AIzaSyD1st-UB9NbBme9z-8M0upwJ0ndQrr8J2E",
+  authDomain:        "campusos-83365.firebaseapp.com",
+  projectId:         "campusos-83365",
+  storageBucket:     "campusos-83365.appspot.com",
+  messagingSenderId: "1234567890",
+  appId:             "1:1234567890:web:campusos-83365"
+};
+
 function isValidFirebaseConfig(cfg) {
   if (!cfg || typeof cfg !== 'object') return false;
   if (!cfg.apiKey || typeof cfg.apiKey !== 'string') return false;
@@ -98,20 +107,18 @@ function getFirebaseConfig() {
   if (saved && isValidFirebaseConfig(saved)) {
     return saved;
   }
-  return null;
+  return DEFAULT_FIREBASE_CONFIG;
 }
 
 let db = null;
 let auth = null;
 let currentUser = null;
 let cloudUnsubscribe = null;
+let firebaseInitError = null;
 
 function initFirebase() {
+  firebaseInitError = null;
   const cfg = getFirebaseConfig();
-  if (!cfg) {
-    updateSyncUI();
-    return;
-  }
 
   if (typeof firebase !== 'undefined' && firebase.apps) {
     try {
@@ -121,7 +128,21 @@ function initFirebase() {
       auth = firebase.auth();
       db   = firebase.firestore();
 
-      db.enablePersistence({ synchronizeTabs: true }).catch(() => {});
+      db.enablePersistence({ synchronizeTabs: true }).catch(err => {
+        console.warn("Firestore persistence notice (non-fatal):", err);
+      });
+
+      // Process redirect authentication result if Returning from redirect sign-in
+      auth.getRedirectResult().then(result => {
+        if (result && result.user) {
+          currentUser = result.user;
+          updateSyncUI();
+          if (state.currentPage === 'settings') renderSettings();
+        }
+      }).catch(err => {
+        console.warn("Firebase redirect auth result error:", err);
+        handleAuthError(err);
+      });
 
       auth.onAuthStateChanged(user => {
         currentUser = user;
@@ -131,11 +152,17 @@ function initFirebase() {
         } else {
           if (cloudUnsubscribe) { cloudUnsubscribe(); cloudUnsubscribe = null; }
         }
+        if (state.currentPage === 'settings') renderSettings();
       });
     } catch (e) {
-      console.warn("Firebase initialized in local-only mode:", e);
+      console.warn("Firebase initialization error:", e);
+      firebaseInitError = e.message || "Failed to initialize Firebase SDK.";
       updateSyncUI();
     }
+  } else {
+    firebaseInitError = "Firebase SDK not loaded. Please check your internet connection or ad blocker.";
+    console.warn(firebaseInitError);
+    updateSyncUI();
   }
 }
 
@@ -478,23 +505,76 @@ window.confirmSaveExtractedTimetable = function() {
   renderPage(state.currentPage);
 };
 
+function handleAuthError(err) {
+  if (!err) return;
+  const code = err.code || '';
+  const msg  = err.message || '';
+
+  if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+    return;
+  }
+
+  if (code === 'auth/popup-blocked') {
+    if (confirm("Sign-in popup was blocked by your browser.\n\nClick OK to try signing in with redirect instead.")) {
+      loginWithGoogleRedirect();
+    }
+    return;
+  }
+
+  if (code === 'auth/unauthorized-domain') {
+    const domain = window.location.hostname;
+    alert(`Unauthorized Domain: '${domain}'\n\nTo allow Google Sign-In on this domain:\n1. Open Firebase Console → Authentication → Settings → Authorized Domains.\n2. Add '${domain}' to authorized domains.`);
+    return;
+  }
+
+  if (code === 'auth/api-key-not-valid' || code === 'auth/invalid-api-key') {
+    alert("Firebase API Key Error: The API key for this project is invalid or restricted in Google Cloud Console. Please verify authorized API key restrictions.");
+    return;
+  }
+
+  if (code === 'auth/operation-not-allowed') {
+    alert("Google Sign-In Disabled: Google auth provider is not enabled in Firebase Console.\n\nGo to Firebase Console → Authentication → Sign-in method → Enable Google.");
+    return;
+  }
+
+  if (code === 'auth/network-request-failed') {
+    alert("Network Error: Could not connect to Google Authentication servers. Please check your internet connection and try again.");
+    return;
+  }
+
+  alert(`Google Sign-In Error (${code || 'unknown'}):\n${msg || 'An unexpected authentication error occurred.'}`);
+}
+
 function loginWithGoogle() {
   if (!auth) {
     initFirebase();
   }
   if (!auth) {
-    alert("Google Sign-In is currently offline. Please check your internet connection.");
+    const detail = firebaseInitError || "Firebase Auth service is not loaded.";
+    alert(`Google Sign-In Unavailable:\n\n${detail}`);
     return;
   }
   const provider = new firebase.auth.GoogleAuthProvider();
-  auth.signInWithPopup(provider).then(() => {
-    updateSyncUI();
-  }).catch(err => {
-    if (err.code === 'auth/unauthorized-domain') {
-      alert("Unauthorized domain: '" + window.location.hostname + "'.\n\nPlease add this domain in Firebase Console → Authentication → Settings → Authorized Domains.");
-    } else if (err.code !== 'auth/popup-closed-by-user') {
-      alert("Sign-in error (" + err.code + "): " + err.message);
+  provider.setCustomParameters({ prompt: 'select_account' });
+
+  auth.signInWithPopup(provider).then(result => {
+    if (result && result.user) {
+      currentUser = result.user;
+      updateSyncUI();
+      if (state.currentPage === 'settings') renderSettings();
     }
+  }).catch(err => {
+    handleAuthError(err);
+  });
+}
+
+function loginWithGoogleRedirect() {
+  if (!auth) initFirebase();
+  if (!auth) return;
+  const provider = new firebase.auth.GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: 'select_account' });
+  auth.signInWithRedirect(provider).catch(err => {
+    handleAuthError(err);
   });
 }
 
@@ -1741,6 +1821,7 @@ window.importData       = importData;
 window.confirmClearTasks = confirmClearTasks;
 window.setTheme         = setTheme;
 window.loginWithGoogle  = loginWithGoogle;
+window.loginWithGoogleRedirect = loginWithGoogleRedirect;
 window.logoutUser       = logoutUser;
 window.triggerTimetableImport = triggerTimetableImport;
 window.resetTimetableToDefault = resetTimetableToDefault;
