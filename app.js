@@ -1070,6 +1070,7 @@ function renderTimetablePreviewModalContent(backdrop) {
           <option value="lecture" ${item.type==='lecture'?'selected':''}>Lecture</option>
           <option value="lab" ${item.type==='lab'?'selected':''}>Lab</option>
           <option value="project" ${item.type==='project'?'selected':''}>Project</option>
+          <option value="off" ${item.type==='off'?'selected':''}>Off</option>
         </select>
       </td>
       <td style="text-align:center">
@@ -1170,10 +1171,10 @@ window.confirmSaveExtractedTimetable = function() {
     newTT[dayNum].push({
       time:    item.time || '10:00',
       end:     item.end || '11:00',
-      subject: item.subject || 'Class',
-      code:    item.code || 'SUB',
-      room:    item.room || 'LT-1',
-      teacher: item.teacher || 'Faculty',
+      subject: item.type === 'off' ? (item.subject || 'Off') : (item.subject || 'Class'),
+      code:    item.type === 'off' ? (item.code || '') : (item.code || 'SUB'),
+      room:    item.type === 'off' ? (item.room || '') : (item.room || 'LT-1'),
+      teacher: item.type === 'off' ? (item.teacher || '') : (item.teacher || 'Faculty'),
       type:    item.type || 'lecture',
     });
   });
@@ -1970,6 +1971,7 @@ function showTimetableEntryModal(day = state.ttDay, idx = null) {
           <option value="lecture" ${item && item.type === 'lecture' ? 'selected' : ''}>Lecture</option>
           <option value="lab" ${item && item.type === 'lab' ? 'selected' : ''}>Lab</option>
           <option value="project" ${item && item.type === 'project' ? 'selected' : ''}>Project / Workshop</option>
+          <option value="off" ${item && item.type === 'off' ? 'selected' : ''}>Off</option>
         </select>
       </div>
 
@@ -1994,16 +1996,23 @@ function saveTimetableEntry(oldDay, idx) {
   const newDay   = parseInt(document.getElementById('tte-day').value);
   const time     = (document.getElementById('tte-time').value || '10:00').trim();
   const end      = (document.getElementById('tte-end').value || '11:00').trim();
-  const subject  = (document.getElementById('tte-subject').value || '').trim();
-  const code     = (document.getElementById('tte-code').value || '').trim() || 'SUB';
-  const room     = (document.getElementById('tte-room').value || '').trim() || '—';
-  const teacher  = (document.getElementById('tte-teacher').value || '').trim() || '—';
+  let subject  = (document.getElementById('tte-subject').value || '').trim();
+  let code     = (document.getElementById('tte-code').value || '').trim();
+  let room     = (document.getElementById('tte-room').value || '').trim();
+  let teacher  = (document.getElementById('tte-teacher').value || '').trim();
   const type     = document.getElementById('tte-type').value || 'lecture';
   const notes    = (document.getElementById('tte-notes').value || '').trim();
 
-  if (!subject) {
-    alert("Please enter a subject name.");
-    return;
+  if (type === 'off') {
+    if (!subject) subject = 'Off';
+  } else {
+    if (!subject) {
+      alert("Please enter a subject name.");
+      return;
+    }
+    if (!code) code = 'SUB';
+    if (!room) room = '—';
+    if (!teacher) teacher = '—';
   }
 
   const tt = JSON.parse(JSON.stringify(loadTimetable()));
