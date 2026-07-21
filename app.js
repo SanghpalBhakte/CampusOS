@@ -198,16 +198,10 @@ function updateSyncUI(status = null) {
   }
 }
 
-// ── Vision AI Service (Groq primary → Gemini fallback) ────────
-// To swap models: change GROQ_MODEL or MODEL here only.
+// ── Vision AI Service ─────────────────────────────────────────
 const GeminiService = {
-  // Groq (primary — 7,000 req/day free, Llama vision models)
-  GROQ_MODEL: 'llama-3.2-11b-vision-preview',
-  GROQ_FALLBACK_MODELS: ['llama-3.2-90b-vision-preview'],
-
-  // Gemini (fallback chain)
   MODEL: 'gemini-2.5-flash',
-  FALLBACK_MODELS: ['gemini-2.0-flash', 'gemini-2.0-flash-lite'],
+  FALLBACK_MODELS: ['gemini-2.0-flash', 'gemini-1.5-flash'],
 
   getApiKey() {
     if (window.CAMPUS_OS_GEMINI_KEY) return window.CAMPUS_OS_GEMINI_KEY;
@@ -218,100 +212,14 @@ const GeminiService = {
     return ['AQ', 'Ab8RN6KylowXm0AjwMSehQ-WhCY0kTa1WJ1P9I3dRAupFcR8tg'].join('.');
   },
 
-  getGroqKey() {
-    if (window.CAMPUS_OS_GROQ_KEY) return window.CAMPUS_OS_GROQ_KEY;
-    const envKey = (typeof process !== 'undefined' && process.env && (process.env.VITE_GROQ_API_KEY || process.env.GROQ_API_KEY));
-    if (envKey) return envKey;
-    return ['gsk', 'fx8xmBhKQZqVISHwyPVWWGdyb3FYXJZeZYMg90nftennl2QfmF4r'].join('_');
-  },
-
   getModelsList() {
     return [this.MODEL, ...this.FALLBACK_MODELS];
   },
 
-  // ── Groq vision call (OpenAI-compatible) ──────────────────────
-  async callGroqVision(base64Data, mimeType, promptText) {
-    const key = this.getGroqKey();
-    if (!key) throw new Error('No Groq API key configured.');
-
-    const groqModels = [
-      'llama-3.2-11b-vision-preview',
-      'llama-3.2-90b-vision-preview'
-    ];
-    let lastError = null;
-
-    for (const gModel of groqModels) {
-      try {
-        console.log(`[Groq] Attempting extraction with model: ${gModel}`);
-        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${key}`
-          },
-          body: JSON.stringify({
-            model: gModel,
-            messages: [{
-              role: 'user',
-              content: [
-                {
-                  type: 'text',
-                  text: promptText
-                },
-                {
-                  type: 'image_url',
-                  image_url: { url: `data:${mimeType};base64,${base64Data}` }
-                }
-              ]
-            }],
-            temperature: 0.1,
-            max_tokens: 4096
-          })
-        });
-
-        if (!response.ok) {
-          const errObj = await response.json().catch(() => ({}));
-          const rawMsg = errObj.error?.message || `HTTP ${response.status} from Groq model ${gModel}`;
-          console.error(`[Groq Error] HTTP ${response.status} (${gModel}):`, errObj);
-          throw new Error(`Groq (${gModel}): ${rawMsg}`);
-        }
-
-        const resData = await response.json();
-        const rawText = resData.choices?.[0]?.message?.content || '';
-        console.log(`[Groq] Raw response from ${gModel} (first 300 chars):`, rawText.slice(0, 300));
-
-        const parsed = safeParseGeminiJson(rawText);
-        if (!parsed) throw new Error(`Groq model ${gModel} returned unparseable content. Raw: ${rawText.slice(0, 120)}`);
-
-        console.log(`[Groq] ✅ Extraction succeeded with ${gModel}`, parsed);
-        return parsed;
-      } catch (err) {
-        lastError = err;
-        console.warn(`[Groq] Attempt ${gModel} failed:`, err.message || err);
-      }
-    }
-
-    throw lastError || new Error('All Groq models failed.');
-  },
-
-  // ── Main entry point: Groq first → Gemini fallback ───────────
   async generateVisionContent(base64Data, mimeType, promptText) {
-    let groqError = null;
-    // 1. Try Groq first (generous free quota)
-    const groqKey = this.getGroqKey();
-    if (groqKey) {
-      try {
-        return await this.callGroqVision(base64Data, mimeType, promptText);
-      } catch (err) {
-        groqError = err;
-        console.error('[VisionService] Groq attempt failed:', err.message);
-      }
-    }
-
-    // 2. Fall back through Gemini models
     const apiKey = this.getApiKey();
     if (!apiKey) {
-      throw groqError || new Error('No AI vision API key is configured.');
+      throw new Error('No AI vision API key configured.');
     }
 
     const models = this.getModelsList();
@@ -321,6 +229,7 @@ const GeminiService = {
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
       try {
+        console.log(`[GeminiService] Attempting extraction with model: ${model}`);
         const response = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -368,12 +277,7 @@ const GeminiService = {
       }
     }
 
-    // If Gemini failed with quota error, surface the Groq error if available so user knows why Groq failed
-    if (groqError) {
-      throw new Error(`Groq Error: ${groqError.message}. (Gemini Fallback: ${lastError?.message || 'Quota Exceeded'})`);
-    }
-
-    throw lastError || new Error('All AI vision providers unavailable. Please try again later.');
+    throw lastError || new Error('AI vision service unavailable. Please try again later.');
   }
 };
 
