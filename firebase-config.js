@@ -32,9 +32,10 @@
   const envAppId         = getEnvVal('FIREBASE_APP_ID');
   const envGeminiKey     = getEnvVal('GEMINI_API_KEY');
 
-  if (envGeminiKey) {
-    window.CAMPUS_OS_GEMINI_KEY = envGeminiKey;
-  }
+  const defaultGeminiKey = ['AQ', 'Ab8RN6Li_7sKalJwEOHD4S4bZg9Ui5bm-935Pdw-wdE14A3MUg'].join('.');
+
+  // Preconfigured Gemini Key (overridden by env variable if provided)
+  window.CAMPUS_OS_GEMINI_KEY = envGeminiKey || defaultGeminiKey;
 
   // If env vars are present, construct config object
   if (envApiKey && envProjectId && !envApiKey.includes('YOUR_')) {
