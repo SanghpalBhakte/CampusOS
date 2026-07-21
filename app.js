@@ -534,14 +534,19 @@ Rules:
   const hasGeminiKey = !!window.CAMPUS_OS_GEMINI_KEY;
 
   if (!hasGroqKey && !hasGeminiKey) {
-    console.log("[ExtractionPipeline] No AI API keys configured. Falling back to deterministic partial data (if any) or manual entry.");
-    if (deterministicResult.schedule.length > 0) {
-      return { schedule: deterministicResult.schedule };
-    }
-    throw new Error("No AI API keys configured and deterministic parser could not extract a clean schedule. Please enter manually.");
+    console.log("[ExtractionPipeline] AI Repair skipped (no API key). Using deterministic output.");
+    // Return what we have, even if schedule is empty. We pass confidence up to the UI.
+    return deterministicResult;
   }
 
-  return await AIService.generateContentFromText(rawOcrText, schemaInstruction);
+  try {
+    const aiResult = await AIService.generateContentFromText(rawOcrText, schemaInstruction);
+    return { ...aiResult, confidence: deterministicResult.confidence };
+  } catch (err) {
+    console.warn("[ExtractionPipeline] AI Repair failed:", err);
+    console.log("[ExtractionPipeline] Falling back to deterministic output due to AI failure.");
+    return deterministicResult;
+  }
 }
 
 function triggerTimetableImport() {
@@ -589,14 +594,23 @@ function handleTimetableImageUpload(event) {
       const result = await extractTimetableFromImage(base64Data, mimeType);
       document.getElementById('tt-loading-backdrop')?.remove();
 
-      const schedule = result?.schedule;
-      if (!Array.isArray(schedule) || schedule.length === 0) {
-        // Extraction succeeded but model found nothing readable
-        showTimetableUploadErrorModal(
-          'No timetable entries could be read from this image. The image may be blurry, low-contrast, or not a timetable.',
-          base64Data, mimeType
-        );
-        return;
+      const schedule = result?.schedule || [];
+      const confidence = result?.confidence || 0;
+
+      if (schedule.length === 0) {
+        if (confidence > 10) {
+          // OCR found some timetable-like data but couldn't parse it well. Drop them in manual edit.
+          console.log('[TimetableUpload] Deterministic parse was low confidence/ambiguous. Falling back to manual edit.');
+          showTimetablePreviewModal([]);
+          return;
+        } else {
+          // Total failure, probably not a timetable
+          showTimetableUploadErrorModal(
+            'No timetable entries could be read from this image. The image may be blurry, low-contrast, or not a timetable.',
+            base64Data, mimeType
+          );
+          return;
+        }
       }
 
       // ✅ SUCCESS → show preview/edit modal
