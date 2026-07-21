@@ -1,6 +1,5 @@
-const CACHE_NAME = 'campus-os-v4';
+const CACHE_NAME = 'campus-os-v5';
 const PRECACHE_ASSETS = [
-  './',
   './index.html',
   './style.css',
   './app.js',
@@ -11,7 +10,11 @@ const PRECACHE_ASSETS = [
 
 self.addEventListener('install', (e) => {
   e.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_ASSETS))
+    caches.open(CACHE_NAME).then((cache) => {
+      return Promise.allSettled(
+        PRECACHE_ASSETS.map((asset) => cache.add(asset).catch(() => {}))
+      );
+    })
   );
   self.skipWaiting();
 });
@@ -35,7 +38,21 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // Stale-While-Revalidate for app shell & static assets
+  // Network-First for Navigation (HTML page requests) to prevent stale cache lock on GitHub Pages
+  if (e.request.mode === 'navigate') {
+    e.respondWith(
+      fetch(e.request)
+        .then((response) => {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put('./index.html', clone));
+          return response;
+        })
+        .catch(() => caches.match('./index.html') || caches.match('./'))
+    );
+    return;
+  }
+
+  // Stale-While-Revalidate for sub-resources (CSS, JS, fonts)
   e.respondWith(
     caches.match(e.request).then((cachedResponse) => {
       const fetchPromise = fetch(e.request)
