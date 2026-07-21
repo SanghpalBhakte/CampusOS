@@ -479,11 +479,13 @@ function handleTimetableImageUpload(event) {
       }
 
       // ✅ SUCCESS → show preview/edit modal
+      console.log('[TimetableUpload] Extraction successful. UI transitioning to showTimetablePreviewModal.');
       showTimetablePreviewModal(schedule);
 
     } catch (err) {
       document.getElementById('tt-loading-backdrop')?.remove();
       console.warn('[TimetableUpload] Extraction error:', err);
+      console.log('[TimetableUpload] UI transitioning to showTimetableUploadErrorModal due to API/extraction failure.');
       const reason = err?.message || 'Gemini AI service returned an error.';
       showTimetableUploadErrorModal(reason, base64Data, mimeType);
     }
@@ -546,6 +548,7 @@ function showTimetableUploadErrorModal(reason, base64Data, mimeType) {
   };
 
   document.getElementById('tt-error-manual-btn').onclick = () => {
+    console.log('[TimetableUpload] User explicitly clicked "Enter Timetable Manually" from Error Modal.');
     backdrop.remove();
     showTimetableEntryModal(state.ttDay, null);
   };
