@@ -208,13 +208,14 @@ const AIService = {
     if (window.CAMPUS_OS_GEMINI_KEY) return window.CAMPUS_OS_GEMINI_KEY;
     const envKey = (typeof process !== 'undefined' && process.env && (process.env.VITE_GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY || process.env.GEMINI_API_KEY));
     if (envKey) return envKey;
-    const saved = localStorage.getItem(KEY_GEMINI_KEY);
-    if (saved) return saved;
-    return ['AQ', 'Ab8RN6KylowXm0AjwMSehQ-WhCY0kTa1WJ1P9I3dRAupFcR8tg'].join('.');
+    return null;
   },
 
   getGroqKey() {
-    return ['gsk_', 'fx8xmBhK', 'QZqVISHwyPV', 'WWGdyb3FYXJZe', 'ZYMg90nftennl2QfmF4r'].join('');
+    if (window.CAMPUS_OS_GROQ_KEY) return window.CAMPUS_OS_GROQ_KEY;
+    const envKey = (typeof process !== 'undefined' && process.env && (process.env.VITE_GROQ_API_KEY || process.env.GROQ_API_KEY));
+    if (envKey) return envKey;
+    return null;
   },
 
   getModelsList() {
@@ -411,12 +412,18 @@ async function getTesseractWorker() {
   tesseractLoading = true;
   updateTimetableLoadingModal("Loading local OCR engine (first time may take longer)...");
   try {
+    console.log("[TesseractWorker] Initializing local OCR engine...");
     const worker = await Tesseract.createWorker('eng', 1, {
-      logger: m => console.log(m)
+      logger: m => {
+        if (m.status === 'recognizing text' && m.progress % 0.2 < 0.05) {
+          console.log(`[TesseractWorker] OCR Progress: ${(m.progress * 100).toFixed(0)}%`);
+        }
+      }
     });
     tesseractWorker = worker;
+    console.log("[TesseractWorker] ✅ OCR engine initialized successfully.");
   } catch (err) {
-    console.error("Tesseract Init Error:", err);
+    console.error("[TesseractWorker] ❌ Init Error:", err);
     throw new Error("Failed to initialize local OCR engine.");
   } finally {
     tesseractLoading = false;
@@ -476,6 +483,7 @@ function parseTimetableDeterministically(ocrText) {
   const times = textLower.match(timeRegex);
   if (times && times.length > 2) confidence += 20;
 
+  console.log(`[TimetableParser] Deterministic parser confidence: ${confidence}/100. Ambiguous: ${true}`);
   return { schedule: [], confidence, ambiguous: true };
 }
 
@@ -521,6 +529,17 @@ Rules:
 2. time and end must be 24-hour HH:MM format (e.g. 09:00, 10:30, 14:00).
 3. Identify typos caused by OCR (e.g. "0S" -> "OS", "10:Q0" -> "10:00") and fix them logically.
 4. If an entry is too mangled to understand, set "isUncertain": true.`;
+
+  const hasGroqKey = !!window.CAMPUS_OS_GROQ_KEY;
+  const hasGeminiKey = !!window.CAMPUS_OS_GEMINI_KEY;
+
+  if (!hasGroqKey && !hasGeminiKey) {
+    console.log("[ExtractionPipeline] No AI API keys configured. Falling back to deterministic partial data (if any) or manual entry.");
+    if (deterministicResult.schedule.length > 0) {
+      return { schedule: deterministicResult.schedule };
+    }
+    throw new Error("No AI API keys configured and deterministic parser could not extract a clean schedule. Please enter manually.");
+  }
 
   return await AIService.generateContentFromText(rawOcrText, schemaInstruction);
 }
@@ -2137,16 +2156,7 @@ function renderSettings() {
       </div>
     </div>
 
-    <div class="section-heading">🧠 AI Configuration</div>
-    <div class="card" style="padding:20px;margin-bottom:20px">
-      <div class="form-group" style="margin-bottom:0">
-        <label class="form-label">Gemini API Key (Required for Timetable Extraction)</label>
-        <input type="password" class="form-input" id="s-gemini-key" value="${localStorage.getItem(KEY_GEMINI_KEY) || ''}" placeholder="AIzaSy...">
-        <div style="font-size:0.78rem;color:var(--text-muted);margin-top:6px;line-height:1.4">
-          The default shared API key often hits its quota limit. <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:var(--accent);text-decoration:none;font-weight:500">Get your own FREE Gemini API key here</a> to ensure instant and reliable image extraction.
-        </div>
-      </div>
-    </div>
+
 
     <div class="section-heading">${icons.layers()} Visual Theme</div>
     <div class="card" style="padding:20px;margin-bottom:20px">
@@ -2199,13 +2209,6 @@ function renderSettings() {
 }
 
 function saveSettings() {
-  const geminiInput = document.getElementById('s-gemini-key');
-  if (geminiInput) {
-    const val = geminiInput.value.trim();
-    if (val) localStorage.setItem(KEY_GEMINI_KEY, val);
-    else localStorage.removeItem(KEY_GEMINI_KEY);
-  }
-
   const rawName = (document.getElementById('s-name').value || '').trim();
   const nameToSave = (rawName.toLowerCase() === 'your name') ? '' : rawName;
   const profile = {
