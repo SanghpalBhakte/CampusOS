@@ -199,8 +199,8 @@ function updateSyncUI(status = null) {
 
 // ── Reusable Gemini Vision AI Service ─────────────────────────
 const GeminiService = {
-  PRIMARY_MODEL: 'gemini-2.0-flash',
-  FALLBACK_MODELS: ['gemini-1.5-flash'],
+  MODEL: 'gemini-3.5-flash',
+  FALLBACK_MODELS: ['gemini-2.0-flash', 'gemini-1.5-flash'],
 
   getApiKey() {
     if (window.CAMPUS_OS_GEMINI_KEY) return window.CAMPUS_OS_GEMINI_KEY;
@@ -212,7 +212,7 @@ const GeminiService = {
   },
 
   getModelsList() {
-    return [this.PRIMARY_MODEL, ...this.FALLBACK_MODELS];
+    return [this.MODEL, ...this.FALLBACK_MODELS];
   },
 
   async generateVisionContent(base64Data, mimeType, promptText) {
