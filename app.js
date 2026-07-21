@@ -822,18 +822,24 @@ async function extractTimetableFromImage(base64Data, mimeType) {
   updateTimetableLoadingModal("Preprocessing image for optimal OCR...");
   const preprocessedDataUrl = await preprocessImageForOCR(base64Data, mimeType);
   
-  updateTimetableLoadingModal("Scanning text locally with Tesseract.js...");
+  updateTimetableLoadingModal("Scanning text and structure with Tesseract.js...");
   const worker = await getTesseractWorker();
   const ocrResult = await worker.recognize(preprocessedDataUrl);
-  const rawOcrText = ocrResult.data.text;
   
-  updateTimetableLoadingModal("Parsing timetable data...");
-  const deterministicResult = parseTimetableDeterministically(rawOcrText);
+  updateTimetableLoadingModal("Reconstructing geometric grid...");
+  let deterministicResult;
+  try {
+    deterministicResult = parseTimetableFromGrid(ocrResult.data);
+  } catch (err) {
+    console.error("[GeometricParser] Fatal crash inside grid parser:", err);
+    // Safe fallback if parsing completely crashes
+    deterministicResult = { schedule: [], confidence: 0, ambiguous: true };
+  }
   
   // If deterministic parser has high confidence and no ambiguity, use it.
-  // Otherwise, use AI Repair layer.
+  // Otherwise, use AI Repair layer if available.
   if (deterministicResult.confidence > 80 && !deterministicResult.ambiguous && deterministicResult.schedule.length > 0) {
-    return { schedule: deterministicResult.schedule };
+    return { schedule: deterministicResult.schedule, confidence: deterministicResult.confidence };
   }
   
   updateTimetableLoadingModal("Applying AI repair to messy OCR text...");
