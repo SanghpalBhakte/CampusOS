@@ -247,7 +247,8 @@ const GeminiService = {
 
         if (!response.ok) {
           const errObj = await response.json().catch(() => ({}));
-          throw new Error(errObj.error?.message || `HTTP ${response.status} from ${model}`);
+          const rawMsg = errObj.error?.message || `HTTP ${response.status} from ${model}`;
+          throw new Error(friendlyGeminiError(response.status, rawMsg));
         }
 
         const resData = await response.json();
@@ -301,6 +302,25 @@ function safeParseGeminiJson(text) {
     console.warn('[safeParseGeminiJson] JSON.parse failed after cleanup:', e.message, '| Snippet:', cleaned.slice(0, 120));
     return null;
   }
+}
+
+// Converts raw Gemini API error messages into short, user-friendly strings.
+function friendlyGeminiError(httpStatus, rawMsg) {
+  const m = (rawMsg || '').toLowerCase();
+  if (httpStatus === 429 || m.includes('quota') || m.includes('rate') || m.includes('limit')) {
+    return 'The AI extraction service has reached its usage limit for now. Please wait a few minutes and try again, or enter your timetable manually.';
+  }
+  if (httpStatus === 403 || m.includes('api key') || m.includes('permission') || m.includes('unauthorized')) {
+    return 'AI service authentication error. The Gemini API key may be invalid or restricted.';
+  }
+  if (httpStatus === 404 || m.includes('not found') || m.includes('not supported')) {
+    return 'The AI model is currently unavailable. Trying a fallback model…';
+  }
+  if (httpStatus >= 500 || m.includes('internal') || m.includes('server error')) {
+    return 'Google AI service is temporarily unavailable. Please try again in a moment.';
+  }
+  // Truncate any other raw message at 160 chars
+  return rawMsg.length > 160 ? rawMsg.slice(0, 157) + '…' : rawMsg;
 }
 
 function showTimetableLoadingModal(msg = "Analyzing photo...") {
