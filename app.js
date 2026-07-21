@@ -2035,6 +2035,17 @@ function renderSettings() {
       </div>
     </div>
 
+    <div class="section-heading">🧠 AI Configuration</div>
+    <div class="card" style="padding:20px;margin-bottom:20px">
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label">Gemini API Key (Required for Timetable Extraction)</label>
+        <input type="password" class="form-input" id="s-gemini-key" value="${localStorage.getItem(KEY_GEMINI_KEY) || ''}" placeholder="AIzaSy...">
+        <div style="font-size:0.78rem;color:var(--text-muted);margin-top:6px;line-height:1.4">
+          The default shared API key often hits its quota limit. <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:var(--accent);text-decoration:none;font-weight:500">Get your own FREE Gemini API key here</a> to ensure instant and reliable image extraction.
+        </div>
+      </div>
+    </div>
+
     <div class="section-heading">${icons.layers()} Visual Theme</div>
     <div class="card" style="padding:20px;margin-bottom:20px">
       <div class="form-group" style="margin-bottom:0">
@@ -2086,6 +2097,13 @@ function renderSettings() {
 }
 
 function saveSettings() {
+  const geminiInput = document.getElementById('s-gemini-key');
+  if (geminiInput) {
+    const val = geminiInput.value.trim();
+    if (val) localStorage.setItem(KEY_GEMINI_KEY, val);
+    else localStorage.removeItem(KEY_GEMINI_KEY);
+  }
+
   const rawName = (document.getElementById('s-name').value || '').trim();
   const nameToSave = (rawName.toLowerCase() === 'your name') ? '' : rawName;
   const profile = {
