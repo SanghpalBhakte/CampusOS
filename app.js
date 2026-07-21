@@ -251,17 +251,57 @@ const GeminiService = {
         }
 
         const resData = await response.json();
-        const text = resData.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
-        return JSON.parse(text);
+        const candidate = resData.candidates?.[0];
+
+        // Check for safety/recitation blocks
+        const finishReason = candidate?.finishReason;
+        if (finishReason && finishReason !== 'STOP' && finishReason !== 'MAX_TOKENS') {
+          throw new Error(`Gemini blocked the response (reason: ${finishReason}). Try a clearer image.`);
+        }
+
+        const rawText = candidate?.content?.parts?.[0]?.text || '';
+        console.log(`[GeminiService] Raw response from ${model} (first 300 chars):`, rawText.slice(0, 300));
+
+        const parsed = safeParseGeminiJson(rawText);
+        if (!parsed) {
+          throw new Error(`Model ${model} returned unparseable content. Raw: ${rawText.slice(0, 120)}`);
+        }
+        console.log(`[GeminiService] ✅ Extraction succeeded with model: ${model}`, parsed);
+        return parsed;
       } catch (err) {
         lastError = err;
-        console.warn(`[GeminiService] Model attempt ${model} failed:`, err);
+        console.warn(`[GeminiService] Model attempt ${model} failed:`, err.message || err);
       }
     }
 
     throw lastError || new Error("Gemini AI service unavailable across all configured models.");
   }
 };
+
+// Strips markdown code fences (```json ... ```) that Gemini sometimes wraps around JSON responses,
+// then safely attempts JSON.parse. Returns null (not throws) if content is unparseable.
+function safeParseGeminiJson(text) {
+  if (!text || typeof text !== 'string') return null;
+  let cleaned = text.trim();
+
+  // Remove leading ```json or ``` fence and trailing ```
+  cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+
+  // If still not starting with { or [, attempt to extract the first {...} block
+  if (!cleaned.startsWith('{') && !cleaned.startsWith('[')) {
+    console.warn('[safeParseGeminiJson] Response does not start with { or [. Attempting substring extraction.');
+    const match = cleaned.match(/\{[\s\S]*\}/);
+    if (!match) return null;
+    cleaned = match[0];
+  }
+
+  try {
+    return JSON.parse(cleaned);
+  } catch (e) {
+    console.warn('[safeParseGeminiJson] JSON.parse failed after cleanup:', e.message, '| Snippet:', cleaned.slice(0, 120));
+    return null;
+  }
+}
 
 function showTimetableLoadingModal(msg = "Analyzing photo...") {
   const backdrop = document.createElement('div');
