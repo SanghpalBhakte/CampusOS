@@ -321,34 +321,116 @@ function handleTimetableImageUpload(event) {
   const file = event.target.files?.[0];
   if (!file) return;
 
-  showTimetableLoadingModal("Scanning timetable photo...");
+  // Validate file type & size (< 12 MB)
+  if (!file.type.startsWith('image/')) {
+    alert('Please upload an image file (JPG, PNG, WEBP, etc.)');
+    return;
+  }
+  if (file.size > 12 * 1024 * 1024) {
+    alert('Image is too large (max 12 MB). Please compress or crop it first.');
+    return;
+  }
+
+  showTimetableLoadingModal('Scanning timetable photo…');
 
   const reader = new FileReader();
   reader.onload = async (e) => {
+    let mimeType, base64Data;
     try {
-      const resultUrl  = e.target.result;
-      const mimeType   = resultUrl.split(';')[0].split(':')[1] || 'image/jpeg';
-      const base64Data = resultUrl.split(',')[1];
+      const resultUrl = e.target.result;
+      mimeType   = resultUrl.split(';')[0].split(':')[1] || 'image/jpeg';
+      base64Data = resultUrl.split(',')[1];
+    } catch {
+      document.getElementById('tt-loading-backdrop')?.remove();
+      showTimetableUploadErrorModal('Could not read the image file. Please try a different photo.');
+      return;
+    }
 
+    try {
       const result = await extractTimetableFromImage(base64Data, mimeType);
       document.getElementById('tt-loading-backdrop')?.remove();
 
-      if (!result.schedule || !Array.isArray(result.schedule) || !result.schedule.length) {
-        document.getElementById('tt-loading-backdrop')?.remove();
-        alert("No clear timetable schedule detected in image. Opening manual editor...");
-        showTimetableEntryModal(state.ttDay, null);
+      const schedule = result?.schedule;
+      if (!Array.isArray(schedule) || schedule.length === 0) {
+        // Extraction succeeded but model found nothing readable
+        showTimetableUploadErrorModal(
+          'No timetable entries could be read from this image. The image may be blurry, low-contrast, or not a timetable.',
+          base64Data, mimeType
+        );
         return;
       }
 
-      showTimetablePreviewModal(result.schedule);
+      // ✅ SUCCESS → show preview/edit modal
+      showTimetablePreviewModal(schedule);
+
     } catch (err) {
       document.getElementById('tt-loading-backdrop')?.remove();
-      console.warn("Timetable extraction error:", err);
-      // Automatic non-blocking fallback to manual timetable editor
-      showTimetableEntryModal(state.ttDay, null);
+      console.warn('[TimetableUpload] Extraction error:', err);
+      const reason = err?.message || 'Gemini AI service returned an error.';
+      showTimetableUploadErrorModal(reason, base64Data, mimeType);
     }
   };
+
+  reader.onerror = () => {
+    document.getElementById('tt-loading-backdrop')?.remove();
+    showTimetableUploadErrorModal('File could not be read. Please try again with a different image.');
+  };
+
   reader.readAsDataURL(file);
+}
+
+// Non-blocking error dialog with Retry, Upload Again, and Enter Manually options.
+function showTimetableUploadErrorModal(reason, base64Data, mimeType) {
+  document.getElementById('tt-upload-error-backdrop')?.remove();
+  const canRetry = !!(base64Data && mimeType);
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  backdrop.id = 'tt-upload-error-backdrop';
+  backdrop.innerHTML = `
+    <div class="modal" style="max-width:400px;text-align:center;padding:28px 24px">
+      <div style="font-size:2.2rem;margin-bottom:12px">⚠️</div>
+      <div style="font-weight:700;font-size:1rem;margin-bottom:8px">Timetable Extraction Failed</div>
+      <div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:20px;line-height:1.5">${reason}</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        ${canRetry ? `<button class="btn-primary" id="tt-error-retry-btn">🔄 Retry with Same Image</button>` : ''}
+        <button class="btn-secondary" id="tt-error-upload-btn">📷 Upload a Different Image</button>
+        <button class="btn-secondary" id="tt-error-manual-btn">✏️ Enter Timetable Manually</button>
+        <button style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.8rem;margin-top:4px"
+                onclick="document.getElementById('tt-upload-error-backdrop')?.remove()">Dismiss</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+
+  if (canRetry) {
+    document.getElementById('tt-error-retry-btn').onclick = async () => {
+      backdrop.remove();
+      showTimetableLoadingModal('Retrying extraction…');
+      try {
+        const result = await extractTimetableFromImage(base64Data, mimeType);
+        document.getElementById('tt-loading-backdrop')?.remove();
+        const schedule = result?.schedule;
+        if (!Array.isArray(schedule) || schedule.length === 0) {
+          showTimetableUploadErrorModal('Still no entries found. Try a clearer photo or enter manually.', base64Data, mimeType);
+        } else {
+          showTimetablePreviewModal(schedule);
+        }
+      } catch (err2) {
+        document.getElementById('tt-loading-backdrop')?.remove();
+        showTimetableUploadErrorModal(err2?.message || 'Retry also failed.', base64Data, mimeType);
+      }
+    };
+  }
+
+  document.getElementById('tt-error-upload-btn').onclick = () => {
+    backdrop.remove();
+    selectTimetableFile();
+  };
+
+  document.getElementById('tt-error-manual-btn').onclick = () => {
+    backdrop.remove();
+    showTimetableEntryModal(state.ttDay, null);
+  };
 }
 
 let pendingExtractedSchedule = [];
