@@ -10,6 +10,7 @@ const KEY_PROFILE          = 'cos_profile';
 const KEY_ASSIGNMENTS      = 'cos_assignments';
 const KEY_CUSTOM_TASKS     = 'cos_custom_tasks';
 const KEY_CUSTOM_TIMETABLE = 'cos_custom_timetable';
+const KEY_CUSTOM_LINKS     = 'cos_custom_links';
 const KEY_GEMINI_KEY       = 'cos_gemini_key';
 const KEY_THEME            = 'cos_theme';
 
@@ -198,9 +199,10 @@ function updateSyncUI(status = null) {
 }
 
 // ── Reusable Gemini Vision AI Service ─────────────────────────
+// To update the model, change MODEL here only. FALLBACK_MODELS are tried in order if PRIMARY fails.
 const GeminiService = {
-  MODEL: 'gemini-3.5-flash',
-  FALLBACK_MODELS: ['gemini-2.0-flash', 'gemini-1.5-flash'],
+  MODEL: 'gemini-2.0-flash',
+  FALLBACK_MODELS: ['gemini-1.5-flash'],
 
   getApiKey() {
     if (window.CAMPUS_OS_GEMINI_KEY) return window.CAMPUS_OS_GEMINI_KEY;
@@ -683,6 +685,9 @@ function applyCloudDataToLocalState(data) {
   if (data.customTimetable && typeof data.customTimetable === 'object') {
     safeSetStorage(KEY_CUSTOM_TIMETABLE, data.customTimetable);
   }
+  if (Array.isArray(data.customLinks)) {
+    safeSetStorage(KEY_CUSTOM_LINKS, data.customLinks);
+  }
   if (data.assignmentStatuses && typeof data.assignmentStatuses === 'object') {
     safeSetStorage(KEY_ASSIGNMENTS, data.assignmentStatuses);
     state.assignments = loadAssignments();
@@ -707,6 +712,7 @@ function pushLocalDataToCloud(uid) {
     profile:            loadProfile(),
     customTasks:        sanitizedTasks,
     customTimetable:    safeGetStorage(KEY_CUSTOM_TIMETABLE, null),
+    customLinks:        safeGetStorage(KEY_CUSTOM_LINKS, null),
     assignmentStatuses: safeGetStorage(KEY_ASSIGNMENTS, {}),
     theme:              localStorage.getItem(KEY_THEME) || 'glass',
     updatedAt:          firebase.firestore.FieldValue.serverTimestamp()
@@ -717,6 +723,19 @@ function pushLocalDataToCloud(uid) {
     }
     console.warn("Cloud push error:", err);
   });
+}
+
+// ── Custom Quick Links / Resources ───────────────────────────
+function loadCustomLinks() {
+  const saved = safeGetStorage(KEY_CUSTOM_LINKS, null);
+  if (Array.isArray(saved)) return saved;
+  // Seed defaults from data.js on first load
+  return JSON.parse(JSON.stringify(QUICK_LINKS));
+}
+
+function saveCustomLinks(links) {
+  safeSetStorage(KEY_CUSTOM_LINKS, links);
+  syncToCloud();
 }
 
 function syncToCloud() {
@@ -1480,32 +1499,182 @@ function renderNotices() {
 // ── Quick Links ───────────────────────────────────────────────
 function renderLinks() {
   const el = document.getElementById('page-links');
+  const links = loadCustomLinks();
+
+  const subjectsHtml = links.map((s, si) => `
+    <div class="link-subject-card" id="link-card-${si}">
+      <div class="link-subject-header" style="display:flex;align-items:center;gap:8px">
+        <span class="link-color-dot" style="background:${s.color || '#6366f1'}"></span>
+        <span style="flex:1;font-weight:600">${s.subject}</span>
+        <span class="link-code">${s.code}</span>
+        <button onclick="editLinkSubject(${si})" title="Edit subject" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:0.9rem;padding:2px 6px">✏️</button>
+        <button onclick="deleteLinkSubject(${si})" title="Delete subject" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:0.9rem;padding:2px 6px">🗑</button>
+      </div>
+      <div class="link-resources">
+        ${s.resources.map((r, ri) => `
+          <div style="display:flex;align-items:center;gap:6px">
+            <a class="resource-link" href="${r.url}" target="_blank" rel="noopener" style="flex:1">
+              <span class="r-icon">${getResourceIcon(r.icon || 'link')}</span>
+              <span class="resource-label">${r.label}</span>
+            </a>
+            <button onclick="editLinkResource(${si},${ri})" title="Edit" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:0.8rem;padding:2px 4px">✏️</button>
+            <button onclick="deleteLinkResource(${si},${ri})" title="Delete" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:0.8rem;padding:2px 4px">✕</button>
+          </div>`).join('')}
+        <button onclick="addLinkResource(${si})" style="margin-top:8px;font-size:0.78rem;color:var(--accent);background:none;border:none;cursor:pointer;padding:4px 0">+ Add Resource</button>
+      </div>
+    </div>`).join('');
+
   el.innerHTML = `
     <div class="page-header">
       <div>
         <div class="page-title">Quick Links</div>
-        <div class="page-subtitle">Notes & resources for your subjects</div>
+        <div class="page-subtitle">Your personal notes &amp; resources — fully editable</div>
       </div>
+      <button class="btn-primary" onclick="addLinkSubject()" style="margin-top:4px">+ Add Subject</button>
     </div>
-    <div class="links-grid">
-      ${QUICK_LINKS.map(s => `
-        <div class="link-subject-card">
-          <div class="link-subject-header">
-            <span class="link-color-dot" style="background:${s.color}"></span>
-            <span>${s.subject}</span>
-            <span class="link-code">${s.code}</span>
-          </div>
-          <div class="link-resources">
-            ${s.resources.map(r => `
-              <a class="resource-link" href="${r.url}" target="_blank" rel="noopener">
-                <span class="r-icon">${getResourceIcon(r.icon)}</span>
-                <span class="resource-label">${r.label}</span>
-              </a>`).join('')}
-          </div>
-        </div>`).join('')}
-    </div>
+    <div class="links-grid">${subjectsHtml}</div>
   `;
 }
+
+window.addLinkSubject = function() {
+  showLinkSubjectModal(null, null);
+};
+
+window.editLinkSubject = function(si) {
+  const links = loadCustomLinks();
+  showLinkSubjectModal(si, links[si]);
+};
+
+window.deleteLinkSubject = function(si) {
+  if (!confirm('Delete this subject and all its resources?')) return;
+  const links = loadCustomLinks();
+  links.splice(si, 1);
+  saveCustomLinks(links);
+  renderLinks();
+};
+
+window.addLinkResource = function(si) {
+  showLinkResourceModal(si, null, null);
+};
+
+window.editLinkResource = function(si, ri) {
+  const links = loadCustomLinks();
+  showLinkResourceModal(si, ri, links[si].resources[ri]);
+};
+
+window.deleteLinkResource = function(si, ri) {
+  if (!confirm('Delete this resource?')) return;
+  const links = loadCustomLinks();
+  links[si].resources.splice(ri, 1);
+  saveCustomLinks(links);
+  renderLinks();
+};
+
+function showLinkSubjectModal(si, existing) {
+  document.getElementById('link-subject-modal-backdrop')?.remove();
+  const isNew = si === null;
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  backdrop.id = 'link-subject-modal-backdrop';
+  backdrop.innerHTML = `
+    <div class="modal" style="max-width:400px">
+      <div class="modal-header">
+        <span class="modal-title">${isNew ? 'Add Subject' : 'Edit Subject'}</span>
+        <button class="modal-close" onclick="document.getElementById('link-subject-modal-backdrop')?.remove()">✕</button>
+      </div>
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:14px">
+        <div>
+          <label class="form-label">Subject Name</label>
+          <input id="lsm-name" class="form-input" value="${existing?.subject || ''}" placeholder="e.g. Data Structures" />
+        </div>
+        <div>
+          <label class="form-label">Short Code</label>
+          <input id="lsm-code" class="form-input" value="${existing?.code || ''}" placeholder="e.g. DS" />
+        </div>
+        <div>
+          <label class="form-label">Color (hex)</label>
+          <input id="lsm-color" type="color" value="${existing?.color || '#6366f1'}" style="width:60px;height:36px;border:none;cursor:pointer;background:none" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="document.getElementById('link-subject-modal-backdrop')?.remove()">Cancel</button>
+        <button class="btn-primary" onclick="saveLinkSubject(${si === null ? 'null' : si})">Save</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+}
+
+window.saveLinkSubject = function(si) {
+  const name  = document.getElementById('lsm-name')?.value?.trim();
+  const code  = document.getElementById('lsm-code')?.value?.trim();
+  const color = document.getElementById('lsm-color')?.value || '#6366f1';
+  if (!name) { alert('Subject name is required.'); return; }
+  const links = loadCustomLinks();
+  if (si === null) {
+    links.push({ subject: name, code: code || name.slice(0,4).toUpperCase(), color, resources: [] });
+  } else {
+    links[si] = { ...links[si], subject: name, code: code || links[si].code, color };
+  }
+  saveCustomLinks(links);
+  document.getElementById('link-subject-modal-backdrop')?.remove();
+  renderLinks();
+};
+
+function showLinkResourceModal(si, ri, existing) {
+  document.getElementById('link-resource-modal-backdrop')?.remove();
+  const isNew = ri === null;
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  backdrop.id = 'link-resource-modal-backdrop';
+  backdrop.innerHTML = `
+    <div class="modal" style="max-width:400px">
+      <div class="modal-header">
+        <span class="modal-title">${isNew ? 'Add Resource' : 'Edit Resource'}</span>
+        <button class="modal-close" onclick="document.getElementById('link-resource-modal-backdrop')?.remove()">✕</button>
+      </div>
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:14px">
+        <div>
+          <label class="form-label">Label</label>
+          <input id="lrm-label" class="form-input" value="${existing?.label || ''}" placeholder="e.g. GFG DSA Sheet" />
+        </div>
+        <div>
+          <label class="form-label">URL</label>
+          <input id="lrm-url" class="form-input" type="url" value="${existing?.url || ''}" placeholder="https://..." />
+        </div>
+        <div>
+          <label class="form-label">Icon</label>
+          <select id="lrm-icon" class="form-input">
+            ${['link','book-open','code','video','eye','graduation-cap','database','cpu','list'].map(ic =>
+              `<option value="${ic}" ${(existing?.icon||'link')===ic?'selected':''}>${ic}</option>`
+            ).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="document.getElementById('link-resource-modal-backdrop')?.remove()">Cancel</button>
+        <button class="btn-primary" onclick="saveLinkResource(${si},${ri === null ? 'null' : ri})">Save</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+}
+
+window.saveLinkResource = function(si, ri) {
+  const label = document.getElementById('lrm-label')?.value?.trim();
+  const url   = document.getElementById('lrm-url')?.value?.trim();
+  const icon  = document.getElementById('lrm-icon')?.value || 'link';
+  if (!label || !url) { alert('Label and URL are required.'); return; }
+  const links = loadCustomLinks();
+  if (ri === null) {
+    links[si].resources.push({ label, url, icon });
+  } else {
+    links[si].resources[ri] = { label, url, icon };
+  }
+  saveCustomLinks(links);
+  document.getElementById('link-resource-modal-backdrop')?.remove();
+  renderLinks();
+};
 
 // ── Daily Summary ─────────────────────────────────────────────
 function renderSummary() {
@@ -1991,6 +2160,8 @@ window.resetTimetableToDefault = resetTimetableToDefault;
 window.showTimetableEntryModal = showTimetableEntryModal;
 window.saveTimetableEntry      = saveTimetableEntry;
 window.deleteTimetableEntry    = deleteTimetableEntry;
+window.saveLinkSubject         = saveLinkSubject;
+window.saveLinkResource        = saveLinkResource;
 
 window.toggleAssignment = (id) => {
   // Custom task

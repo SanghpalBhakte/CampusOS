@@ -118,7 +118,7 @@ export const QUICK_LINKS = [
     ],
   },
   {
-    subject: "Modern Data Management",
+    subject: "Multi Disciplinary Minor",
     code: "MDM",
     color: "#ec4899",
     resources: [
