@@ -199,7 +199,7 @@ function updateSyncUI(status = null) {
 }
 
 // ── Vision AI Service (Groq primary → Gemini fallback) ────────
-const GeminiService = {
+const AIService = {
   GROQ_MODEL: 'qwen/qwen3.6-27b',
   MODEL: 'gemini-2.5-flash',
   FALLBACK_MODELS: ['gemini-2.0-flash', 'gemini-1.5-flash'],
@@ -221,13 +221,12 @@ const GeminiService = {
     return [this.MODEL, ...this.FALLBACK_MODELS];
   },
 
-  async callGroqVision(base64Data, mimeType, promptText) {
+  async callGroqText(ocrText, promptText) {
     const key = this.getGroqKey();
     if (!key) throw new Error('No Groq API key configured.');
     
-    console.log(`[GeminiService] Attempting extraction with Groq model: ${this.GROQ_MODEL}`);
+    console.log(`[AIService] Attempting extraction with Groq model: ${this.GROQ_MODEL}`);
     const endpoint = 'https://api.groq.com/openai/v1/chat/completions';
-    const dataUrl = `data:${mimeType};base64,${base64Data}`;
     
     const response = await fetch(endpoint, {
       method: 'POST',
@@ -238,13 +237,8 @@ const GeminiService = {
       body: JSON.stringify({
         model: this.GROQ_MODEL,
         messages: [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: promptText },
-              { type: "image_url", image_url: { url: dataUrl } }
-            ]
-          }
+          { role: "system", content: "You are an expert AI that structures raw OCR data into valid JSON." },
+          { role: "user", content: promptText + "\n\nRaw OCR Text:\n" + ocrText }
         ],
         temperature: 0.1,
         response_format: { type: "json_object" }
@@ -264,30 +258,30 @@ const GeminiService = {
     if (!parsed) {
       throw new Error(`Groq returned unparseable content.`);
     }
-    console.log(`[GeminiService] ✅ Extraction succeeded with Groq:`, parsed);
+    console.log(`[AIService] ✅ Extraction succeeded with Groq:`, parsed);
     return parsed;
   },
 
-  async generateVisionContent(base64Data, mimeType, promptText) {
+  async generateContentFromText(ocrText, promptText) {
     let lastError = null;
 
     try {
-      return await this.callGroqVision(base64Data, mimeType, promptText);
+      return await this.callGroqText(ocrText, promptText);
     } catch (err) {
       lastError = err;
-      console.warn(`[GeminiService] Groq failed:`, err.message || err);
+      console.warn(`[AIService] Groq text failed:`, err.message || err);
     }
 
     const apiKey = this.getApiKey();
     if (!apiKey) {
-      throw new Error(lastError ? lastError.message : 'No AI vision API key configured.');
+      throw new Error(lastError ? lastError.message : 'No AI API key configured.');
     }
 
     const models = this.getModelsList();
     for (const model of models) {
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
       try {
-        console.log(`[GeminiService] Attempting extraction with Gemini model: ${model}`);
+        console.log(`[AIService] Attempting extraction with Gemini model: ${model}`);
         const response = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -295,7 +289,7 @@ const GeminiService = {
             contents: [{
               parts: [
                 { text: promptText },
-                { inlineData: { mimeType: mimeType, data: base64Data } }
+                { text: "\n\nRaw OCR Text:\n" + ocrText }
               ]
             }],
             generationConfig: {
@@ -324,15 +318,15 @@ const GeminiService = {
         if (!parsed) {
           throw new Error(`Model ${model} returned unparseable content. Raw: ${rawText.slice(0, 120)}`);
         }
-        console.log(`[GeminiService] ✅ Extraction succeeded with model: ${model}`, parsed);
+        console.log(`[AIService] ✅ Extraction succeeded with model: ${model}`, parsed);
         return parsed;
       } catch (err) {
         lastError = new Error(`${lastError ? lastError.message + ' (Gemini Fallback: ' + (err.message || err) + ')' : (err.message || err)}`);
-        console.warn(`[GeminiService] Model attempt ${model} failed:`, err.message || err);
+        console.warn(`[AIService] Model attempt ${model} failed:`, err.message || err);
       }
     }
 
-    throw lastError || new Error('AI vision service unavailable. Please try again later.');
+    throw lastError || new Error('AI service unavailable. Please try again later.');
   }
 };
 
@@ -381,6 +375,16 @@ function friendlyGeminiError(httpStatus, rawMsg) {
   return rawMsg.length > 160 ? rawMsg.slice(0, 157) + '…' : rawMsg;
 }
 
+function updateTimetableLoadingModal(msg) {
+  const backdrop = document.getElementById('tt-loading-backdrop');
+  if (backdrop) {
+    const msgEl = backdrop.querySelector('.loading-msg');
+    if (msgEl) msgEl.textContent = msg;
+  } else {
+    showTimetableLoadingModal(msg);
+  }
+}
+
 function showTimetableLoadingModal(msg = "Analyzing photo...") {
   const backdrop = document.createElement('div');
   backdrop.className = 'modal-backdrop';
@@ -388,15 +392,113 @@ function showTimetableLoadingModal(msg = "Analyzing photo...") {
   backdrop.innerHTML = `
     <div class="modal" style="max-width:360px;text-align:center;padding:32px 24px">
       <div style="font-size:2rem;margin-bottom:12px;animation:spin 1.5s linear infinite">✨</div>
-      <div style="font-weight:700;font-size:1rem;margin-bottom:6px">${msg}</div>
-      <div style="font-size:0.8rem;color:var(--text-muted)">Extracting weekly schedule using Gemini Vision AI...</div>
+      <div style="font-weight:700;font-size:1rem;margin-bottom:6px" class="loading-msg">${msg}</div>
+      <div style="font-size:0.8rem;color:var(--text-muted)">Extracting weekly schedule...</div>
     </div>
   `;
   document.body.appendChild(backdrop);
 }
 
+let tesseractWorker = null;
+let tesseractLoading = false;
+
+async function getTesseractWorker() {
+  if (tesseractWorker) return tesseractWorker;
+  if (tesseractLoading) {
+    while(tesseractLoading) await new Promise(r => setTimeout(r, 100));
+    return tesseractWorker;
+  }
+  tesseractLoading = true;
+  updateTimetableLoadingModal("Loading local OCR engine (first time may take longer)...");
+  try {
+    const worker = await Tesseract.createWorker('eng', 1, {
+      logger: m => console.log(m)
+    });
+    tesseractWorker = worker;
+  } catch (err) {
+    console.error("Tesseract Init Error:", err);
+    throw new Error("Failed to initialize local OCR engine.");
+  } finally {
+    tesseractLoading = false;
+  }
+  return tesseractWorker;
+}
+
+function preprocessImageForOCR(base64Data, mimeType) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const MAX_DIM = 2000;
+      let width = img.width;
+      let height = img.height;
+      if (width > MAX_DIM || height > MAX_DIM) {
+        const ratio = Math.min(MAX_DIM / width, MAX_DIM / height);
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+      }
+      canvas.width = width;
+      canvas.height = height;
+      
+      ctx.drawImage(img, 0, 0, width, height);
+      
+      const imageData = ctx.getImageData(0, 0, width, height);
+      const data = imageData.data;
+      for (let i = 0; i < data.length; i += 4) {
+        const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+        const contrast = 1.5;
+        const val = ((avg / 255 - 0.5) * contrast + 0.5) * 255;
+        const clamped = Math.max(0, Math.min(255, val));
+        data[i] = clamped;
+        data[i + 1] = clamped;
+        data[i + 2] = clamped;
+      }
+      ctx.putImageData(imageData, 0, 0);
+      resolve(canvas.toDataURL(mimeType, 0.9));
+    };
+    img.onerror = () => reject(new Error("Failed to load image for preprocessing"));
+    img.src = `data:${mimeType};base64,${base64Data}`;
+  });
+}
+
+function parseTimetableDeterministically(ocrText) {
+  const schedule = [];
+  let confidence = 0;
+  const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  const textLower = ocrText.toLowerCase();
+  
+  days.forEach(d => {
+    if (textLower.includes(d)) confidence += 10;
+  });
+  
+  const timeRegex = /\b([0-1]?[0-9]|2[0-3])[:.][0-5][0-9]\b/g;
+  const times = textLower.match(timeRegex);
+  if (times && times.length > 2) confidence += 20;
+
+  return { schedule: [], confidence, ambiguous: true };
+}
+
 async function extractTimetableFromImage(base64Data, mimeType) {
-  const schemaInstruction = `Extract all weekly college class timetable entries from this image.
+  updateTimetableLoadingModal("Preprocessing image for optimal OCR...");
+  const preprocessedDataUrl = await preprocessImageForOCR(base64Data, mimeType);
+  
+  updateTimetableLoadingModal("Scanning text locally with Tesseract.js...");
+  const worker = await getTesseractWorker();
+  const ocrResult = await worker.recognize(preprocessedDataUrl);
+  const rawOcrText = ocrResult.data.text;
+  
+  updateTimetableLoadingModal("Parsing timetable data...");
+  const deterministicResult = parseTimetableDeterministically(rawOcrText);
+  
+  // If deterministic parser has high confidence and no ambiguity, use it.
+  // Otherwise, use AI Repair layer.
+  if (deterministicResult.confidence > 80 && !deterministicResult.ambiguous && deterministicResult.schedule.length > 0) {
+    return { schedule: deterministicResult.schedule };
+  }
+  
+  updateTimetableLoadingModal("Applying AI repair to messy OCR text...");
+  const schemaInstruction = `Extract all weekly college class timetable entries from this raw OCR text.
 Return JSON matching this exact structure:
 {
   "schedule": [
@@ -417,10 +519,10 @@ Return JSON matching this exact structure:
 Rules:
 1. Day must be one of: Mon, Tue, Wed, Thu, Fri, Sat.
 2. time and end must be 24-hour HH:MM format (e.g. 09:00, 10:30, 14:00).
-3. If any entry has blurry, cropped, ambiguous, or uncertain text, DO NOT GUESS. Set "isUncertain": true for that entry.
-4. Extract every valid lecture, lab, or tutorial entry visible.`;
+3. Identify typos caused by OCR (e.g. "0S" -> "OS", "10:Q0" -> "10:00") and fix them logically.
+4. If an entry is too mangled to understand, set "isUncertain": true.`;
 
-  return await GeminiService.generateVisionContent(base64Data, mimeType, schemaInstruction);
+  return await AIService.generateContentFromText(rawOcrText, schemaInstruction);
 }
 
 function triggerTimetableImport() {
@@ -486,7 +588,7 @@ function handleTimetableImageUpload(event) {
       document.getElementById('tt-loading-backdrop')?.remove();
       console.warn('[TimetableUpload] Extraction error:', err);
       console.log('[TimetableUpload] UI transitioning to showTimetableUploadErrorModal due to API/extraction failure.');
-      const reason = err?.message || 'Gemini AI service returned an error.';
+      const reason = err?.message || 'AI extraction service returned an error.';
       showTimetableUploadErrorModal(reason, base64Data, mimeType);
     }
   };
