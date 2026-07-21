@@ -1,4 +1,4 @@
-const CACHE_NAME = 'campus-os-v5';
+const CACHE_NAME = 'campus-os-v6';
 const PRECACHE_ASSETS = [
   './index.html',
   './style.css',
@@ -33,26 +33,28 @@ self.addEventListener('fetch', (e) => {
 
   const url = new URL(e.request.url);
 
-  // Skip Firebase Firestore / Auth API traffic from SW caching
-  if (url.hostname.includes('googleapis.com') || url.hostname.includes('firebase')) {
+  // Skip Firebase Firestore / Auth / Gemini / Groq API traffic from SW caching
+  if (url.hostname.includes('googleapis.com') || url.hostname.includes('firebase') || url.hostname.includes('groq.com')) {
     return;
   }
 
-  // Network-First for Navigation (HTML page requests) to prevent stale cache lock on GitHub Pages
-  if (e.request.mode === 'navigate') {
+  // Network-First for Navigation and JS files to prevent stale cache lock
+  if (e.request.mode === 'navigate' || url.pathname.endsWith('.js') || url.pathname.endsWith('.css')) {
     e.respondWith(
       fetch(e.request)
         .then((response) => {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put('./index.html', clone));
+          if (response && response.status === 200) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(e.request, clone));
+          }
           return response;
         })
-        .catch(() => caches.match('./index.html') || caches.match('./'))
+        .catch(() => caches.match(e.request) || caches.match('./index.html') || caches.match('./'))
     );
     return;
   }
 
-  // Stale-While-Revalidate for sub-resources (CSS, JS, fonts)
+  // Stale-While-Revalidate for other static assets
   e.respondWith(
     caches.match(e.request).then((cachedResponse) => {
       const fetchPromise = fetch(e.request)
