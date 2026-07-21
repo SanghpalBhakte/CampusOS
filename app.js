@@ -159,78 +159,6 @@ function updateSyncUI(status = null) {
   }
 }
 
-function showFirebaseSetupModal() {
-  const currentCfg = getFirebaseConfig() || {};
-  const backdrop = document.createElement('div');
-  backdrop.className = 'modal-backdrop';
-  backdrop.id = 'firebase-setup-backdrop';
-  backdrop.innerHTML = `
-    <div class="modal" onclick="event.stopPropagation()" style="max-width:480px">
-      <div class="modal-header">
-        <h2 class="modal-title">Firebase Cloud Sync Setup</h2>
-        <button class="modal-close" onclick="document.getElementById('firebase-setup-backdrop').remove()">${icons.x()}</button>
-      </div>
-
-      <div style="font-size:0.83rem;color:var(--text-secondary);margin-bottom:14px;line-height:1.5">
-        To sync tasks between phone and laptop, paste your web app credentials from
-        <a href="https://console.firebase.google.com/" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:underline">Firebase Console</a>.
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">API Key <span class="req">*</span></label>
-        <input type="text" class="form-input" id="fb-apiKey" placeholder="AIzaSy..." value="${currentCfg.apiKey || ''}">
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">Project ID <span class="req">*</span></label>
-        <input type="text" class="form-input" id="fb-projectId" placeholder="your-project-id" value="${currentCfg.projectId || ''}">
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">Auth Domain <span class="req">*</span></label>
-        <input type="text" class="form-input" id="fb-authDomain" placeholder="your-project.firebaseapp.com" value="${currentCfg.authDomain || ''}">
-      </div>
-
-      <div class="form-actions">
-        <button class="btn-secondary" onclick="clearFirebaseConfig()">Clear Config</button>
-        <button class="btn-primary" onclick="saveFirebaseConfig()">Save & Connect</button>
-      </div>
-    </div>
-  `;
-  backdrop.addEventListener('click', () => backdrop.remove());
-  document.body.appendChild(backdrop);
-}
-
-function saveFirebaseConfig() {
-  const apiKey     = (document.getElementById('fb-apiKey').value || '').trim();
-  const projectId  = (document.getElementById('fb-projectId').value || '').trim();
-  const authDomain = (document.getElementById('fb-authDomain').value || '').trim();
-
-  if (!apiKey || !projectId || !authDomain) {
-    alert("Please enter API Key, Project ID, and Auth Domain.");
-    return;
-  }
-
-  const cfg = { apiKey, projectId, authDomain };
-  if (!isValidFirebaseConfig(cfg)) {
-    alert("Invalid API key format. Please copy your web config from Firebase Console.");
-    return;
-  }
-
-  safeSetStorage('cos_firebase_config', cfg);
-  document.getElementById('firebase-setup-backdrop')?.remove();
-  alert("Firebase config saved! Initializing cloud sync...");
-  initFirebase();
-  setTimeout(() => loginWithGoogle(), 300);
-}
-
-function clearFirebaseConfig() {
-  localStorage.removeItem('cos_firebase_config');
-  document.getElementById('firebase-setup-backdrop')?.remove();
-  alert("Firebase config cleared. Switched to local mode.");
-  location.reload();
-}
-
 // ── Gemini Timetable Image Extractor ─────────────────────────
 function showGeminiKeyModal(onSuccess) {
   const savedKey = localStorage.getItem(KEY_GEMINI_KEY) || '';
@@ -551,21 +479,21 @@ window.confirmSaveExtractedTimetable = function() {
 };
 
 function loginWithGoogle() {
-  if (!auth || !getFirebaseConfig()) {
-    showFirebaseSetupModal();
+  if (!auth) {
+    initFirebase();
+  }
+  if (!auth) {
+    alert("Google Sign-In is currently offline. Please check your internet connection.");
     return;
   }
   const provider = new firebase.auth.GoogleAuthProvider();
   auth.signInWithPopup(provider).then(() => {
     updateSyncUI();
   }).catch(err => {
-    if (err.code === 'auth/api-key-not-valid') {
-      alert("Invalid Firebase API Key. Please update your key in Firebase Console.");
-      showFirebaseSetupModal();
-    } else if (err.code === 'auth/unauthorized-domain') {
-      alert("Unauthorized domain: '" + window.location.hostname + "'.\n\nAdd this domain in Firebase Console → Authentication → Settings → Authorized Domains.");
+    if (err.code === 'auth/unauthorized-domain') {
+      alert("Unauthorized domain: '" + window.location.hostname + "'.\n\nPlease add this domain in Firebase Console → Authentication → Settings → Authorized Domains.");
     } else if (err.code !== 'auth/popup-closed-by-user') {
-      alert("Authentication error (" + err.code + "): " + err.message);
+      alert("Sign-in error (" + err.code + "): " + err.message);
     }
   });
 }
@@ -1814,9 +1742,6 @@ window.confirmClearTasks = confirmClearTasks;
 window.setTheme         = setTheme;
 window.loginWithGoogle  = loginWithGoogle;
 window.logoutUser       = logoutUser;
-window.showFirebaseSetupModal = showFirebaseSetupModal;
-window.saveFirebaseConfig  = saveFirebaseConfig;
-window.clearFirebaseConfig = clearFirebaseConfig;
 window.triggerTimetableImport = triggerTimetableImport;
 window.resetTimetableToDefault = resetTimetableToDefault;
 
