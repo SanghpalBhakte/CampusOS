@@ -1171,15 +1171,22 @@ img { display: block; max-width: 100%; }
   background: var(--fab-bg);
   backdrop-filter: var(--fab-blur);
   -webkit-backdrop-filter: var(--fab-blur);
-  color: white;
+  color: #fff;
   border-radius: 999px;
-  font-size: 0.85rem;
   font-weight: 600;
-  font-family: var(--font);
-  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.35);
-  transition: box-shadow var(--ease), transform var(--ease);
+  font-size: 0.95rem;
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
   cursor: pointer;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), left 0.25s cubic-bezier(0.4, 0, 0.2, 1), right 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s ease, background 0.25s ease;
   border: 1px solid rgba(255, 255, 255, 0.15);
+  touch-action: none; /* Prevent scrolling while dragging on mobile */
+  user-select: none;
+}
+
+.fab.dragging {
+  transition: none !important;
+  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.45);
+  transform: scale(1.02);
 }
 
 .fab:hover {

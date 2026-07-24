@@ -1380,6 +1380,7 @@ function applyCloudDataToLocalState(data) {
     initTheme();
   }
   updateTopbarProfile();
+  setupFABDrag();
   updateNavBadges();
   if (['settings', 'assignments', 'dashboard'].includes(state.currentPage)) {
     renderPage(state.currentPage);
@@ -3235,6 +3236,7 @@ function saveSettings() {
 
   // Refresh topbar avatar / name
   updateTopbarProfile();
+  setupFABDrag();
   syncToCloud();
 }
 
@@ -3279,6 +3281,7 @@ function importData(event) {
       }
 
       updateTopbarProfile();
+  setupFABDrag();
       updateNavBadges();
       alert('Backup restored successfully!');
       renderSettings();
@@ -3551,6 +3554,7 @@ function updateNavBadges() {
 function init() {
   initTheme();
   updateTopbarProfile();
+  setupFABDrag();
 
   document.getElementById('theme-toggle')?.addEventListener('click', toggleTheme);
   document.getElementById('global-search')?.addEventListener('keydown', e => {
@@ -3575,3 +3579,105 @@ function init() {
 }
 
 document.addEventListener('DOMContentLoaded', init);
+
+function setupFABDrag() {
+  const fab = document.querySelector('.fab');
+  if (!fab) return;
+
+  let isDragging = false;
+  let hasMoved = false;
+  let startX = 0;
+  let initialLeft = 0;
+  let clickPrevented = false;
+
+  const getClientX = (e) => e.touches ? e.touches[0].clientX : e.clientX;
+
+  const onStart = (e) => {
+    if (window.innerWidth > 768) return; // Only drag on mobile
+    isDragging = true;
+    hasMoved = false;
+    clickPrevented = false;
+    startX = getClientX(e);
+    const rect = fab.getBoundingClientRect();
+    initialLeft = rect.left;
+    
+    // Convert current position to left-based so drag is 1:1
+    fab.style.right = 'auto';
+    fab.style.left = ${initialLeft}px;
+    fab.style.transform = 'none';
+  };
+
+  const onMove = (e) => {
+    if (!isDragging || window.innerWidth > 768) return;
+    const currentX = getClientX(e);
+    const diff = currentX - startX;
+    
+    if (Math.abs(diff) > 5) {
+      hasMoved = true;
+      fab.classList.add('dragging');
+      if (e.cancelable) e.preventDefault(); // Prevent scrolling while actively dragging horizontally
+    }
+    
+    if (hasMoved) {
+      let newLeft = initialLeft + diff;
+      const maxLeft = window.innerWidth - fab.offsetWidth - 16;
+      if (newLeft < 16) newLeft = 16;
+      if (newLeft > maxLeft) newLeft = maxLeft;
+      fab.style.left = ${newLeft}px;
+    }
+  };
+
+  const onEnd = (e) => {
+    if (!isDragging) return;
+    isDragging = false;
+    fab.classList.remove('dragging');
+    
+    if (hasMoved) {
+      clickPrevented = true; // Mark to prevent the next click
+      const rect = fab.getBoundingClientRect();
+      const center = rect.left + (rect.width / 2);
+      const w = window.innerWidth;
+      
+      fab.style.right = 'auto';
+      if (center < w * 0.33) {
+        fab.style.left = '16px';
+        fab.style.transform = 'none';
+      } else if (center > w * 0.66) {
+        fab.style.left = 'auto';
+        fab.style.right = '16px';
+        fab.style.transform = 'none';
+      } else {
+        fab.style.left = '50%';
+        fab.style.transform = 'translateX(-50%)';
+      }
+    }
+  };
+
+  fab.addEventListener('mousedown', onStart);
+  document.addEventListener('mousemove', onMove, { passive: false });
+  document.addEventListener('mouseup', onEnd);
+  
+  fab.addEventListener('touchstart', onStart, { passive: true });
+  document.addEventListener('touchmove', onMove, { passive: false });
+  document.addEventListener('touchend', onEnd);
+
+  // Handle desktop resize reset
+  window.addEventListener('resize', () => {
+    if (window.innerWidth > 768) {
+      fab.style.left = '';
+      fab.style.right = '';
+      fab.style.transform = '';
+      fab.classList.remove('dragging');
+    }
+  });
+
+  // Intercept the click event on FAB to prevent opening if we dragged
+  fab.addEventListener('click', (e) => {
+    if (clickPrevented) {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      clickPrevented = false; // Reset for next tap
+    }
+  }, true); // use capture phase
+}
