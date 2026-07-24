@@ -146,6 +146,54 @@
   background-attachment: fixed;
 }
 
+/* ── Emerald Sage Theme (Calm Forest Focus) ─────────────────── */
+[data-theme="emerald"] {
+  --bg:            #080f0c;
+  --surface:       #101c18;
+  --surface-2:     #182822;
+  --border:        rgba(16, 185, 129, 0.16);
+  --border-light:  rgba(16, 185, 129, 0.08);
+
+  --text-primary:  #f0fdf4;
+  --text-secondary:#a7f3d0;
+  --text-muted:    #4ade80;
+
+  --accent:        #10b981;
+  --accent-light:  #34d399;
+  --accent-dim:    rgba(16, 185, 129, 0.15);
+  --accent-hover:  #059669;
+
+  --banner-bg: linear-gradient(135deg, #064e3b 0%, #022c22 60%, #065f46 100%);
+  --banner-text: #ffffff;
+
+  --shadow:    0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+/* ── Warm Dusk Theme (Calm Twilight Amber) ─────────────────── */
+[data-theme="sunset"] {
+  --bg:            #110d18;
+  --surface:       #1a1426;
+  --surface-2:     #241c33;
+  --border:        rgba(245, 158, 11, 0.16);
+  --border-light:  rgba(245, 158, 11, 0.08);
+
+  --text-primary:  #fffbeb;
+  --text-secondary:#fde68a;
+  --text-muted:    #d97706;
+
+  --accent:        #f59e0b;
+  --accent-light:  #fbbf24;
+  --accent-dim:    rgba(245, 158, 11, 0.15);
+  --accent-hover:  #d97706;
+
+  --banner-bg: linear-gradient(135deg, #451a03 0%, #1e1b4b 60%, #31102e 100%);
+  --banner-text: #ffffff;
+
+  --shadow:    0 2px 8px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.55);
+}
+
 /* ── Reset & Base ───────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 

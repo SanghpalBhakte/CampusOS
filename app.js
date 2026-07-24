@@ -1370,7 +1370,7 @@ function applyCloudDataToLocalState(data) {
     safeSetStorage(KEY_ASSIGNMENTS, data.assignmentStatuses);
     state.assignments = loadAssignments();
   }
-  if (data.theme && ['dark', 'light', 'glass'].includes(data.theme)) {
+  if (data.theme && ['dark', 'light', 'glass', 'emerald', 'sunset'].includes(data.theme)) {
     localStorage.setItem(KEY_THEME, data.theme);
     initTheme();
   }
@@ -1477,18 +1477,19 @@ function initTheme() {
   updateThemeIcon(theme);
 }
 
+const ALL_THEMES = ['dark', 'light', 'glass', 'emerald', 'sunset'];
+
 function toggleTheme() {
   const current = document.documentElement.getAttribute('data-theme') || 'dark';
-  const themes  = ['dark', 'light', 'glass'];
-  const nextIdx = (themes.indexOf(current) + 1) % themes.length;
-  const next    = themes[nextIdx];
+  const nextIdx = (ALL_THEMES.indexOf(current) + 1) % ALL_THEMES.length;
+  const next    = ALL_THEMES[nextIdx];
   document.documentElement.setAttribute('data-theme', next);
   localStorage.setItem(KEY_THEME, next);
   updateThemeIcon(next);
 }
 
 function setTheme(theme) {
-  if (!['dark', 'light', 'glass'].includes(theme)) return;
+  if (!ALL_THEMES.includes(theme)) return;
   document.documentElement.setAttribute('data-theme', theme);
   localStorage.setItem(KEY_THEME, theme);
   updateThemeIcon(theme);
@@ -2629,16 +2630,27 @@ function renderSettings() {
     <div class="section-heading">${icons.layers()} Visual Theme</div>
     <div class="card" style="padding:20px;margin-bottom:20px">
       <div class="form-group" style="margin-bottom:0">
-        <label class="form-label">Active Theme</label>
-        <div style="display:flex;gap:10px;flex-wrap:wrap">
-          <button class="filter-chip ${document.documentElement.getAttribute('data-theme')==='dark'?'active':''}" onclick="setTheme('dark')">
-            🌙 Dark (Slate)
+        <label class="form-label" style="margin-bottom:12px">Select Theme</label>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(130px, 1fr));gap:10px">
+          <button class="filter-chip ${document.documentElement.getAttribute('data-theme')==='dark'?'active':''}" onclick="setTheme('dark')" style="justify-content:flex-start">
+            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#6366f1;margin-right:6px"></span>
+            🌙 Dark
           </button>
-          <button class="filter-chip ${document.documentElement.getAttribute('data-theme')==='light'?'active':''}" onclick="setTheme('light')">
-            ☀️ Light (Clean)
+          <button class="filter-chip ${document.documentElement.getAttribute('data-theme')==='light'?'active':''}" onclick="setTheme('light')" style="justify-content:flex-start">
+            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#4f46e5;margin-right:6px"></span>
+            ☀️ Light
           </button>
-          <button class="filter-chip ${document.documentElement.getAttribute('data-theme')==='glass'?'active':''}" onclick="setTheme('glass')">
-            ⚡ Futuristic Glass (Dark)
+          <button class="filter-chip ${document.documentElement.getAttribute('data-theme')==='glass'?'active':''}" onclick="setTheme('glass')" style="justify-content:flex-start">
+            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#38bdf8;margin-right:6px"></span>
+            🧊 Glass
+          </button>
+          <button class="filter-chip ${document.documentElement.getAttribute('data-theme')==='emerald'?'active':''}" onclick="setTheme('emerald')" style="justify-content:flex-start">
+            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#10b981;margin-right:6px"></span>
+            🌿 Emerald
+          </button>
+          <button class="filter-chip ${document.documentElement.getAttribute('data-theme')==='sunset'?'active':''}" onclick="setTheme('sunset')" style="justify-content:flex-start">
+            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#f59e0b;margin-right:6px"></span>
+            🌅 Dusk
           </button>
         </div>
       </div>

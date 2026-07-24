@@ -3,6 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>
+    (function() {
+      try {
+        var t = localStorage.getItem('cos_theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', t);
+      } catch(e) {}
+    })();
+  </script>
   <meta name="description" content="Campus OS — Your personal college dashboard. Timetable, assignments, notices and resources in one place." />
   <title>Campus OS — Your College Dashboard</title>
 
