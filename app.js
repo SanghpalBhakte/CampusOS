@@ -1834,21 +1834,21 @@ function renderDashboard() {
     <div style="margin-bottom:20px">
       ${dueSoonList.map(a => {
         const days  = dueDaysLeft(a.dueDate);
-        const label = days < 0 ? 'Overdue' : days === 0 ? 'Due Today' : \`\${days}d left\`;
+        const label = days < 0 ? 'Overdue' : days === 0 ? 'Due Today' : `${days}d left`;
         const cls   = days < 0 ? 'overdue' : days === 0 ? 'today' : days <= 3 ? 'soon' : '';
         const done  = a.status === 'submitted';
-        return \`
+        return `
           <div class="card card-sm assignment-card" style="margin-bottom:8px;display:flex;align-items:center;gap:12px;cursor:pointer;padding:12px 14px"
-               onclick="toggleAssignment('\${a.id}')" title="Click to mark \${done ? 'pending' : 'done'}">
-            <div style="width:18px;height:18px;border-radius:5px;border:2px solid \${done?'var(--green)':a.priority==='high'?'var(--red)':a.priority==='medium'?'var(--yellow)':'var(--border)'};background:\${done?'var(--green)':'transparent'};display:grid;place-items:center;flex-shrink:0;color:white;transition:all 0.15s">
-              \${done ? icons.check() : ''}
+               onclick="toggleAssignment('${a.id}')" title="Click to mark ${done ? 'pending' : 'done'}">
+            <div style="width:18px;height:18px;border-radius:5px;border:2px solid ${done?'var(--green)':a.priority==='high'?'var(--red)':a.priority==='medium'?'var(--yellow)':'var(--border)'};background:${done?'var(--green)':'transparent'};display:grid;place-items:center;flex-shrink:0;color:white;transition:all 0.15s">
+              ${done ? icons.check() : ''}
             </div>
             <div style="flex:1;min-width:0">
-              <div class="font-semibold" style="font-size:0.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;\${done?'text-decoration:line-through;opacity:0.5':''}"><span class="\${done?'done':''} \${a.priority==='high'?'text-red':''} \${a.priority==='medium'?'text-yellow':''} \${a.priority==='low'?'text-green':''}"></span>\${a.title}</div>
-              <div class="text-xs text-muted">\${a.subject}</div>
+              <div class="font-semibold" style="font-size:0.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${done?'text-decoration:line-through;opacity:0.5':''}">${a.title}</div>
+              <div class="text-xs text-muted">${a.subject}</div>
             </div>
-            <span class="due-badge \${cls}">\${label}</span>
-          </div>\`;
+            <span class="due-badge ${cls}">${label}</span>
+          </div>`;
       }).join('')}
     </div>` : ''}
 
@@ -1858,10 +1858,10 @@ function renderDashboard() {
       ${importantNotices.map(n => `
         <div class="card card-sm notice-card important" onclick="navigateTo('notices')" style="margin-bottom:8px;padding:12px 14px">
           <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
-            <div style="font-weight:600;font-size:0.9rem">\${n.title}</div>
-            <span class="cat-badge cat-\${n.category}">\${n.category}</span>
+            <div style="font-weight:600;font-size:0.9rem">${n.title}</div>
+            <span class="cat-badge cat-${n.category}">${n.category}</span>
           </div>
-          <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px">\${formatDate(n.date)}</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px">${formatDate(n.date)}</div>
         </div>
       `).join('')}
     </div>` : ''}
@@ -1882,8 +1882,8 @@ function renderDashboard() {
     <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(180px, 1fr));gap:8px;margin-bottom:20px">
       ${quickLinksPreview.map(s => `
         <div class="card card-sm" style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:12px 14px" onclick="navigateTo('resources')">
-          <span style="width:8px;height:8px;border-radius:50%;background:\${s.color || 'var(--accent)'};flex-shrink:0"></span>
-          <span style="font-weight:600;font-size:0.85rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">\${s.subject}</span>
+          <span style="width:8px;height:8px;border-radius:50%;background:${s.color || 'var(--accent)'};flex-shrink:0"></span>
+          <span style="font-weight:600;font-size:0.85rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${s.subject}</span>
         </div>
       `).join('')}
     </div>` : ''}
