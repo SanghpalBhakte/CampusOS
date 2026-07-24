@@ -6,8 +6,8 @@
   <script>
     (function() {
       try {
-        var t = localStorage.getItem('cos_theme') || 'paper';
-        var m = { 'soft-neutral': 'paper', light: 'paper', 'mist-blue': 'cloud', glass: 'cloud', sandstone: 'stone', emerald: 'stone', dark: 'quiet-dark', sunset: 'quiet-dark' };
+        var t = localStorage.getItem('cos_theme') || 'quiet-dark';
+        var m = { dark: 'quiet-dark', sunset: 'quiet-dark', 'soft-neutral': 'paper', light: 'paper', 'mist-blue': 'cloud', glass: 'cloud', sandstone: 'stone', emerald: 'stone' };
         if (m[t]) t = m[t];
         document.documentElement.setAttribute('data-theme', t);
       } catch(e) {}
