@@ -45,8 +45,8 @@ export const TIMETABLE = {
     { time: "10:00", end: "11:00", subject: "DEMP-AI-B2 / DS-AI-C2 / WD-AI-A2",code: "LAB",  room: "AI-B2/C2/A2", teacher: "Faculty", type: "lab" },
     { time: "11:00", end: "12:00", subject: "DEMP-AI-B2 / DS-AI-C2 / WD-AI-A2",code: "LAB",  room: "AI-B2/C2/A2", teacher: "Faculty", type: "lab" },
     { time: "12:00", end: "12:45", subject: "Recess",                           code: "REC",  room: "—",         teacher: "—",         type: "off" },
-    { time: "12:45", end: "13:45", subject: "Community Engagement (AI-A2,B2,C2,D2)", code: "CE", room: "AI-A2,B2,C2,D2", teacher: "Coordinator", type: "lab" },
-    { time: "13:45", end: "14:45", subject: "Community Engagement (AI-A2,B2,C2,D2)", code: "CE", room: "AI-A2,B2,C2,D2", teacher: "Coordinator", type: "lab" },
+    { time: "12:45", end: "13:45", subject: "Community Engagement Lab (AI-A2,B2,C2,D2)", code: "CE", room: "AI-A2,B2,C2,D2", teacher: "Coordinator", type: "lab" },
+    { time: "13:45", end: "14:45", subject: "Community Engagement Lab (AI-A2,B2,C2,D2)", code: "CE", room: "AI-A2,B2,C2,D2", teacher: "Coordinator", type: "lab" },
     { time: "14:45", end: "15:00", subject: "Recess",                           code: "REC",  room: "—",         teacher: "—",         type: "off" },
   ],
   5: [ // Friday
@@ -56,7 +56,7 @@ export const TIMETABLE = {
     { time: "12:45", end: "13:45", subject: "PBST (Prob & Stats)",              code: "PBST", room: "LT-1",      teacher: "Prof. SDJ", type: "lecture" },
     { time: "13:45", end: "14:45", subject: "PBST (Prob & Stats)",              code: "PBST", room: "LT-1",      teacher: "Prof. SDJ", type: "lecture" },
     { time: "14:45", end: "15:00", subject: "Recess",                           code: "REC",  room: "—",         teacher: "—",         type: "off" },
-    { time: "15:00", end: "17:00", subject: "Community Engagement (AI-A2,B2)",  code: "CE",   room: "AI-A2,B2",    teacher: "Coordinator", type: "lab" },
+    { time: "15:00", end: "17:00", subject: "Community Engagement Lab (AI-A2,B2)", code: "CE", room: "AI-A2,B2", teacher: "Coordinator", type: "lab" },
   ],
   6: [ // Saturday
     { time: "10:00", end: "11:00", subject: "Constitution of India (COI)",      code: "COI",  room: "LT-2",      teacher: "Faculty",   type: "lecture" },
