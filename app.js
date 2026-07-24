@@ -1719,27 +1719,54 @@ function getResourceIcon(name) {
   return (map[name] || icons.link)();
 }
 
+const SUBJECT_ALIASES = {
+  'DS': 'Data Structures',
+  'DEMP': 'Digital Electronics',
+  'AI': 'Artificial Intelligence',
+  'MDM': 'Multi Disciplinary Minor',
+  'PBST': 'Probability and Statistics',
+  'COI': 'Constitution of India',
+  'BMFA': 'Basic Mgmt',
+  'OE-1': 'Open Elective 1',
+  'OE-2': 'Open Elective 2'
+};
+
 window.handleQuickAdd = function() {
   const inputEl = document.getElementById('quick-add-input');
   if (!inputEl) return;
   const text = inputEl.value.trim();
   if (!text) return;
 
-  const knownSubjects = ['DS', 'DEMP', 'AI', 'MDM', 'PBST', 'COI', 'BMFA', 'OE-1', 'OE-2', 'Community Engagement'];
-  let subject = 'General';
-  for (const sub of knownSubjects) {
-    if (text.toLowerCase().includes(sub.toLowerCase())) {
-      subject = sub;
+  let subjectCode = 'General';
+  let subjectName = 'General';
+  let foundAlias = false;
+
+  for (const [key, val] of Object.entries(SUBJECT_ALIASES)) {
+    // Check key or value match
+    if (text.toLowerCase().includes(key.toLowerCase()) || text.toLowerCase().includes(val.toLowerCase())) {
+      subjectCode = key;
+      subjectName = val;
+      foundAlias = true;
       break;
     }
   }
+  
+  if (!foundAlias) {
+    console.warn("[Quick Add] Unmapped subject for text:", text);
+  }
 
   let dueDate = new Date();
+  let dateFound = false;
   const lowerText = text.toLowerCase();
-  if (lowerText.includes('tomorrow')) {
+  
+  if (lowerText.includes('today')) {
+    dateFound = true;
+  } else if (lowerText.includes('tomorrow')) {
     dueDate.setDate(dueDate.getDate() + 1);
+    dateFound = true;
   } else if (lowerText.includes('next week')) {
     dueDate.setDate(dueDate.getDate() + 7);
+    dateFound = true;
   } else if (lowerText.match(/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/)) {
     const days = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
     const match = lowerText.match(/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/)[0];
@@ -1748,44 +1775,109 @@ window.handleQuickAdd = function() {
     let diff = targetIdx - currentIdx;
     if (diff <= 0) diff += 7;
     dueDate.setDate(dueDate.getDate() + diff);
+    dateFound = true;
   } else if (lowerText.match(/\b(\d{1,2})(st|nd|rd|th)\b/)) {
     const match = lowerText.match(/\b(\d{1,2})(st|nd|rd|th)\b/);
     const dayNum = parseInt(match[1]);
     dueDate.setDate(dayNum);
     if (dueDate < new Date()) dueDate.setMonth(dueDate.getMonth() + 1);
+    dateFound = true;
   }
 
-  const dStr = dueDate.toISOString().split('T')[0];
-  
-  const t = {
-    id: 'c-' + Date.now(),
-    subject: subject,
-    code: subject,
-    title: text,
-    description: 'Added via Quick Add',
-    dueDate: dStr,
-    priority: 'medium',
-    status: 'pending',
-    marks: 0,
-    isCustom: true
-  };
-  
-  state.customTasks.push(t);
-  saveCustomTasks();
-  
-  const container = document.getElementById('quick-add-container');
-  if (container) {
-    container.innerHTML = \`
-      <div class="card card-sm" style="display:flex;align-items:center;gap:12px;background:var(--surface-2);color:var(--text-primary);padding:10px 14px;border:1px solid var(--accent)">
-        <div style="color:var(--green)">\${icons.check()}</div>
-        <div style="flex:1">
-          <div style="font-weight:600;font-size:0.85rem">Added: \${t.title}</div>
-          <div style="font-size:0.75rem;color:var(--text-muted)">\${subject} · Due: \${formatDate(dStr)}</div>
+  const finalizeQuickAdd = (finalDateStr) => {
+    const t = {
+      id: 'c-' + Date.now(),
+      subject: subjectName,
+      code: subjectCode,
+      title: text,
+      description: 'Added via Quick Add',
+      dueDate: finalDateStr,
+      priority: 'medium',
+      status: 'pending',
+      marks: 0,
+      isCustom: true
+    };
+    
+    state.customTasks.push(t);
+    saveCustomTasks();
+    
+    const container = document.getElementById('quick-add-container');
+    if (container) {
+      container.innerHTML = \`
+        <div class="card card-sm" style="display:flex;align-items:center;gap:12px;background:var(--surface-2);color:var(--text-primary);padding:10px 14px;border:1px solid var(--accent)">
+          <div style="color:var(--green)">\${icons.check()}</div>
+          <div style="flex:1">
+            <div style="font-weight:600;font-size:0.85rem">Added: \${t.title}</div>
+            <div style="font-size:0.75rem;color:var(--text-muted)">
+              \${!foundAlias ? '<span class="type-badge" style="padding:2px 4px;font-size:0.6rem;background:var(--accent-dim);color:var(--accent)">General</span> ' : ''}
+              \${subjectCode} · Due: \${formatDate(finalDateStr)}
+            </div>
+          </div>
         </div>
-      </div>
-    \`;
-    setTimeout(() => renderPage('dashboard'), 2500);
+      \`;
+      setTimeout(() => renderPage('dashboard'), 2500);
+    }
+  };
+
+  if (!dateFound) {
+    const container = document.getElementById('quick-add-container');
+    if (container) {
+      container.innerHTML = \`
+        <div class="card card-sm" style="display:flex;flex-direction:column;gap:10px;padding:12px">
+          <div style="font-size:0.85rem;color:var(--text-secondary)">Couldn't detect a date for: <strong>"\${text}"</strong></div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-size:0.8rem;color:var(--text-muted)">Due:</span>
+            <input type="date" id="quick-add-date" style="flex:1;padding:4px 8px;border-radius:4px;border:1px solid var(--border);background:var(--surface-2);color:var(--text-primary)">
+            <button class="btn btn-sm btn-primary" onclick="window._qaFinalize('\${encodeURIComponent(text)}')">Save</button>
+            <button class="btn btn-sm" onclick="renderPage('dashboard')">Cancel</button>
+          </div>
+        </div>
+      \`;
+      window._qaFinalize = function(encText) {
+        const val = document.getElementById('quick-add-date').value;
+        if (val) {
+          finalizeQuickAdd(val);
+        }
+      };
+    }
+  } else {
+    finalizeQuickAdd(dueDate.toISOString().split('T')[0]);
   }
+};
+
+window.handleRolloverAction = function(taskId, action) {
+  const t = state.customTasks.find(x => x.id === taskId);
+  if (!t) return;
+  if (action === 'done') {
+    t.status = 'submitted';
+    saveCustomTasks();
+    renderPage('review');
+  } else if (action === 'reschedule') {
+    const el = document.getElementById(`rollover-card-${taskId}`);
+    if (el) {
+      el.innerHTML = \`
+        <div style="flex:1;display:flex;flex-direction:column;gap:8px">
+          <div style="font-size:0.8rem;color:var(--text-muted)">Reschedule to:</div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <input type="date" id="resched-${taskId}" value="\${t.dueDate}" style="flex:1;padding:4px 8px;border-radius:4px;border:1px solid var(--border);background:var(--surface-2);color:var(--text-primary)">
+            <button class="btn btn-sm btn-primary" onclick="window._rsSave('\${taskId}')">Save</button>
+            <button class="btn btn-sm" onclick="renderPage('review')">Cancel</button>
+          </div>
+        </div>
+      \`;
+    }
+  }
+};
+
+window._rsSave = function(taskId) {
+  const t = state.customTasks.find(x => x.id === taskId);
+  if (!t) return;
+  const val = document.getElementById(`resched-${taskId}`).value;
+  if (val) {
+    t.dueDate = val;
+    saveCustomTasks();
+  }
+  renderPage('review');
 };
 
 function renderReview() {
@@ -1818,6 +1910,17 @@ function renderReview() {
     if (next7Days[n.date]) next7Days[n.date].items.push({ type: 'notice', data: n });
   });
   
+  let maxItems = 0;
+  let busyDayDate = null;
+  Object.keys(next7Days).forEach(dateStr => {
+    const count = next7Days[dateStr].items.length;
+    if (count > maxItems) {
+      maxItems = count;
+      busyDayDate = dateStr;
+    }
+  });
+  if (maxItems < 2) busyDayDate = null; // Only highlight if 2+ items
+
   let lookaheadHTML = '';
   Object.keys(next7Days).sort().forEach(dateStr => {
     const day = next7Days[dateStr];
@@ -1849,9 +1952,14 @@ function renderReview() {
       }
     }).join('');
     
+    const isBusy = (dateStr === busyDayDate);
+    
     lookaheadHTML += \`
       <div style="margin-bottom:20px">
-        <div style="font-size:0.85rem;font-weight:600;color:var(--text-secondary);margin-bottom:8px">\${formatDate(dateStr)}</div>
+        <div style="font-size:0.85rem;font-weight:600;color:var(--text-secondary);margin-bottom:8px;display:flex;align-items:center;gap:8px">
+          \${formatDate(dateStr)}
+          \${isBusy ? '<span class="type-badge" style="background:rgba(245,158,11,0.15);color:var(--yellow);padding:2px 6px;font-size:0.65rem">🔥 Busy Day</span>' : ''}
+        </div>
         \${itemsHTML}
       </div>
     \`;
@@ -1881,10 +1989,14 @@ function renderReview() {
     <div class="section-heading">Rollover (Pending from past 7 days)</div>
     <div style="margin-bottom:20px">
       \${tasksRolledOver.map(a => \`
-        <div class="card card-sm assignment-card" style="margin-bottom:8px;display:flex;align-items:center;gap:12px;padding:12px 14px;border-left:3px solid var(--red)">
+        <div class="card card-sm assignment-card" id="rollover-card-\${a.id}" style="margin-bottom:8px;display:flex;align-items:center;gap:12px;padding:12px 14px;border-left:3px solid var(--red)">
           <div style="flex:1;min-width:0">
             <div class="font-semibold" style="font-size:0.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">\${a.title}</div>
             <div class="text-xs text-muted">\${a.subject} · Due: \${formatDate(a.dueDate)}</div>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="icon-btn-xs" style="color:var(--green);border:1px solid var(--border)" onclick="handleRolloverAction('\${a.id}', 'done')" title="Mark Done">\${icons.check()}</button>
+            <button class="icon-btn-xs" style="border:1px solid var(--border)" onclick="handleRolloverAction('\${a.id}', 'reschedule')" title="Reschedule">📅</button>
           </div>
         </div>
       \`).join('')}
@@ -1954,6 +2066,8 @@ function renderDashboard() {
         .slice(0, 3);
   const quickLinksPreview = loadCustomLinks().slice(0, 4);
 
+  const tasksDueToday = allTasks().filter(a => a.status === 'pending' && a.dueDate === todayStr()).length;
+
   el.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
       <div class="greeting-banner" style="margin-bottom:0">
@@ -1968,11 +2082,18 @@ function renderDashboard() {
       </button>
     </div>
 
-    <div id="quick-add-container" style="margin-bottom:20px">
+    <div id="quick-add-container" style="margin-bottom:12px">
       <div class="card" style="display:flex;align-items:center;gap:10px;padding:8px 12px">
         <div style="color:var(--accent);opacity:0.8">${icons.plus()}</div>
         <input type="text" id="quick-add-input" placeholder="Quick add: 'DS assignment due Friday'" style="flex:1;border:none;background:transparent;outline:none;font-size:0.9rem;color:var(--text-primary)" onkeypress="if(event.key==='Enter') handleQuickAdd()">
         <button class="btn btn-sm btn-primary" onclick="handleQuickAdd()" style="padding:4px 12px">Add</button>
+      </div>
+    </div>
+    
+    <div class="card card-sm" style="margin-bottom:20px;display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surface-2)">
+      <div style="color:var(--text-secondary)">📅</div>
+      <div style="font-size:0.85rem;color:var(--text-secondary)">
+        <strong>Today:</strong> ${classes} classes left, ${tasksDueToday} pending ${tasksDueToday === 1 ? 'task' : 'tasks'} due.
       </div>
     </div>
 
