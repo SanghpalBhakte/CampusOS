@@ -18,7 +18,12 @@ const KEY_THEME            = 'cos_theme';
 function safeGetStorage(key, fallback = null) {
   try {
     const v = localStorage.getItem(key);
-    return v ? JSON.parse(v) : fallback;
+    if (v === null || v === undefined) return fallback;
+    try {
+      return JSON.parse(v);
+    } catch (_) {
+      return v;
+    }
   } catch (err) {
     console.warn(`localStorage read error for key [${key}]:`, err);
     return fallback;
