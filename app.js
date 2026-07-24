@@ -1732,7 +1732,7 @@ function renderDashboard() {
   const liveTT     = loadTimetable();
   const dayClasses = liveTT[now.getDay()] || [];
   const currentMin = currentTimeMinutes();
-  const nextClass  = dayClasses.find(c => timeToMinutes(c.time || '10:00') > currentMin);
+  const nextClass  = dayClasses.find(c => timeToMinutes(c.time || '10:00') > currentMin && c.type !== 'off');
 
   // Exam countdown
   let countdownHTML = '';
@@ -1771,6 +1771,13 @@ function renderDashboard() {
       <button class="btn-primary" onclick="navigateTo('settings')" style="flex-shrink:0;padding:6px 14px;font-size:0.8rem">Go to Settings</button>
     </div>` : '';
 
+  const importantNotices = NOTICES.filter(n => n.important).slice(0, 2);
+  const dueSoonList = allTasks()
+        .filter(a => a.status === 'pending')
+        .sort((a,b) => a.dueDate.localeCompare(b.dueDate))
+        .slice(0, 3);
+  const quickLinksPreview = loadCustomLinks().slice(0, 4);
+
   el.innerHTML = `
     <div class="greeting-banner">
       <div class="greeting-text">${greetingWord()}, ${displayName.split(' ')[0]}! 👋</div>
@@ -1785,6 +1792,7 @@ function renderDashboard() {
     ${setupBanner}
     ${countdownHTML}
 
+    <!-- 1. TODAY INFORMATION -->
     <div class="stat-grid">
       <div class="stat-card" onclick="navigateTo('timetable')" style="cursor:pointer">
         <div class="stat-icon" style="background:rgba(99,102,241,0.12);color:var(--accent)">${icons.timetable()}</div>
@@ -1810,7 +1818,7 @@ function renderDashboard() {
 
     ${nextClass ? `
     <div class="section-heading">Next Class</div>
-    <div class="card" style="display:flex;gap:14px;align-items:center;margin-bottom:20px">
+    <div class="card" style="display:flex;gap:14px;align-items:center;margin-bottom:20px;cursor:pointer" onclick="navigateTo('timetable')">
       <div style="width:44px;height:44px;border-radius:10px;background:var(--accent-dim);color:var(--accent);display:grid;place-items:center;flex-shrink:0">
         ${icons.clock()}
       </div>
@@ -1818,11 +1826,49 @@ function renderDashboard() {
         <div style="font-weight:700">${nextClass.subject}</div>
         <div class="text-sm text-muted">${nextClass.time} · ${nextClass.room} · ${nextClass.teacher}</div>
       </div>
-      <span class="type-badge type-${nextClass.type}">${nextClass.type}</span>
+      <span class="type-badge type-${nextClass.type || 'lecture'}">${nextClass.type || 'lecture'}</span>
     </div>` : ''}
 
+    ${dueSoonList.length > 0 ? `
+    <div class="section-heading">Due Soon</div>
+    <div style="margin-bottom:20px">
+      ${dueSoonList.map(a => {
+        const days  = dueDaysLeft(a.dueDate);
+        const label = days < 0 ? 'Overdue' : days === 0 ? 'Due Today' : \`\${days}d left\`;
+        const cls   = days < 0 ? 'overdue' : days === 0 ? 'today' : days <= 3 ? 'soon' : '';
+        const done  = a.status === 'submitted';
+        return \`
+          <div class="card card-sm assignment-card" style="margin-bottom:8px;display:flex;align-items:center;gap:12px;cursor:pointer;padding:12px 14px"
+               onclick="toggleAssignment('\${a.id}')" title="Click to mark \${done ? 'pending' : 'done'}">
+            <div style="width:18px;height:18px;border-radius:5px;border:2px solid \${done?'var(--green)':a.priority==='high'?'var(--red)':a.priority==='medium'?'var(--yellow)':'var(--border)'};background:\${done?'var(--green)':'transparent'};display:grid;place-items:center;flex-shrink:0;color:white;transition:all 0.15s">
+              \${done ? icons.check() : ''}
+            </div>
+            <div style="flex:1;min-width:0">
+              <div class="font-semibold" style="font-size:0.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;\${done?'text-decoration:line-through;opacity:0.5':''}"><span class="\${done?'done':''} \${a.priority==='high'?'text-red':''} \${a.priority==='medium'?'text-yellow':''} \${a.priority==='low'?'text-green':''}"></span>\${a.title}</div>
+              <div class="text-xs text-muted">\${a.subject}</div>
+            </div>
+            <span class="due-badge \${cls}">\${label}</span>
+          </div>\`;
+      }).join('')}
+    </div>` : ''}
+
+    ${importantNotices.length > 0 ? `
+    <div class="section-heading">Important Notices</div>
+    <div style="margin-bottom:20px">
+      ${importantNotices.map(n => `
+        <div class="card card-sm notice-card important" onclick="navigateTo('notices')" style="margin-bottom:8px;padding:12px 14px">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+            <div style="font-weight:600;font-size:0.9rem">\${n.title}</div>
+            <span class="cat-badge cat-\${n.category}">\${n.category}</span>
+          </div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px">\${formatDate(n.date)}</div>
+        </div>
+      `).join('')}
+    </div>` : ''}
+
+    <!-- 2. UPCOMING ITEMS -->
     <div class="section-heading">Assignment Progress</div>
-    <div class="card" style="margin-bottom:20px">
+    <div class="card" style="margin-bottom:20px;cursor:pointer" onclick="navigateTo('assignments')">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
         <span class="text-sm font-semibold">Submitted ${submittedCount} / ${total}</span>
         <span class="text-sm text-muted">${progress}%</span>
@@ -1830,35 +1876,17 @@ function renderDashboard() {
       <div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:${progress}%"></div></div>
     </div>
 
-    <div class="section-heading">Due Soon</div>
-    ${(() => {
-      const dueSoon = allTasks()
-        .filter(a => a.status === 'pending')
-        .sort((a,b) => a.dueDate.localeCompare(b.dueDate))
-        .slice(0, 3);
-      if (!dueSoon.length) return `
-        <div class="card" style="text-align:center;padding:24px;color:var(--text-muted)">
-          🎉 Nothing pending — enjoy the break!
-        </div>`;
-      return dueSoon.map(a => {
-        const days  = dueDaysLeft(a.dueDate);
-        const label = days < 0 ? 'Overdue' : days === 0 ? 'Due Today' : `${days}d left`;
-        const cls   = days < 0 ? 'overdue' : days === 0 ? 'today' : days <= 3 ? 'soon' : '';
-        const done  = a.status === 'submitted';
-        return `
-          <div class="card card-sm" style="margin-bottom:8px;display:flex;align-items:center;gap:12px;cursor:pointer"
-               onclick="toggleAssignment('${a.id}')" title="Click to mark ${done ? 'pending' : 'done'}">
-            <div style="width:18px;height:18px;border-radius:5px;border:2px solid ${done?'var(--green)':a.priority==='high'?'var(--red)':a.priority==='medium'?'var(--yellow)':'var(--border)'};background:${done?'var(--green)':'transparent'};display:grid;place-items:center;flex-shrink:0;color:white;transition:all 0.15s">
-              ${done ? icons.check() : ''}
-            </div>
-            <div style="flex:1;min-width:0">
-              <div class="font-semibold" style="font-size:0.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${done?'text-decoration:line-through;opacity:0.5':''}">${a.title}</div>
-              <div class="text-xs text-muted">${a.subject}</div>
-            </div>
-            <span class="due-badge ${cls}">${label}</span>
-          </div>`;
-      }).join('');
-    })()}
+    <!-- 3. RESOURCES -->
+    ${quickLinksPreview.length > 0 ? `
+    <div class="section-heading">Quick Links <button class="icon-btn-xs" style="float:right" onclick="navigateTo('resources')">→</button></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(180px, 1fr));gap:8px;margin-bottom:20px">
+      ${quickLinksPreview.map(s => `
+        <div class="card card-sm" style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:12px 14px" onclick="navigateTo('resources')">
+          <span style="width:8px;height:8px;border-radius:50%;background:\${s.color || 'var(--accent)'};flex-shrink:0"></span>
+          <span style="font-weight:600;font-size:0.85rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">\${s.subject}</span>
+        </div>
+      `).join('')}
+    </div>` : ''}
   `;
 }
 
