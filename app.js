@@ -1660,7 +1660,8 @@ function resetTimetableToDefault() {
 
 function todayClasses() {
   const tt = loadTimetable();
-  return (tt[new Date().getDay()] || []).filter(c => c.type !== 'off').length;
+  const currentMin = currentTimeMinutes();
+  return (tt[new Date().getDay()] || []).filter(c => c.type !== 'off' && c.subject !== 'Recess' && timeToMinutes(c.end || '23:59') > currentMin).length;
 }
 
 // ── SVG Icons ─────────────────────────────────────────────────
@@ -1732,8 +1733,7 @@ function renderDashboard() {
   const liveTT     = loadTimetable();
   const dayClasses = liveTT[now.getDay()] || [];
   const currentMin = currentTimeMinutes();
-  const nextClass  = dayClasses.find(c => timeToMinutes(c.time || '10:00') > currentMin && c.type !== 'off');
-
+  const nextClass  = dayClasses.find(c => timeToMinutes(c.end || '23:59') > currentMin && c.type !== 'off' && c.subject !== 'Recess');
   // Exam countdown
   let countdownHTML = '';
   if (liveProfile.examDate) {
@@ -1797,7 +1797,7 @@ function renderDashboard() {
       <div class="stat-card" onclick="navigateTo('timetable')" style="cursor:pointer">
         <div class="stat-icon" style="background:rgba(99,102,241,0.12);color:var(--accent)">${icons.timetable()}</div>
         <div class="stat-value">${classes}</div>
-        <div class="stat-label">Classes Today</div>
+        <div class="stat-label">Classes Left</div>
       </div>
       <div class="stat-card" onclick="navigateTo('assignments')" style="cursor:pointer">
         <div class="stat-icon" style="background:rgba(239,68,68,0.12);color:var(--red)">${icons.assignments()}</div>
@@ -1816,8 +1816,8 @@ function renderDashboard() {
       </div>
     </div>
 
-    ${nextClass ? `
     <div class="section-heading">Next Class</div>
+    ${nextClass ? `
     <div class="card" style="display:flex;gap:14px;align-items:center;margin-bottom:20px;cursor:pointer" onclick="navigateTo('timetable')">
       <div style="width:44px;height:44px;border-radius:10px;background:var(--accent-dim);color:var(--accent);display:grid;place-items:center;flex-shrink:0">
         ${icons.clock()}
@@ -1827,7 +1827,12 @@ function renderDashboard() {
         <div class="text-sm text-muted">${nextClass.time} · ${nextClass.room} · ${nextClass.teacher}</div>
       </div>
       <span class="type-badge type-${nextClass.type || 'lecture'}">${nextClass.type || 'lecture'}</span>
-    </div>` : ''}
+    </div>` : `
+    <div class="card card-sm" style="margin-bottom:20px;padding:24px;text-align:center;color:var(--text-muted)">
+      ${dayClasses.filter(c => c.type !== 'off' && c.subject !== 'Recess').length > 0 
+          ? "🎉 All classes finished for today!" 
+          : "🎉 No classes today — enjoy the break!"}
+    </div>`}
 
     ${dueSoonList.length > 0 ? `
     <div class="section-heading">Due Soon</div>
@@ -2512,8 +2517,7 @@ function renderSummaryContent(container) {
   const importantNotices = NOTICES.filter(n => n.important).slice(0, 3);
   const overdueItems = allTasks().filter(a => a.status === 'pending' && a.dueDate < todayStr());
   const currentMin   = currentTimeMinutes();
-  const remaining    = classes.filter(c => c.type !== 'off' && timeToMinutes(c.end) > currentMin);
-
+  const remaining    = classes.filter(c => c.type !== 'off' && c.subject !== 'Recess' && timeToMinutes(c.end || '23:59') > currentMin);
   container.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;background:var(--surface);padding:10px 14px;border:1px solid var(--border);border-radius:var(--radius-sm)">
       <div style="font-weight:600;font-size:0.88rem;color:var(--text-secondary)">📅 Today's Date</div>
