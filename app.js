@@ -2293,7 +2293,9 @@ function renderLinksContent(container) {
       </div>
 
       <div class="link-resources">
-        ${s.resources.map((r, ri) => `
+        ${s.resources.length === 0 ? `
+          <div style="font-size:0.8rem;color:var(--text-muted);font-style:italic;padding:4px 0">No links added yet. Click below to add one.</div>
+        ` : s.resources.map((r, ri) => `
           <div class="resource-item-row">
             <a class="resource-link" href="${r.url}" target="_blank" rel="noopener">
               <span class="r-icon">${getResourceIcon(r.icon || 'link')}</span>
@@ -2358,7 +2360,7 @@ function showLinkSubjectModal(si, existing) {
   backdrop.className = 'modal-backdrop';
   backdrop.id = 'link-subject-modal-backdrop';
   backdrop.innerHTML = `
-    <div class="modal" style="max-width:400px">
+    <div class="modal" style="max-width:400px;width:92vw">
       <div class="modal-header">
         <span class="modal-title">${isNew ? 'Add Subject' : 'Edit Subject'}</span>
         <button class="modal-close" onclick="document.getElementById('link-subject-modal-backdrop')?.remove()">✕</button>
@@ -2410,7 +2412,7 @@ function showLinkResourceModal(si, ri, existing) {
   backdrop.className = 'modal-backdrop';
   backdrop.id = 'link-resource-modal-backdrop';
   backdrop.innerHTML = `
-    <div class="modal" style="max-width:400px">
+    <div class="modal" style="max-width:400px;width:92vw">
       <div class="modal-header">
         <span class="modal-title">${isNew ? 'Add Resource' : 'Edit Resource'}</span>
         <button class="modal-close" onclick="document.getElementById('link-resource-modal-backdrop')?.remove()">✕</button>
