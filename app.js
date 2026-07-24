@@ -3589,6 +3589,15 @@ function setupFABDrag() {
   let startX = 0;
   let initialLeft = 0;
   let clickPrevented = false;
+  // First-time hint
+  let hintEl = null;
+  if (window.innerWidth <= 768 && !localStorage.getItem('fabHintDismissed')) {
+    hintEl = document.createElement('div');
+    hintEl.className = 'fab-hint';
+    hintEl.innerText = 'Drag me left/right';
+    fab.appendChild(hintEl);
+  }
+
   const applySnapPosition = (pos) => {
     if (window.innerWidth > 768) return;
     fab.style.right = 'auto';
@@ -3631,6 +3640,11 @@ function setupFABDrag() {
     
     if (Math.abs(diff) > 5) {
       hasMoved = true;
+      if (hintEl) {
+        hintEl.remove();
+        hintEl = null;
+        localStorage.setItem('fabHintDismissed', 'true');
+      }
       fab.classList.add('dragging');
       if (e.cancelable) e.preventDefault(); // Prevent scrolling while actively dragging horizontally
     }
