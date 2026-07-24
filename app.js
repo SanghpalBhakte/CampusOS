@@ -1652,7 +1652,7 @@ function saveTimetable(ttMap) {
 }
 
 function resetTimetableToDefault() {
-  if (!confirm("Reset timetable back to official Sem 4 default schedule?")) return;
+  if (!confirm("Reset timetable back to official Sem 3 default schedule?")) return;
   localStorage.removeItem(KEY_CUSTOM_TIMETABLE);
   syncToCloud();
   renderPage(state.currentPage);
@@ -2651,7 +2651,7 @@ function renderSettings() {
         </div>
         <div class="form-group">
           <label class="form-label">Year & Semester</label>
-          <input type="text" class="form-input" id="s-year" value="${p.year}" placeholder="e.g. 2nd Year — Semester 4">
+          <input type="text" class="form-input" id="s-year" value="${p.year}" placeholder="e.g. 2nd Year — Semester 3">
         </div>
       </div>
     </div>

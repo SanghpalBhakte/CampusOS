@@ -7,7 +7,7 @@
 export const STUDENT = {
   name:    "Your Name",
   branch:  "Artificial Intelligence & Data Science",
-  year:    "2nd Year — Semester 4",
+  year:    "2nd Year — Semester 3",
   college: "Your College",
   rollNo:  "Your Roll No.",
 };
@@ -84,7 +84,7 @@ export const NOTICES = [
   },
   {
     id: "n2",
-    title: "Timetable Updated for Sem 4",
+    title: "Timetable Updated for Sem 3",
     category: "Academic",
     date: new Date().toISOString().split('T')[0],
     content: "Your weekly timetable has been configured with DS, DEMP, WD, PBST, MDM, COI, BMFA, OE-1, OE-2, and Community Engagement modules.",
