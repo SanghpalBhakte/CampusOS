@@ -1645,7 +1645,7 @@ function resetTimetableToDefault() {
 
 function todayClasses() {
   const tt = loadTimetable();
-  return (tt[new Date().getDay()] || []).length;
+  return (tt[new Date().getDay()] || []).filter(c => c.type !== 'off').length;
 }
 
 // ── SVG Icons ─────────────────────────────────────────────────
@@ -2464,12 +2464,12 @@ window.saveLinkResource = function(si, ri) {
 function renderSummaryContent(container) {
   const today    = new Date();
   const todayDay = today.getDay();
-  const classes  = TIMETABLE[todayDay] || [];
+  const classes  = loadTimetable()[todayDay] || [];
   const dueTodayItems = allTasks().filter(a => a.dueDate === todayStr() && a.status === 'pending');
   const importantNotices = NOTICES.filter(n => n.important).slice(0, 3);
   const overdueItems = allTasks().filter(a => a.status === 'pending' && a.dueDate < todayStr());
   const currentMin   = currentTimeMinutes();
-  const remaining    = classes.filter(c => timeToMinutes(c.end) > currentMin);
+  const remaining    = classes.filter(c => c.type !== 'off' && timeToMinutes(c.end) > currentMin);
 
   container.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;background:var(--surface);padding:10px 14px;border:1px solid var(--border);border-radius:var(--radius-sm)">
