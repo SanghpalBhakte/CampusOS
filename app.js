@@ -3589,6 +3589,23 @@ function setupFABDrag() {
   let startX = 0;
   let initialLeft = 0;
   let clickPrevented = false;
+  const applySnapPosition = (pos) => {
+    if (window.innerWidth > 768) return;
+    fab.style.right = 'auto';
+    if (pos === 'left') {
+      fab.style.left = '16px';
+      fab.style.transform = 'none';
+    } else if (pos === 'right') {
+      fab.style.left = 'auto';
+      fab.style.right = '16px';
+      fab.style.transform = 'none';
+    } else if (pos === 'center') {
+      fab.style.left = '50%';
+      fab.style.transform = 'translateX(-50%)';
+    }
+  };
+  const savedPos = localStorage.getItem('fabPosition');
+  if (savedPos) applySnapPosition(savedPos);
 
   const getClientX = (e) => e.touches ? e.touches[0].clientX : e.clientX;
 
@@ -3639,17 +3656,12 @@ function setupFABDrag() {
       const w = window.innerWidth;
       
       fab.style.right = 'auto';
-      if (center < w * 0.33) {
-        fab.style.left = '16px';
-        fab.style.transform = 'none';
-      } else if (center > w * 0.66) {
-        fab.style.left = 'auto';
-        fab.style.right = '16px';
-        fab.style.transform = 'none';
-      } else {
-        fab.style.left = '50%';
-        fab.style.transform = 'translateX(-50%)';
-      }
+      let snapPos = 'right';
+      if (center < w * 0.33) snapPos = 'left';
+      else if (center > w * 0.66) snapPos = 'right';
+      else snapPos = 'center';
+      applySnapPosition(snapPos);
+      localStorage.setItem('fabPosition', snapPos);
     }
   };
 
