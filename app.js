@@ -1504,19 +1504,33 @@ function updateThemeIcon(theme) {
 }
 
 // ── Routing ───────────────────────────────────────────────────
-const PAGES = ['dashboard', 'timetable', 'assignments', 'notices', 'links', 'summary', 'settings'];
+const PAGES = ['dashboard', 'timetable', 'assignments', 'notices', 'resources', 'links', 'summary', 'settings'];
 
 function navigate(page) {
   if (!PAGES.includes(page)) page = 'dashboard';
-  state.currentPage    = page;
-  window.location.hash = page;
+
+  if (page === 'links' || page === 'summary') {
+    state.resourcesTab = page;
+    page = 'resources';
+  } else if (page === 'resources') {
+    if (!state.resourcesTab) state.resourcesTab = 'links';
+  }
+
+  state.currentPage = page;
+  window.location.hash = (page === 'resources') ? (state.resourcesTab || 'resources') : page;
 
   document.querySelectorAll('.section-page').forEach(el =>
     el.classList.toggle('active', el.dataset.page === page)
   );
-  document.querySelectorAll('[data-nav]').forEach(el =>
-    el.classList.toggle('active', el.dataset.nav === page)
-  );
+
+  document.querySelectorAll('[data-nav]').forEach(el => {
+    const navVal = el.dataset.nav;
+    if (page === 'resources') {
+      el.classList.toggle('active', navVal === 'resources' || navVal === state.resourcesTab);
+    } else {
+      el.classList.toggle('active', navVal === page);
+    }
+  });
 
   renderPage(page);
 }
@@ -1528,13 +1542,14 @@ function renderPage(page) {
       case 'timetable':   renderTimetable();   break;
       case 'assignments': renderAssignments(); break;
       case 'notices':     renderNotices();     break;
-      case 'links':       renderLinks();       break;
-      case 'summary':     renderSummary();     break;
+      case 'resources':
+      case 'links':
+      case 'summary':     renderResources();   break;
       case 'settings':    renderSettings();    break;
     }
   } catch (err) {
     console.error(`Error rendering page [${page}]:`, err);
-    const targetEl = document.getElementById(`page-${page}`);
+    const targetEl = document.getElementById(`page-${page}`) || document.getElementById('page-resources');
     if (targetEl) {
       targetEl.innerHTML = `
         <div class="card" style="text-align:center;padding:40px 20px;margin-top:20px;border-left:3px solid var(--red)">
@@ -2182,44 +2197,124 @@ function renderNotices() {
   `;
 }
 
-// ── Quick Links ───────────────────────────────────────────────
+// ── Resources (Quick Links & Daily Summary) ─────────────────────
+function switchResourcesTab(tab) {
+  state.resourcesTab = tab;
+  window.location.hash = tab;
+  document.querySelectorAll('[data-nav]').forEach(el => {
+    const navVal = el.dataset.nav;
+    el.classList.toggle('active', navVal === 'resources' || navVal === tab);
+  });
+  renderResources();
+}
+
+function renderResources() {
+  const el = document.getElementById('page-resources') || document.getElementById('page-links');
+  if (!el) return;
+
+  const currentTab = state.resourcesTab || 'links';
+
+  el.innerHTML = `
+    <div class="page-header" style="margin-bottom: 16px;">
+      <div>
+        <div class="page-title">Resources &amp; Insights</div>
+        <div class="page-subtitle">Personal notes, subject links &amp; daily academic summary</div>
+      </div>
+      ${currentTab === 'links' ? `
+        <button class="btn-primary" onclick="addLinkSubject()" style="font-size:0.85rem;padding:8px 14px">+ Add Subject</button>
+      ` : ''}
+    </div>
+
+    <div class="resources-tab-bar" role="tablist" aria-label="Resources sections">
+      <button role="tab" aria-selected="${currentTab === 'links'}" class="res-tab-btn ${currentTab === 'links' ? 'active' : ''}" onclick="switchResourcesTab('links')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+        </svg>
+        Quick Links
+      </button>
+      <button role="tab" aria-selected="${currentTab === 'summary'}" class="res-tab-btn ${currentTab === 'summary' ? 'active' : ''}" onclick="switchResourcesTab('summary')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        Daily Summary
+      </button>
+    </div>
+
+    <div id="resources-subtab-content"></div>
+  `;
+
+  const contentEl = document.getElementById('resources-subtab-content');
+  if (!contentEl) return;
+
+  if (currentTab === 'links') {
+    renderLinksContent(contentEl);
+  } else {
+    renderSummaryContent(contentEl);
+  }
+}
+
 function renderLinks() {
-  const el = document.getElementById('page-links');
+  state.resourcesTab = 'links';
+  renderResources();
+}
+
+function renderSummary() {
+  state.resourcesTab = 'summary';
+  renderResources();
+}
+
+function renderLinksContent(container) {
   const links = loadCustomLinks();
+
+  if (!links || links.length === 0) {
+    container.innerHTML = `
+      <div class="card" style="text-align:center;padding:40px 20px;color:var(--text-muted)">
+        <div style="font-size:2.2rem;margin-bottom:12px">📚</div>
+        <div style="font-weight:700;font-size:1.05rem;color:var(--text-primary);margin-bottom:6px">No Quick Links Saved Yet</div>
+        <div style="font-size:0.85rem;margin-bottom:20px;max-width:360px;margin-left:auto;margin-right:auto">Organize your course notes, slides, GitHub repos, and drive links by subject.</div>
+        <button class="btn-primary" onclick="addLinkSubject()" style="font-size:0.85rem">+ Add Your First Subject</button>
+      </div>
+    `;
+    return;
+  }
 
   const subjectsHtml = links.map((s, si) => `
     <div class="link-subject-card" id="link-card-${si}">
-      <div class="link-subject-header" style="display:flex;align-items:center;gap:8px">
+      <div class="link-subject-header">
         <span class="link-color-dot" style="background:${s.color || '#6366f1'}"></span>
-        <span style="flex:1;font-weight:600">${s.subject}</span>
+        <span class="link-subject-title" title="${s.subject}">${s.subject}</span>
         <span class="link-code">${s.code}</span>
-        <button onclick="editLinkSubject(${si})" title="Edit subject" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:0.9rem;padding:2px 6px">✏️</button>
-        <button onclick="deleteLinkSubject(${si})" title="Delete subject" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:0.9rem;padding:2px 6px">🗑</button>
+        <div class="link-subject-actions">
+          <button class="icon-btn-sm" onclick="editLinkSubject(${si})" title="Edit subject" aria-label="Edit subject">✏️</button>
+          <button class="icon-btn-sm icon-btn-danger" onclick="deleteLinkSubject(${si})" title="Delete subject" aria-label="Delete subject">🗑</button>
+        </div>
       </div>
+
       <div class="link-resources">
         ${s.resources.map((r, ri) => `
-          <div style="display:flex;align-items:center;gap:6px">
-            <a class="resource-link" href="${r.url}" target="_blank" rel="noopener" style="flex:1">
+          <div class="resource-item-row">
+            <a class="resource-link" href="${r.url}" target="_blank" rel="noopener">
               <span class="r-icon">${getResourceIcon(r.icon || 'link')}</span>
-              <span class="resource-label">${r.label}</span>
+              <span class="resource-label" title="${r.label}">${r.label}</span>
             </a>
-            <button onclick="editLinkResource(${si},${ri})" title="Edit" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:0.8rem;padding:2px 4px">✏️</button>
-            <button onclick="deleteLinkResource(${si},${ri})" title="Delete" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:0.8rem;padding:2px 4px">✕</button>
+            <div class="resource-actions">
+              <button class="icon-btn-xs" onclick="editLinkResource(${si},${ri})" title="Edit resource" aria-label="Edit resource">✏️</button>
+              <button class="icon-btn-xs icon-btn-danger" onclick="deleteLinkResource(${si},${ri})" title="Delete resource" aria-label="Delete resource">✕</button>
+            </div>
           </div>`).join('')}
-        <button onclick="addLinkResource(${si})" style="margin-top:8px;font-size:0.78rem;color:var(--accent);background:none;border:none;cursor:pointer;padding:4px 0">+ Add Resource</button>
+      </div>
+
+      <div style="padding: 10px 16px 14px;">
+        <button class="btn-add-resource" onclick="addLinkResource(${si})">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add Resource
+        </button>
       </div>
     </div>`).join('');
 
-  el.innerHTML = `
-    <div class="page-header">
-      <div>
-        <div class="page-title">Quick Links</div>
-        <div class="page-subtitle">Your personal notes &amp; resources — fully editable</div>
-      </div>
-      <button class="btn-primary" onclick="addLinkSubject()" style="margin-top:4px">+ Add Subject</button>
-    </div>
-    <div class="links-grid">${subjectsHtml}</div>
-  `;
+  container.innerHTML = `<div class="links-grid">${subjectsHtml}</div>`;
 }
 
 window.addLinkSubject = function() {
@@ -2288,6 +2383,7 @@ function showLinkSubjectModal(si, existing) {
       </div>
     </div>
   `;
+  backdrop.addEventListener('click', e => { if (e.target === backdrop) backdrop.remove(); });
   document.body.appendChild(backdrop);
 }
 
@@ -2343,6 +2439,7 @@ function showLinkResourceModal(si, ri, existing) {
       </div>
     </div>
   `;
+  backdrop.addEventListener('click', e => { if (e.target === backdrop) backdrop.remove(); });
   document.body.appendChild(backdrop);
 }
 
@@ -2362,9 +2459,7 @@ window.saveLinkResource = function(si, ri) {
   renderLinks();
 };
 
-// ── Daily Summary ─────────────────────────────────────────────
-function renderSummary() {
-  const el       = document.getElementById('page-summary');
+function renderSummaryContent(container) {
   const today    = new Date();
   const todayDay = today.getDay();
   const classes  = TIMETABLE[todayDay] || [];
@@ -2374,12 +2469,10 @@ function renderSummary() {
   const currentMin   = currentTimeMinutes();
   const remaining    = classes.filter(c => timeToMinutes(c.end) > currentMin);
 
-  el.innerHTML = `
-    <div class="page-header">
-      <div>
-        <div class="page-title">Daily Summary</div>
-        <div class="page-subtitle">${DAY_NAMES[todayDay]}, ${today.getDate()} ${MONTH_NAMES[today.getMonth()]} ${today.getFullYear()}</div>
-      </div>
+  container.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;background:var(--surface);padding:10px 14px;border:1px solid var(--border);border-radius:var(--radius-sm)">
+      <div style="font-weight:600;font-size:0.88rem;color:var(--text-secondary)">📅 Today's Date</div>
+      <div style="font-weight:700;font-size:0.88rem;color:var(--accent)">${DAY_NAMES[todayDay]}, ${today.getDate()} ${MONTH_NAMES[today.getMonth()]} ${today.getFullYear()}</div>
     </div>
 
     <div class="section-heading">Today's Schedule</div>
@@ -2389,20 +2482,23 @@ function renderSummary() {
           const isPast = currentMin >= timeToMinutes(c.end);
           return `<div class="summary-item" style="${isPast?'opacity:0.5':''}">
             <div class="summary-icon" style="background:rgba(99,102,241,0.12);color:var(--accent)">${icons.timetable()}</div>
-            <div>
-              <div class="summary-text-main">${c.subject} <span class="type-badge type-${c.type}" style="margin-left:6px">${c.type}</span></div>
+            <div style="flex:1;min-width:0">
+              <div class="summary-text-main" style="display:flex;align-items:center;flex-wrap:wrap;gap:6px">
+                <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.subject}</span>
+                <span class="type-badge type-${c.type}">${c.type}</span>
+              </div>
               <div class="summary-text-sub">${c.time}–${c.end} · ${c.room} · ${c.teacher}</div>
             </div>
           </div>`;
         }).join('')
     }
 
-    <div class="section-heading">Due Today</div>
+    <div class="section-heading" style="margin-top:20px">Due Today</div>
     ${dueTodayItems.length
       ? dueTodayItems.map(a => `
           <div class="summary-item">
             <div class="summary-icon" style="background:rgba(245,158,11,0.12);color:var(--yellow)">${icons.assignments()}</div>
-            <div>
+            <div style="flex:1;min-width:0">
               <div class="summary-text-main">${a.title}</div>
               <div class="summary-text-sub">${a.subject} · ${a.marks > 0 ? a.marks + ' marks' : 'Custom task'}</div>
             </div>
@@ -2411,22 +2507,22 @@ function renderSummary() {
     }
 
     ${overdueItems.length ? `
-      <div class="section-heading" style="color:var(--red)">⚠ Overdue</div>
+      <div class="section-heading" style="margin-top:20px;color:var(--red)">⚠ Overdue</div>
       ${overdueItems.map(a => `
         <div class="summary-item" style="border-left:3px solid var(--red)">
           <div class="summary-icon" style="background:rgba(239,68,68,0.12);color:var(--red)">${icons.alert()}</div>
-          <div>
+          <div style="flex:1;min-width:0">
             <div class="summary-text-main">${a.title}</div>
             <div class="summary-text-sub">${a.subject} · ${Math.abs(dueDaysLeft(a.dueDate))}d overdue</div>
           </div>
         </div>`).join('')}` : ''}
 
-    <div class="section-heading">Important Notices</div>
+    <div class="section-heading" style="margin-top:20px">Important Notices</div>
     ${importantNotices.length
       ? importantNotices.map(n => `
           <div class="summary-item" onclick="showNotice('${n.id}')" style="cursor:pointer">
             <div class="summary-icon" style="background:rgba(239,68,68,0.12);color:var(--red)">${icons.notices()}</div>
-            <div>
+            <div style="flex:1;min-width:0">
               <div class="summary-text-main">${n.title}</div>
               <div class="summary-text-sub">${formatDate(n.date)} · ${n.category}</div>
             </div>
@@ -2434,10 +2530,27 @@ function renderSummary() {
       : '<div class="card" style="text-align:center;padding:20px;color:var(--text-muted)">No important notices.</div>'
     }
 
-    <div class="section-heading">Quick Stats</div>
+    <div class="section-heading" style="margin-top:20px">Quick Stats</div>
     <div class="stat-grid" style="margin-bottom:0">
       <div class="stat-card">
         <div class="stat-value">${remaining.length}</div>
+        <div class="stat-label">Classes Remaining</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" style="color:var(--yellow)">${dueTodayItems.length}</div>
+        <div class="stat-label">Due Today</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" style="color:${overdueItems.length ? 'var(--red)' : 'var(--text-primary)'}">${overdueItems.length}</div>
+        <div class="stat-label">Overdue Tasks</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" style="color:var(--green)">${allTasks().filter(a => a.status === 'submitted').length}</div>
+        <div class="stat-label">Submitted</div>
+      </div>
+    </div>
+  `;
+}
         <div class="stat-label">Classes Remaining</div>
       </div>
       <div class="stat-card">
@@ -2850,6 +2963,8 @@ window.saveTimetableEntry      = saveTimetableEntry;
 window.deleteTimetableEntry    = deleteTimetableEntry;
 window.saveLinkSubject         = saveLinkSubject;
 window.saveLinkResource        = saveLinkResource;
+window.switchResourcesTab     = switchResourcesTab;
+window.renderResources        = renderResources;
 
 window.toggleAssignment = (id) => {
   // Custom task
