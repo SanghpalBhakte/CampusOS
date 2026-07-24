@@ -2007,6 +2007,174 @@ function renderReview() {
   \`;
 }
 
+// ── Ask CampusOS Assistant ────────────────────────────────────
+
+window.handleAssistantQuestion = function() {
+  const el = document.getElementById('assistant-input');
+  const text = (el ? el.value.trim() : '').toLowerCase();
+  if (!text) return;
+
+  const container = document.getElementById('assistant-answer-container');
+  if (!container) return;
+
+  container.innerHTML = '';
+  let intentType = 'unknown';
+  let intentData = {};
+
+  if ((text.includes('today') && text.includes('need to')) || (text.includes('today') && text.includes('due')) || text.includes('what do i need to do today')) {
+    intentType = 'today-summary';
+  } else if ((text.includes('overdue') || text.includes('late') || text.includes('pending')) && (text.includes('any') || text.includes('what'))) {
+    intentType = 'overdue';
+  } else if (text.includes('exam') || text.includes('test') || text.includes('quiz')) {
+    intentType = 'exams';
+  } else if (text.match(/\b(tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/) && text.match(/\b(class|classes|left|have)\b/)) {
+    intentType = 'timetable-day';
+    intentData.dayMatch = text.match(/\b(tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/)[0];
+  } else {
+    for (const [key, val] of Object.entries(SUBJECT_ALIASES)) {
+      if (text.includes(key.toLowerCase()) || text.includes(val.toLowerCase())) {
+        intentType = 'subject-tasks';
+        intentData.subject = key;
+        intentData.window = text.includes('next week') ? 'next-week' : 'this-week';
+        break;
+      }
+    }
+  }
+
+  let answerHTML = '';
+  switch (intentType) {
+    case 'today-summary': answerHTML = answerTodaySummary(); break;
+    case 'subject-tasks': answerHTML = answerSubjectTasks(intentData.subject, intentData.window); break;
+    case 'timetable-day': answerHTML = answerTimetableDay(intentData.dayMatch); break;
+    case 'overdue':       answerHTML = answerOverdueTasks(); break;
+    case 'exams':         answerHTML = answerExams(); break;
+    default:              answerHTML = answerUnknown(); break;
+  }
+
+  container.innerHTML = \`
+    <div class="card card-sm" style="margin-bottom:12px;padding:14px;background:var(--surface-2);border-left:3px solid var(--accent)">
+      \${answerHTML}
+    </div>
+  \`;
+};
+
+function answerTodaySummary() {
+  const currentMin = currentTimeMinutes();
+  const tt = loadTimetable();
+  const dayClasses = tt[new Date().getDay()] || [];
+  const nextClass = dayClasses.find(c => timeToMinutes(c.end || '23:59') > currentMin && c.type !== 'off' && c.subject !== 'Recess');
+  const classesLeft = todayClasses();
+  const tsks = allTasks().filter(a => a.status === 'pending' && a.dueDate === todayStr());
+  
+  let html = \`<div style="font-weight:600;margin-bottom:8px">Today's Summary</div>\`;
+  html += \`<div style="font-size:0.85rem;margin-bottom:8px">You have \${classesLeft} classes left and \${tsks.length} tasks due today.</div>\`;
+  if (nextClass) {
+    html += \`<div style="font-size:0.85rem;color:var(--text-secondary)">👉 Next class: <strong>\${nextClass.subject}</strong> at \${nextClass.time} in \${nextClass.room}</div>\`;
+  }
+  if (tsks.length > 0) {
+    html += \`<ul style="font-size:0.85rem;color:var(--text-secondary);margin:8px 0 0 16px;padding:0">\`;
+    tsks.forEach(t => { html += \`<li>\${t.title}</li>\`; });
+    html += \`</ul>\`;
+  }
+  return html;
+}
+
+function answerSubjectTasks(subject, window) {
+  const todayS = todayStr();
+  const next7 = new Date(); next7.setDate(new Date().getDate() + 7);
+  const next7Str = next7.toISOString().split('T')[0];
+  
+  let tsks = allTasks().filter(a => a.status === 'pending' && a.code === subject);
+  if (window === 'this-week') {
+    tsks = tsks.filter(a => a.dueDate >= todayS && a.dueDate <= next7Str);
+  } else {
+    const next14 = new Date(); next14.setDate(new Date().getDate() + 14);
+    tsks = tsks.filter(a => a.dueDate > next7Str && a.dueDate <= next14.toISOString().split('T')[0]);
+  }
+  
+  let html = \`<div style="font-weight:600;margin-bottom:8px">\${subject} Tasks (\${window.replace('-', ' ')})</div>\`;
+  if (tsks.length === 0) {
+    html += \`<div style="font-size:0.85rem">No pending tasks found for \${subject}.</div>\`;
+  } else {
+    html += \`<ul style="font-size:0.85rem;color:var(--text-secondary);margin:0 0 0 16px;padding:0">\`;
+    tsks.forEach(t => { html += \`<li>\${t.title} (Due: \${formatDate(t.dueDate)})</li>\`; });
+    html += \`</ul>\`;
+  }
+  return html;
+}
+
+function answerTimetableDay(dayMatch) {
+  let targetDate = new Date();
+  if (dayMatch === 'tomorrow') {
+    targetDate.setDate(targetDate.getDate() + 1);
+  } else {
+    const days = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+    const targetIdx = days.indexOf(dayMatch);
+    const currentIdx = targetDate.getDay();
+    let diff = targetIdx - currentIdx;
+    if (diff <= 0) diff += 7;
+    targetDate.setDate(targetDate.getDate() + diff);
+  }
+  
+  const tt = loadTimetable();
+  const dayIdx = targetDate.getDay();
+  const classes = (tt[dayIdx] || []).filter(c => c.type !== 'off' && c.subject !== 'Recess');
+  
+  let html = \`<div style="font-weight:600;margin-bottom:8px">Classes on \${DAY_NAMES[dayIdx]}</div>\`;
+  if (classes.length === 0) {
+    html += \`<div style="font-size:0.85rem">You have no classes scheduled.</div>\`;
+  } else {
+    html += \`<div style="font-size:0.85rem;margin-bottom:8px">You have \${classes.length} classes:</div>\`;
+    html += \`<ul style="font-size:0.85rem;color:var(--text-secondary);margin:0 0 0 16px;padding:0">\`;
+    classes.forEach(c => { html += \`<li><strong>\${c.subject}</strong> (\${c.time} - \${c.room})</li>\`; });
+    html += \`</ul>\`;
+  }
+  return html;
+}
+
+function answerOverdueTasks() {
+  const tsks = allTasks().filter(t => t.status === 'pending' && t.dueDate < todayStr());
+  let html = \`<div style="font-weight:600;margin-bottom:8px">Overdue Tasks</div>\`;
+  if (tsks.length === 0) {
+    html += \`<div style="font-size:0.85rem">You have no overdue tasks. Great job!</div>\`;
+  } else {
+    html += \`<div style="font-size:0.85rem;margin-bottom:8px">You have \${tsks.length} overdue task(s):</div>\`;
+    html += \`<ul style="font-size:0.85rem;color:var(--text-secondary);margin:0 0 0 16px;padding:0">\`;
+    tsks.forEach(t => { html += \`<li>\${t.title} (Due: \${formatDate(t.dueDate)})</li>\`; });
+    html += \`</ul>\`;
+  }
+  return html;
+}
+
+function answerExams() {
+  const tsks = allTasks().filter(t => t.status === 'pending' && (t.title.toLowerCase().includes('exam') || t.title.toLowerCase().includes('test') || t.title.toLowerCase().includes('quiz')));
+  const nts = NOTICES.filter(n => n.category.toLowerCase().includes('exam') || n.title.toLowerCase().includes('exam') || n.title.toLowerCase().includes('test'));
+  
+  let html = \`<div style="font-weight:600;margin-bottom:8px">Upcoming Exams & Tests</div>\`;
+  if (tsks.length === 0 && nts.length === 0) {
+    html += \`<div style="font-size:0.85rem">No exams or tests found in your tasks or notices.</div>\`;
+  } else {
+    html += \`<ul style="font-size:0.85rem;color:var(--text-secondary);margin:0 0 0 16px;padding:0">\`;
+    tsks.forEach(t => { html += \`<li>\${t.title} (Due: \${formatDate(t.dueDate)})</li>\`; });
+    nts.forEach(n => { html += \`<li>\${n.title} (Notice Date: \${formatDate(n.date)})</li>\`; });
+    html += \`</ul>\`;
+  }
+  return html;
+}
+
+function answerUnknown() {
+  return \`
+    <div style="font-weight:600;margin-bottom:8px">I'm not sure how to answer that yet.</div>
+    <div style="font-size:0.85rem;color:var(--text-secondary)">Try asking:</div>
+    <ul style="font-size:0.85rem;color:var(--text-muted);margin:8px 0 0 16px;padding:0">
+      <li>"What do I need to do today?"</li>
+      <li>"Show DS tasks due this week"</li>
+      <li>"How many classes left tomorrow?"</li>
+      <li>"Any overdue tasks?"</li>
+    </ul>
+  \`;
+}
+
 // ── Dashboard ─────────────────────────────────────────────────
 function renderDashboard() {
   const el       = document.getElementById('page-dashboard');
@@ -2089,6 +2257,14 @@ function renderDashboard() {
         <button class="btn btn-sm btn-primary" onclick="handleQuickAdd()" style="padding:4px 12px">Add</button>
       </div>
     </div>
+    
+    <div style="margin-bottom:12px">
+      <div class="card" style="display:flex;align-items:center;gap:10px;padding:8px 12px">
+        <div style="color:var(--accent);opacity:0.8">✨</div>
+        <input type="text" id="assistant-input" placeholder="Ask CampusOS (e.g. 'What do I need to do today?')" style="flex:1;border:none;background:transparent;outline:none;font-size:0.9rem;color:var(--text-primary)" onkeypress="if(event.key==='Enter') handleAssistantQuestion()">
+      </div>
+    </div>
+    <div id="assistant-answer-container"></div>
     
     <div class="card card-sm" style="margin-bottom:20px;display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surface-2)">
       <div style="color:var(--text-secondary)">📅</div>
