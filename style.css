@@ -5,115 +5,42 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
-/* ── 1) Paper — Warm Off-White, Muted Graphite, Gentle Teal Accent ── */
+/* ── 1) Paper — Default Theme (Warm Off-White, Graphite, Muted Teal) ── */
+:root,
 [data-theme="paper"],
 [data-theme="soft-neutral"],
 [data-theme="light"] {
-  --bg:            #fbf9f5;
-  --surface:       #ffffff;
-  --surface-2:     #f4f1ea;
-  --border:        #e6e2d8;
-  --border-light:  #f0ece2;
-
-  --text-primary:  #242729;
-  --text-secondary:#54595e;
-  --text-muted:    #8a9096;
-
-  --accent:        #148087;
-  --accent-light:  #1eb0b9;
-  --accent-dim:    rgba(20, 128, 135, 0.08);
-  --accent-hover:  #0e6369;
-
-  --banner-bg: linear-gradient(135deg, #0e6369 0%, #1c2124 100%);
-  --banner-text: #ffffff;
-
-  --shadow:    0 1px 3px rgba(36, 39, 41, 0.04), 0 4px 12px rgba(36, 39, 41, 0.03);
-  --shadow-md: 0 4px 6px -1px rgba(36, 39, 41, 0.07), 0 12px 24px -4px rgba(36, 39, 41, 0.05);
-}
-
-/* ── 2) Cloud — Cool Light Gray, Pale Blue Tint, Muted Navy Accent ── */
-[data-theme="cloud"],
-[data-theme="mist-blue"],
-[data-theme="glass"] {
-  --bg:            #f2f5f8;
-  --surface:       #ffffff;
-  --surface-2:     #e4e9f0;
-  --border:        #cbd4e1;
-  --border-light:  #e2e8f0;
-
-  --text-primary:  #111827;
-  --text-secondary:#374151;
-  --text-muted:    #6b7280;
-
-  --accent:        #1e3a8a;
-  --accent-light:  #2563eb;
-  --accent-dim:    rgba(30, 58, 138, 0.08);
-  --accent-hover:  #1e293b;
-
-  --banner-bg: linear-gradient(135deg, #1e3a8a 0%, #111827 100%);
-  --banner-text: #ffffff;
-
-  --shadow:    0 1px 3px rgba(17, 24, 39, 0.05), 0 4px 12px rgba(17, 24, 39, 0.03);
-  --shadow-md: 0 4px 6px -1px rgba(17, 24, 39, 0.08), 0 12px 24px -4px rgba(17, 24, 39, 0.06);
-}
-
-/* ── 3) Stone — Soft Sand & Mineral Neutrals, Desaturated Green-Blue Accent ── */
-[data-theme="stone"],
-[data-theme="sandstone"],
-[data-theme="emerald"] {
-  --bg:            #f5f3ef;
-  --surface:       #faf9f6;
-  --surface-2:     #e9e6df;
-  --border:        #d7d3c9;
-  --border-light:  #e7e3d9;
-
-  --text-primary:  #272522;
-  --text-secondary:#57544f;
-  --text-muted:    #8c877e;
-
-  --accent:        #2c6e63;
-  --accent-light:  #3e9486;
-  --accent-dim:    rgba(44, 110, 99, 0.08);
-  --accent-hover:  #1f524a;
-
-  --banner-bg: linear-gradient(135deg, #1f524a 0%, #1c1a17 100%);
-  --banner-text: #ffffff;
-
-  --shadow:    0 1px 3px rgba(39, 37, 34, 0.04), 0 4px 12px rgba(39, 37, 34, 0.03);
-  --shadow-md: 0 4px 6px -1px rgba(39, 37, 34, 0.07), 0 12px 24px -4px rgba(39, 37, 34, 0.05);
-}
-
-/* ── 4) Quiet Dark — Soft Charcoal & Low-Saturation Blue-Gray ── */
-:root,
-[data-theme="quiet-dark"],
-[data-theme="dark"],
-[data-theme="sunset"] {
   --font: 'Inter', system-ui, -apple-system, sans-serif;
 
-  --accent:        #52719a;
-  --accent-light:  #6b8bb8;
-  --accent-dim:    rgba(82, 113, 154, 0.16);
-  --accent-hover:  #3f5a7e;
+  /* Surfaces — Warm Off-White Editorial Paper */
+  --bg:            #f8f6f0;
+  --surface:       #ffffff;
+  --surface-2:     #f0ece3;
+  --border:        #e3ded3;
+  --border-light:  #ebe7dc;
 
-  --bg:            #121417;
-  --surface:       #1a1d22;
-  --surface-2:     #242830;
-  --border:        rgba(255, 255, 255, 0.09);
-  --border-light:  rgba(255, 255, 255, 0.04);
+  /* Text — Muted Graphite */
+  --text-primary:  #232628;
+  --text-secondary:#52575c;
+  --text-muted:    #888e94;
 
-  --text-primary:  #f0f2f5;
-  --text-secondary:#9ba4b0;
-  --text-muted:    #656e7b;
+  /* Accent — Muted Teal */
+  --accent:        #147980;
+  --accent-light:  #1da1ab;
+  --accent-dim:    rgba(20, 121, 128, 0.08);
+  --accent-hover:  #0e5c62;
 
-  --green:  #34d399;
-  --yellow: #fbbf24;
-  --red:    #f87171;
-  --blue:   #38bdf8;
-  --purple: #a78bfa;
-  --pink:   #f472b6;
+  /* Status Colors */
+  --green:  #10b981;
+  --yellow: #f59e0b;
+  --red:    #ef4444;
+  --blue:   #0284c7;
+  --purple: #8b5cf6;
+  --pink:   #ec4899;
 
-  --banner-bg: linear-gradient(135deg, #1f2836 0%, #121417 100%);
-  --banner-text: #f0f2f5;
+  /* Banner */
+  --banner-bg: linear-gradient(135deg, #0e5c62 0%, #1a2327 100%);
+  --banner-text: #ffffff;
 
   --topbar-bg:      var(--surface);
   --topbar-blur:    none;
@@ -128,6 +55,7 @@
   --fab-bg:         var(--accent);
   --fab-blur:       none;
 
+  /* Layout */
   --sidebar-w: 240px;
   --topbar-h:  60px;
   --nav-h:     64px;
@@ -135,34 +63,98 @@
   --radius-sm: 8px;
   --radius-xs: 6px;
 
-  --shadow:    0 2px 8px rgba(0, 0, 0, 0.28);
-  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.45);
+  /* Shadows */
+  --shadow:    0 1px 3px rgba(35, 38, 40, 0.05), 0 4px 12px rgba(35, 38, 40, 0.03);
+  --shadow-md: 0 4px 6px -1px rgba(35, 38, 40, 0.08), 0 12px 24px -4px rgba(35, 38, 40, 0.06);
 
+  /* Transitions */
   --ease: 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* ── Cocoa Night — Deep Brown-Gray Neutrals with Soft Desaturated Teal Accents ── */
-[data-theme="cocoa-night"] {
-  --bg:            #161413;
-  --surface:       #1e1b19;
-  --surface-2:     #282522;
-  --border:        rgba(255, 255, 255, 0.08);
+/* ── 2) Cloud — Cool Gray-Blue Surfaces with Restrained Navy Accent ── */
+[data-theme="cloud"],
+[data-theme="mist-blue"],
+[data-theme="glass"] {
+  --bg:            #eef2f6;
+  --surface:       #ffffff;
+  --surface-2:     #e2e8f0;
+  --border:        #cbd5e1;
+  --border-light:  #e2e8f0;
+
+  --text-primary:  #0f172a;
+  --text-secondary:#334155;
+  --text-muted:    #64748b;
+
+  --accent:        #1e3a8a;
+  --accent-light:  #2563eb;
+  --accent-dim:    rgba(30, 58, 138, 0.08);
+  --accent-hover:  #172554;
+
+  --banner-bg: linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%);
+  --banner-text: #ffffff;
+
+  --shadow:    0 1px 3px rgba(15, 23, 42, 0.06), 0 4px 12px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.09), 0 12px 24px -4px rgba(15, 23, 42, 0.07);
+}
+
+/* ── 3) Stone — Sand/Mineral Neutrals with Dark Taupe Text & Desaturated Green-Blue Accent ── */
+[data-theme="stone"],
+[data-theme="sandstone"],
+[data-theme="emerald"] {
+  --bg:            #f3f0e8;
+  --surface:       #faf8f3;
+  --surface-2:     #e6e2d6;
+  --border:        #d5d0c3;
+  --border-light:  #e3ded2;
+
+  --text-primary:  #2a2723;
+  --text-secondary:#5a554c;
+  --text-muted:    #8e887d;
+
+  --accent:        #2c6e63;
+  --accent-light:  #3b8a7d;
+  --accent-dim:    rgba(44, 110, 99, 0.08);
+  --accent-hover:  #1e4d45;
+
+  --banner-bg: linear-gradient(135deg, #1e4d45 0%, #1e1c19 100%);
+  --banner-text: #ffffff;
+
+  --shadow:    0 1px 3px rgba(42, 39, 35, 0.05), 0 4px 12px rgba(42, 39, 35, 0.03);
+  --shadow-md: 0 4px 6px -1px rgba(42, 39, 35, 0.08), 0 12px 24px -4px rgba(42, 39, 35, 0.06);
+}
+
+/* ── 4) Quiet Dark — Soft Charcoal & Slate Surfaces with Muted Steel-Blue Accents ── */
+[data-theme="quiet-dark"],
+[data-theme="dark"],
+[data-theme="cocoa-night"],
+[data-theme="sunset"] {
+  --bg:            #121417;
+  --surface:       #1a1d22;
+  --surface-2:     #242830;
+  --border:        rgba(255, 255, 255, 0.09);
   --border-light:  rgba(255, 255, 255, 0.04);
 
-  --text-primary:  #f3f1ee;
-  --text-secondary:#a39e96;
-  --text-muted:    #6e6861;
+  --text-primary:  #f0f2f5;
+  --text-secondary:#9ba4b0;
+  --text-muted:    #656e7b;
 
-  --accent:        #3b7a70;
-  --accent-light:  #4b968b;
-  --accent-dim:    rgba(59, 122, 112, 0.16);
-  --accent-hover:  #2e6159;
+  --accent:        #52719a;
+  --accent-light:  #6b8bb8;
+  --accent-dim:    rgba(82, 113, 154, 0.16);
+  --accent-hover:  #3f5a7e;
 
-  --banner-bg: linear-gradient(135deg, #282522 0%, #161413 100%);
-  --banner-text: #f3f1ee;
+  --green:  #34d399;
+  --yellow: #fbbf24;
+  --red:    #f87171;
+  --blue:   #38bdf8;
+  --purple: #a78bfa;
+  --pink:   #f472b6;
 
-  --shadow:    0 2px 8px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --banner-bg: linear-gradient(135deg, #1f2836 0%, #121417 100%);
+  --banner-text: #f0f2f5;
+
+  --shadow:    0 2px 8px rgba(0, 0, 0, 0.28);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.45);
 }
 
 /* ── Reset & Base ───────────────────────────────────────────── */

@@ -1474,13 +1474,12 @@ const state = {
 };
 
 // ── Theme ─────────────────────────────────────────────────────
-const ALL_THEMES = ['quiet-dark', 'cocoa-night', 'paper', 'cloud'];
+const ALL_THEMES = ['paper', 'cloud', 'stone', 'quiet-dark'];
 const LEGACY_THEME_MAP = {
-  dark: 'quiet-dark', sunset: 'quiet-dark',
-  'cocoa-night': 'cocoa-night',
   'soft-neutral': 'paper', light: 'paper',
   'mist-blue': 'cloud', glass: 'cloud',
   sandstone: 'stone', emerald: 'stone',
+  dark: 'quiet-dark', 'cocoa-night': 'quiet-dark', sunset: 'quiet-dark',
 };
 
 function initTheme() {
@@ -1488,13 +1487,13 @@ function initTheme() {
   const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
   let theme         = saved || (prefersDark ? 'quiet-dark' : 'paper');
   if (LEGACY_THEME_MAP[theme]) theme = LEGACY_THEME_MAP[theme];
-  if (!ALL_THEMES.includes(theme)) theme = 'quiet-dark';
+  if (!ALL_THEMES.includes(theme)) theme = 'paper';
   document.documentElement.setAttribute('data-theme', theme);
   updateThemeIcon(theme);
 }
 
 function toggleTheme() {
-  let current = document.documentElement.getAttribute('data-theme') || 'quiet-dark';
+  let current = document.documentElement.getAttribute('data-theme') || 'paper';
   if (LEGACY_THEME_MAP[current]) current = LEGACY_THEME_MAP[current];
   const nextIdx = (ALL_THEMES.indexOf(current) + 1) % ALL_THEMES.length;
   const next    = ALL_THEMES[nextIdx];
@@ -1515,8 +1514,8 @@ function setTheme(theme) {
 function updateThemeIcon(theme) {
   const icon = document.getElementById('theme-icon');
   if (!icon) return;
-  if (theme === 'quiet-dark' || theme === 'cocoa-night') icon.innerHTML = moonSVG();
-  else icon.innerHTML = sunSVG();
+  if (theme === 'quiet-dark') icon.innerHTML = moonSVG();
+  else                        icon.innerHTML = sunSVG();
 }
 
 // ── Routing ───────────────────────────────────────────────────
@@ -2647,21 +2646,21 @@ function renderSettings() {
       <div class="form-group" style="margin-bottom:0">
         <label class="form-label" style="margin-bottom:12px">Select Theme</label>
         <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(150px, 1fr));gap:10px">
-          <button class="filter-chip ${['quiet-dark','dark','sunset'].includes(document.documentElement.getAttribute('data-theme'))?'active':''}" onclick="setTheme('quiet-dark')" style="justify-content:flex-start">
-            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#52719a;margin-right:6px"></span>
-            🌒 Quiet Dark
-          </button>
-          <button class="filter-chip ${document.documentElement.getAttribute('data-theme')==='cocoa-night'?'active':''}" onclick="setTheme('cocoa-night')" style="justify-content:flex-start">
-            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#3b7a70;margin-right:6px"></span>
-            ☕ Cocoa Night
-          </button>
           <button class="filter-chip ${['paper','soft-neutral','light'].includes(document.documentElement.getAttribute('data-theme'))?'active':''}" onclick="setTheme('paper')" style="justify-content:flex-start">
-            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#148087;margin-right:6px"></span>
-            📄 Paper Light
+            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#147980;margin-right:6px"></span>
+            📄 Paper (Default)
           </button>
           <button class="filter-chip ${['cloud','mist-blue','glass'].includes(document.documentElement.getAttribute('data-theme'))?'active':''}" onclick="setTheme('cloud')" style="justify-content:flex-start">
             <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#1e3a8a;margin-right:6px"></span>
-            ☁️ Cloud Light
+            ☁️ Cloud (Navy)
+          </button>
+          <button class="filter-chip ${['stone','sandstone','emerald'].includes(document.documentElement.getAttribute('data-theme'))?'active':''}" onclick="setTheme('stone')" style="justify-content:flex-start">
+            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#2c6e63;margin-right:6px"></span>
+            🪨 Stone (Mineral)
+          </button>
+          <button class="filter-chip ${['quiet-dark','dark','cocoa-night','sunset'].includes(document.documentElement.getAttribute('data-theme'))?'active':''}" onclick="setTheme('quiet-dark')" style="justify-content:flex-start">
+            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#52719a;margin-right:6px"></span>
+            🌒 Quiet Dark
           </button>
         </div>
       </div>
