@@ -1554,6 +1554,7 @@ function renderPage(page) {
   try {
     switch (page) {
       case 'dashboard':   renderDashboard();   break;
+      case 'review':      renderReview();      break;
       case 'timetable':   renderTimetable();   break;
       case 'assignments': renderAssignments(); break;
       case 'notices':     renderNotices();     break;
@@ -1718,6 +1719,182 @@ function getResourceIcon(name) {
   return (map[name] || icons.link)();
 }
 
+window.handleQuickAdd = function() {
+  const inputEl = document.getElementById('quick-add-input');
+  if (!inputEl) return;
+  const text = inputEl.value.trim();
+  if (!text) return;
+
+  const knownSubjects = ['DS', 'DEMP', 'AI', 'MDM', 'PBST', 'COI', 'BMFA', 'OE-1', 'OE-2', 'Community Engagement'];
+  let subject = 'General';
+  for (const sub of knownSubjects) {
+    if (text.toLowerCase().includes(sub.toLowerCase())) {
+      subject = sub;
+      break;
+    }
+  }
+
+  let dueDate = new Date();
+  const lowerText = text.toLowerCase();
+  if (lowerText.includes('tomorrow')) {
+    dueDate.setDate(dueDate.getDate() + 1);
+  } else if (lowerText.includes('next week')) {
+    dueDate.setDate(dueDate.getDate() + 7);
+  } else if (lowerText.match(/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/)) {
+    const days = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+    const match = lowerText.match(/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/)[0];
+    const targetIdx = days.indexOf(match);
+    const currentIdx = dueDate.getDay();
+    let diff = targetIdx - currentIdx;
+    if (diff <= 0) diff += 7;
+    dueDate.setDate(dueDate.getDate() + diff);
+  } else if (lowerText.match(/\b(\d{1,2})(st|nd|rd|th)\b/)) {
+    const match = lowerText.match(/\b(\d{1,2})(st|nd|rd|th)\b/);
+    const dayNum = parseInt(match[1]);
+    dueDate.setDate(dayNum);
+    if (dueDate < new Date()) dueDate.setMonth(dueDate.getMonth() + 1);
+  }
+
+  const dStr = dueDate.toISOString().split('T')[0];
+  
+  const t = {
+    id: 'c-' + Date.now(),
+    subject: subject,
+    code: subject,
+    title: text,
+    description: 'Added via Quick Add',
+    dueDate: dStr,
+    priority: 'medium',
+    status: 'pending',
+    marks: 0,
+    isCustom: true
+  };
+  
+  state.customTasks.push(t);
+  saveCustomTasks();
+  
+  const container = document.getElementById('quick-add-container');
+  if (container) {
+    container.innerHTML = \`
+      <div class="card card-sm" style="display:flex;align-items:center;gap:12px;background:var(--surface-2);color:var(--text-primary);padding:10px 14px;border:1px solid var(--accent)">
+        <div style="color:var(--green)">\${icons.check()}</div>
+        <div style="flex:1">
+          <div style="font-weight:600;font-size:0.85rem">Added: \${t.title}</div>
+          <div style="font-size:0.75rem;color:var(--text-muted)">\${subject} · Due: \${formatDate(dStr)}</div>
+        </div>
+      </div>
+    \`;
+    setTimeout(() => renderPage('dashboard'), 2500);
+  }
+};
+
+function renderReview() {
+  const el = document.getElementById('page-review');
+  const now = new Date();
+  
+  const last7 = new Date(); last7.setDate(now.getDate() - 7);
+  const lookbackStr = last7.toISOString().split('T')[0];
+  const todayS = todayStr();
+  
+  const tasksCompleted = allTasks().filter(t => t.status === 'submitted' && t.dueDate >= lookbackStr && t.dueDate <= todayS);
+  const tasksRolledOver = allTasks().filter(t => t.status === 'pending' && t.dueDate >= lookbackStr && t.dueDate < todayS);
+  
+  const next7 = new Date(); next7.setDate(now.getDate() + 7);
+  const lookaheadStr = next7.toISOString().split('T')[0];
+  
+  const upcomingTasks = allTasks().filter(t => t.dueDate >= todayS && t.dueDate <= lookaheadStr);
+  const upcomingNotices = NOTICES.filter(n => n.date >= todayS && n.date <= lookaheadStr);
+  
+  const next7Days = {};
+  for(let i=0; i<=7; i++) {
+    const d = new Date(); d.setDate(now.getDate() + i);
+    next7Days[d.toISOString().split('T')[0]] = { date: d, items: [] };
+  }
+  
+  upcomingTasks.forEach(t => {
+    if (next7Days[t.dueDate]) next7Days[t.dueDate].items.push({ type: 'task', data: t });
+  });
+  upcomingNotices.forEach(n => {
+    if (next7Days[n.date]) next7Days[n.date].items.push({ type: 'notice', data: n });
+  });
+  
+  let lookaheadHTML = '';
+  Object.keys(next7Days).sort().forEach(dateStr => {
+    const day = next7Days[dateStr];
+    if (day.items.length === 0) return;
+    
+    let itemsHTML = day.items.map(it => {
+      if (it.type === 'task') {
+        const a = it.data;
+        const done = a.status === 'submitted';
+        return \`
+          <div class="card card-sm assignment-card" style="margin-bottom:8px;display:flex;align-items:center;gap:12px;padding:12px 14px">
+            <div style="width:18px;height:18px;border-radius:5px;border:2px solid \${done?'var(--green)':a.priority==='high'?'var(--red)':'var(--border)'};background:\${done?'var(--green)':'transparent'};display:grid;place-items:center;flex-shrink:0;color:white">
+              \${done ? icons.check() : ''}
+            </div>
+            <div style="flex:1;min-width:0">
+              <div class="font-semibold" style="font-size:0.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;\${done?'text-decoration:line-through;opacity:0.5':''}"><span class="\${done?'done':''} \${a.priority==='high'?'text-red':''} \${a.priority==='medium'?'text-yellow':''} \${a.priority==='low'?'text-green':''}"></span>\${a.title}</div>
+              <div class="text-xs text-muted">\${a.subject}</div>
+            </div>
+          </div>
+        \`;
+      } else {
+        const n = it.data;
+        return \`
+          <div class="card card-sm notice-card" style="margin-bottom:8px;padding:12px 14px">
+            <div style="font-weight:600;font-size:0.9rem">\${n.title}</div>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px">\${n.category}</div>
+          </div>
+        \`;
+      }
+    }).join('');
+    
+    lookaheadHTML += \`
+      <div style="margin-bottom:20px">
+        <div style="font-size:0.85rem;font-weight:600;color:var(--text-secondary);margin-bottom:8px">\${formatDate(dateStr)}</div>
+        \${itemsHTML}
+      </div>
+    \`;
+  });
+  
+  if (!lookaheadHTML) {
+    lookaheadHTML = \`<div class="card" style="padding:24px;text-align:center;color:var(--text-muted)">Nothing scheduled for the next 7 days.</div>\`;
+  }
+
+  el.innerHTML = \`
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <button class="icon-btn-xs" onclick="navigateTo('dashboard')">←</button>
+        <h2 style="margin:0;font-size:1.2rem;font-weight:700">Weekly Review</h2>
+      </div>
+    </div>
+    
+    <div class="section-heading">Lookback (Last 7 Days)</div>
+    <div class="stat-grid" style="margin-bottom:20px">
+      <div class="stat-card">
+        <div class="stat-value" style="color:var(--green)">\${tasksCompleted.length}</div>
+        <div class="stat-label">Tasks Done</div>
+      </div>
+    </div>
+    
+    \${tasksRolledOver.length > 0 ? \`
+    <div class="section-heading">Rollover (Pending from past 7 days)</div>
+    <div style="margin-bottom:20px">
+      \${tasksRolledOver.map(a => \`
+        <div class="card card-sm assignment-card" style="margin-bottom:8px;display:flex;align-items:center;gap:12px;padding:12px 14px;border-left:3px solid var(--red)">
+          <div style="flex:1;min-width:0">
+            <div class="font-semibold" style="font-size:0.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">\${a.title}</div>
+            <div class="text-xs text-muted">\${a.subject} · Due: \${formatDate(a.dueDate)}</div>
+          </div>
+        </div>
+      \`).join('')}
+    </div>\` : ''}
+
+    <div class="section-heading">Lookahead (Next 7 Days)</div>
+    \${lookaheadHTML}
+  \`;
+}
+
 // ── Dashboard ─────────────────────────────────────────────────
 function renderDashboard() {
   const el       = document.getElementById('page-dashboard');
@@ -1759,7 +1936,6 @@ function renderDashboard() {
     }
   }
 
-  // Profile setup prompt (shown when name is still default/empty)
   const displayName = getDisplayName();
   const needsSetup = !liveProfile.name || liveProfile.name === 'Your Name';
   const setupBanner = needsSetup ? `
@@ -1779,13 +1955,24 @@ function renderDashboard() {
   const quickLinksPreview = loadCustomLinks().slice(0, 4);
 
   el.innerHTML = `
-    <div class="greeting-banner">
-      <div class="greeting-text">${greetingWord()}, ${displayName.split(' ')[0]}! 👋</div>
-      <div class="greeting-sub">${liveProfile.branch} · ${liveProfile.year}</div>
-      <div class="greeting-date">
-        ${svg('<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>', 14)}
-        &nbsp;${DAY_NAMES[now.getDay()]}, ${now.getDate()} ${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}
-        &nbsp;·&nbsp; ${liveProfile.rollNo}
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <div class="greeting-banner" style="margin-bottom:0">
+        <div class="greeting-text">${greetingWord()}, ${displayName.split(' ')[0]}! 👋</div>
+        <div class="greeting-date">
+          ${svg('<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>', 14)}
+          &nbsp;${DAY_NAMES[now.getDay()]}, ${now.getDate()} ${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}
+        </div>
+      </div>
+      <button class="btn btn-sm" onclick="navigateTo('review')" style="gap:6px;display:flex;align-items:center;background:var(--surface-2);color:var(--text-primary);border:1px solid var(--border)">
+        ${icons.calendar()} Review
+      </button>
+    </div>
+
+    <div id="quick-add-container" style="margin-bottom:20px">
+      <div class="card" style="display:flex;align-items:center;gap:10px;padding:8px 12px">
+        <div style="color:var(--accent);opacity:0.8">${icons.plus()}</div>
+        <input type="text" id="quick-add-input" placeholder="Quick add: 'DS assignment due Friday'" style="flex:1;border:none;background:transparent;outline:none;font-size:0.9rem;color:var(--text-primary)" onkeypress="if(event.key==='Enter') handleQuickAdd()">
+        <button class="btn btn-sm btn-primary" onclick="handleQuickAdd()" style="padding:4px 12px">Add</button>
       </div>
     </div>
 
