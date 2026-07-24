@@ -2551,15 +2551,6 @@ function renderSummaryContent(container) {
     </div>
   `;
 }
-        <div class="stat-label">Classes Remaining</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value" style="color:${overdueItems.length?'var(--red)':'inherit'}">${overdueItems.length}</div>
-        <div class="stat-label">Overdue Tasks</div>
-      </div>
-    </div>
-  `;
-}
 
 // ── Settings ──────────────────────────────────────────────────
 function renderSettings() {
