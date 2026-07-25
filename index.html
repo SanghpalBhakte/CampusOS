@@ -63,18 +63,12 @@
         <span id="sync-icon">☁️</span>
         <span id="sync-label" class="text-xs text-muted">Local</span>
       </button>
-      <button class="btn-icon" id="theme-toggle" title="Toggle theme" aria-label="Toggle light/dark mode">
-        <span id="theme-icon">
-          <!-- filled by JS -->
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/>
-            <line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
-            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/>
-            <line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
-            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-          </svg>
-        </span>
-      </button>
+      <select id="theme-selector" class="theme-selector-topbar" aria-label="Select visual theme" title="Select visual theme" onchange="setTheme(this.value)">
+        <option value="paper">📄 Paper</option>
+        <option value="cloud">☁️ Cloud</option>
+        <option value="stone">🪨 Stone</option>
+        <option value="quiet-dark">🌒 Quiet Dark</option>
+      </select>
       <div class="avatar" id="topbar-avatar" onclick="navigateTo('settings')" title="Your Profile" style="cursor:pointer">?</div>
     </div>
   </header>

@@ -1490,7 +1490,7 @@ function initTheme() {
   if (LEGACY_THEME_MAP[theme]) theme = LEGACY_THEME_MAP[theme];
   if (!ALL_THEMES.includes(theme)) theme = 'paper';
   document.documentElement.setAttribute('data-theme', theme);
-  updateThemeIcon(theme);
+  updateThemeSelector(theme);
 }
 
 function toggleTheme() {
@@ -1500,7 +1500,7 @@ function toggleTheme() {
   const next    = ALL_THEMES[nextIdx];
   document.documentElement.setAttribute('data-theme', next);
   localStorage.setItem(KEY_THEME, next);
-  updateThemeIcon(next);
+  updateThemeSelector(next);
 }
 
 function setTheme(theme) {
@@ -1508,15 +1508,15 @@ function setTheme(theme) {
   if (!ALL_THEMES.includes(theme)) return;
   document.documentElement.setAttribute('data-theme', theme);
   localStorage.setItem(KEY_THEME, theme);
-  updateThemeIcon(theme);
+  updateThemeSelector(theme);
   renderPage(state.currentPage);
 }
 
-function updateThemeIcon(theme) {
-  const icon = document.getElementById('theme-icon');
-  if (!icon) return;
-  if (theme === 'quiet-dark') icon.innerHTML = moonSVG();
-  else                        icon.innerHTML = sunSVG();
+function updateThemeSelector(theme) {
+  const selector = document.getElementById('theme-selector');
+  if (selector && selector.value !== theme) {
+    selector.value = theme;
+  }
 }
 
 // ── Routing ───────────────────────────────────────────────────
@@ -3556,7 +3556,6 @@ function init() {
   updateTopbarProfile();
   setupFABDrag();
 
-  document.getElementById('theme-toggle')?.addEventListener('click', toggleTheme);
   document.getElementById('global-search')?.addEventListener('keydown', e => {
     if (e.key === 'Enter') handleGlobalSearch(e.target.value);
   });
