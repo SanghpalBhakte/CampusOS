@@ -1,8 +1,12 @@
-const CACHE_NAME = 'campus-os-v8';
+const CACHE_NAME = 'campus-os-v9';
 const PRECACHE_ASSETS = [
+  './',
   './index.html',
+  'index.html',
   './style.css',
+  'style.css',
   './app.js',
+  'app.js',
   './data.js',
   './firebase-config.js',
   './manifest.json'
@@ -49,7 +53,7 @@ self.addEventListener('fetch', (e) => {
           }
           return response;
         })
-        .catch(() => caches.match(e.request) || caches.match('./index.html') || caches.match('./'))
+        .catch(() => caches.match(e.request) || caches.match('./index.html') || caches.match('index.html') || caches.match('./'))
     );
     return;
   }
