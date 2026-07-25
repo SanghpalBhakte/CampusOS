@@ -1572,12 +1572,6 @@ function navigate(page) {
 window.navigateTo = navigate;
 window.navigate   = navigate;
 
-if (window._pendingNav) {
-  const pending = window._pendingNav;
-  delete window._pendingNav;
-  navigate(pending);
-}
-
 function renderPage(page) {
   try {
     switch (page) {
@@ -1831,18 +1825,18 @@ window.handleQuickAdd = function() {
     
     const container = document.getElementById('quick-add-container');
     if (container) {
-      container.innerHTML = \`
+      container.innerHTML = `
         <div class="card card-sm" style="display:flex;align-items:center;gap:12px;background:var(--surface-2);color:var(--text-primary);padding:10px 14px;border:1px solid var(--accent)">
-          <div style="color:var(--green)">\${icons.check()}</div>
+          <div style="color:var(--green)">${icons.check()}</div>
           <div style="flex:1">
-            <div style="font-weight:600;font-size:0.85rem">Added: \${t.title}</div>
+            <div style="font-weight:600;font-size:0.85rem">Added: ${t.title}</div>
             <div style="font-size:0.75rem;color:var(--text-muted)">
-              \${!foundAlias ? '<span class="type-badge" style="padding:2px 4px;font-size:0.6rem;background:var(--accent-dim);color:var(--accent)">General</span> ' : ''}
-              \${subjectCode} · Due: \${formatDate(finalDateStr)}
+              ${!foundAlias ? '<span class="type-badge" style="padding:2px 4px;font-size:0.6rem;background:var(--accent-dim);color:var(--accent)">General</span> ' : ''}
+              ${subjectCode} · Due: ${formatDate(finalDateStr)}
             </div>
           </div>
         </div>
-      \`;
+      `;
       setTimeout(() => renderPage('dashboard'), 2500);
     }
   };
@@ -1850,17 +1844,17 @@ window.handleQuickAdd = function() {
   if (!dateFound) {
     const container = document.getElementById('quick-add-container');
     if (container) {
-      container.innerHTML = \`
+      container.innerHTML = `
         <div class="card card-sm" style="display:flex;flex-direction:column;gap:10px;padding:12px">
-          <div style="font-size:0.85rem;color:var(--text-secondary)">Couldn't detect a date for: <strong>"\${text}"</strong></div>
+          <div style="font-size:0.85rem;color:var(--text-secondary)">Couldn't detect a date for: <strong>"${text}"</strong></div>
           <div style="display:flex;align-items:center;gap:10px">
             <span style="font-size:0.8rem;color:var(--text-muted)">Due:</span>
             <input type="date" id="quick-add-date" style="flex:1;padding:4px 8px;border-radius:4px;border:1px solid var(--border);background:var(--surface-2);color:var(--text-primary)">
-            <button class="btn btn-sm btn-primary" onclick="window._qaFinalize('\${encodeURIComponent(text)}')">Save</button>
+            <button class="btn btn-sm btn-primary" onclick="window._qaFinalize('${encodeURIComponent(text)}')">Save</button>
             <button class="btn btn-sm" onclick="renderPage('dashboard')">Cancel</button>
           </div>
         </div>
-      \`;
+      `;
       window._qaFinalize = function(encText) {
         const val = document.getElementById('quick-add-date').value;
         if (val) {
@@ -1883,16 +1877,16 @@ window.handleRolloverAction = function(taskId, action) {
   } else if (action === 'reschedule') {
     const el = document.getElementById(`rollover-card-${taskId}`);
     if (el) {
-      el.innerHTML = \`
+      el.innerHTML = `
         <div style="flex:1;display:flex;flex-direction:column;gap:8px">
           <div style="font-size:0.8rem;color:var(--text-muted)">Reschedule to:</div>
           <div style="display:flex;align-items:center;gap:10px">
-            <input type="date" id="resched-${taskId}" value="\${t.dueDate}" style="flex:1;padding:4px 8px;border-radius:4px;border:1px solid var(--border);background:var(--surface-2);color:var(--text-primary)">
-            <button class="btn btn-sm btn-primary" onclick="window._rsSave('\${taskId}')">Save</button>
+            <input type="date" id="resched-${taskId}" value="${t.dueDate}" style="flex:1;padding:4px 8px;border-radius:4px;border:1px solid var(--border);background:var(--surface-2);color:var(--text-primary)">
+            <button class="btn btn-sm btn-primary" onclick="window._rsSave('${taskId}')">Save</button>
             <button class="btn btn-sm" onclick="renderPage('review')">Cancel</button>
           </div>
         </div>
-      \`;
+      `;
     }
   }
 };
@@ -1958,46 +1952,46 @@ function renderReview() {
       if (it.type === 'task') {
         const a = it.data;
         const done = a.status === 'submitted';
-        return \`
+        return `
           <div class="card card-sm assignment-card" style="margin-bottom:8px;display:flex;align-items:center;gap:12px;padding:12px 14px">
-            <div style="width:18px;height:18px;border-radius:5px;border:2px solid \${done?'var(--green)':a.priority==='high'?'var(--red)':'var(--border)'};background:\${done?'var(--green)':'transparent'};display:grid;place-items:center;flex-shrink:0;color:white">
-              \${done ? icons.check() : ''}
+            <div style="width:18px;height:18px;border-radius:5px;border:2px solid ${done?'var(--green)':a.priority==='high'?'var(--red)':'var(--border)'};background:${done?'var(--green)':'transparent'};display:grid;place-items:center;flex-shrink:0;color:white">
+              ${done ? icons.check() : ''}
             </div>
             <div style="flex:1;min-width:0">
-              <div class="font-semibold" style="font-size:0.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;\${done?'text-decoration:line-through;opacity:0.5':''}"><span class="\${done?'done':''} \${a.priority==='high'?'text-red':''} \${a.priority==='medium'?'text-yellow':''} \${a.priority==='low'?'text-green':''}"></span>\${a.title}</div>
-              <div class="text-xs text-muted">\${a.subject}</div>
+              <div class="font-semibold" style="font-size:0.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${done?'text-decoration:line-through;opacity:0.5':''}"><span class="${done?'done':''} ${a.priority==='high'?'text-red':''} ${a.priority==='medium'?'text-yellow':''} ${a.priority==='low'?'text-green':''}"></span>${a.title}</div>
+              <div class="text-xs text-muted">${a.subject}</div>
             </div>
           </div>
-        \`;
+        `;
       } else {
         const n = it.data;
-        return \`
+        return `
           <div class="card card-sm notice-card" style="margin-bottom:8px;padding:12px 14px">
-            <div style="font-weight:600;font-size:0.9rem">\${n.title}</div>
-            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px">\${n.category}</div>
+            <div style="font-weight:600;font-size:0.9rem">${n.title}</div>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px">${n.category}</div>
           </div>
-        \`;
+        `;
       }
     }).join('');
     
     const isBusy = (dateStr === busyDayDate);
     
-    lookaheadHTML += \`
+    lookaheadHTML += `
       <div style="margin-bottom:20px">
         <div style="font-size:0.85rem;font-weight:600;color:var(--text-secondary);margin-bottom:8px;display:flex;align-items:center;gap:8px">
-          \${formatDate(dateStr)}
-          \${isBusy ? '<span class="type-badge" style="background:rgba(245,158,11,0.15);color:var(--yellow);padding:2px 6px;font-size:0.65rem">🔥 Busy Day</span>' : ''}
+          ${formatDate(dateStr)}
+          ${isBusy ? '<span class="type-badge" style="background:rgba(245,158,11,0.15);color:var(--yellow);padding:2px 6px;font-size:0.65rem">🔥 Busy Day</span>' : ''}
         </div>
-        \${itemsHTML}
+        ${itemsHTML}
       </div>
-    \`;
+    `;
   });
   
   if (!lookaheadHTML) {
-    lookaheadHTML = \`<div class="card" style="padding:24px;text-align:center;color:var(--text-muted)">Nothing scheduled for the next 7 days.</div>\`;
+    lookaheadHTML = `<div class="card" style="padding:24px;text-align:center;color:var(--text-muted)">Nothing scheduled for the next 7 days.</div>`;
   }
 
-  el.innerHTML = \`
+  el.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
       <div style="display:flex;align-items:center;gap:12px">
         <button class="icon-btn-xs" onclick="navigateTo('dashboard')">←</button>
@@ -2008,31 +2002,31 @@ function renderReview() {
     <div class="section-heading">Lookback (Last 7 Days)</div>
     <div class="stat-grid" style="margin-bottom:20px">
       <div class="stat-card">
-        <div class="stat-value" style="color:var(--green)">\${tasksCompleted.length}</div>
+        <div class="stat-value" style="color:var(--green)">${tasksCompleted.length}</div>
         <div class="stat-label">Tasks Done</div>
       </div>
     </div>
     
-    \${tasksRolledOver.length > 0 ? \`
+    ${tasksRolledOver.length > 0 ? `
     <div class="section-heading">Rollover (Pending from past 7 days)</div>
     <div style="margin-bottom:20px">
-      \${tasksRolledOver.map(a => \`
-        <div class="card card-sm assignment-card" id="rollover-card-\${a.id}" style="margin-bottom:8px;display:flex;align-items:center;gap:12px;padding:12px 14px;border-left:3px solid var(--red)">
+      ${tasksRolledOver.map(a => `
+        <div class="card card-sm assignment-card" id="rollover-card-${a.id}" style="margin-bottom:8px;display:flex;align-items:center;gap:12px;padding:12px 14px;border-left:3px solid var(--red)">
           <div style="flex:1;min-width:0">
-            <div class="font-semibold" style="font-size:0.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">\${a.title}</div>
-            <div class="text-xs text-muted">\${a.subject} · Due: \${formatDate(a.dueDate)}</div>
+            <div class="font-semibold" style="font-size:0.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${a.title}</div>
+            <div class="text-xs text-muted">${a.subject} · Due: ${formatDate(a.dueDate)}</div>
           </div>
           <div style="display:flex;gap:6px">
-            <button class="icon-btn-xs" style="color:var(--green);border:1px solid var(--border)" onclick="handleRolloverAction('\${a.id}', 'done')" title="Mark Done">\${icons.check()}</button>
-            <button class="icon-btn-xs" style="border:1px solid var(--border)" onclick="handleRolloverAction('\${a.id}', 'reschedule')" title="Reschedule">📅</button>
+            <button class="icon-btn-xs" style="color:var(--green);border:1px solid var(--border)" onclick="handleRolloverAction('${a.id}', 'done')" title="Mark Done">${icons.check()}</button>
+            <button class="icon-btn-xs" style="border:1px solid var(--border)" onclick="handleRolloverAction('${a.id}', 'reschedule')" title="Reschedule">📅</button>
           </div>
         </div>
-      \`).join('')}
-    </div>\` : ''}
+      `).join('')}
+    </div>` : ''}
 
     <div class="section-heading">Lookahead (Next 7 Days)</div>
-    \${lookaheadHTML}
-  \`;
+    ${lookaheadHTML}
+  `;
 }
 
 // ── Ask CampusOS Assistant ────────────────────────────────────
@@ -2079,11 +2073,11 @@ window.handleAssistantQuestion = function() {
     default:              answerHTML = answerUnknown(); break;
   }
 
-  container.innerHTML = \`
+  container.innerHTML = `
     <div class="card card-sm" style="margin-bottom:12px;padding:14px;background:var(--surface-2);border-left:3px solid var(--accent)">
-      \${answerHTML}
+      ${answerHTML}
     </div>
-  \`;
+  `;
 };
 
 function answerTodaySummary() {
@@ -2094,15 +2088,15 @@ function answerTodaySummary() {
   const classesLeft = todayClasses();
   const tsks = allTasks().filter(a => a.status === 'pending' && a.dueDate === todayStr());
   
-  let html = \`<div style="font-weight:600;margin-bottom:8px">Today's Summary</div>\`;
-  html += \`<div style="font-size:0.85rem;margin-bottom:8px">You have \${classesLeft} classes left and \${tsks.length} tasks due today.</div>\`;
+  let html = `<div style="font-weight:600;margin-bottom:8px">Today's Summary</div>`;
+  html += `<div style="font-size:0.85rem;margin-bottom:8px">You have ${classesLeft} classes left and ${tsks.length} tasks due today.</div>`;
   if (nextClass) {
-    html += \`<div style="font-size:0.85rem;color:var(--text-secondary)">👉 Next class: <strong>\${nextClass.subject}</strong> at \${nextClass.time} in \${nextClass.room}</div>\`;
+    html += `<div style="font-size:0.85rem;color:var(--text-secondary)">👉 Next class: <strong>${nextClass.subject}</strong> at ${nextClass.time} in ${nextClass.room}</div>`;
   }
   if (tsks.length > 0) {
-    html += \`<ul style="font-size:0.85rem;color:var(--text-secondary);margin:8px 0 0 16px;padding:0">\`;
-    tsks.forEach(t => { html += \`<li>\${t.title}</li>\`; });
-    html += \`</ul>\`;
+    html += `<ul style="font-size:0.85rem;color:var(--text-secondary);margin:8px 0 0 16px;padding:0">`;
+    tsks.forEach(t => { html += `<li>${t.title}</li>`; });
+    html += `</ul>`;
   }
   return html;
 }
@@ -2120,13 +2114,13 @@ function answerSubjectTasks(subject, window) {
     tsks = tsks.filter(a => a.dueDate > next7Str && a.dueDate <= next14.toISOString().split('T')[0]);
   }
   
-  let html = \`<div style="font-weight:600;margin-bottom:8px">\${subject} Tasks (\${window.replace('-', ' ')})</div>\`;
+  let html = `<div style="font-weight:600;margin-bottom:8px">${subject} Tasks (${window.replace('-', ' ')})</div>`;
   if (tsks.length === 0) {
-    html += \`<div style="font-size:0.85rem">No pending tasks found for \${subject}.</div>\`;
+    html += `<div style="font-size:0.85rem">No pending tasks found for ${subject}.</div>`;
   } else {
-    html += \`<ul style="font-size:0.85rem;color:var(--text-secondary);margin:0 0 0 16px;padding:0">\`;
-    tsks.forEach(t => { html += \`<li>\${t.title} (Due: \${formatDate(t.dueDate)})</li>\`; });
-    html += \`</ul>\`;
+    html += `<ul style="font-size:0.85rem;color:var(--text-secondary);margin:0 0 0 16px;padding:0">`;
+    tsks.forEach(t => { html += `<li>${t.title} (Due: ${formatDate(t.dueDate)})</li>`; });
+    html += `</ul>`;
   }
   return html;
 }
@@ -2148,28 +2142,28 @@ function answerTimetableDay(dayMatch) {
   const dayIdx = targetDate.getDay();
   const classes = (tt[dayIdx] || []).filter(c => c.type !== 'off' && c.subject !== 'Recess');
   
-  let html = \`<div style="font-weight:600;margin-bottom:8px">Classes on \${DAY_NAMES[dayIdx]}</div>\`;
+  let html = `<div style="font-weight:600;margin-bottom:8px">Classes on ${DAY_NAMES[dayIdx]}</div>`;
   if (classes.length === 0) {
-    html += \`<div style="font-size:0.85rem">You have no classes scheduled.</div>\`;
+    html += `<div style="font-size:0.85rem">You have no classes scheduled.</div>`;
   } else {
-    html += \`<div style="font-size:0.85rem;margin-bottom:8px">You have \${classes.length} classes:</div>\`;
-    html += \`<ul style="font-size:0.85rem;color:var(--text-secondary);margin:0 0 0 16px;padding:0">\`;
-    classes.forEach(c => { html += \`<li><strong>\${c.subject}</strong> (\${c.time} - \${c.room})</li>\`; });
-    html += \`</ul>\`;
+    html += `<div style="font-size:0.85rem;margin-bottom:8px">You have ${classes.length} classes:</div>`;
+    html += `<ul style="font-size:0.85rem;color:var(--text-secondary);margin:0 0 0 16px;padding:0">`;
+    classes.forEach(c => { html += `<li><strong>${c.subject}</strong> (${c.time} - ${c.room})</li>`; });
+    html += `</ul>`;
   }
   return html;
 }
 
 function answerOverdueTasks() {
   const tsks = allTasks().filter(t => t.status === 'pending' && t.dueDate < todayStr());
-  let html = \`<div style="font-weight:600;margin-bottom:8px">Overdue Tasks</div>\`;
+  let html = `<div style="font-weight:600;margin-bottom:8px">Overdue Tasks</div>`;
   if (tsks.length === 0) {
-    html += \`<div style="font-size:0.85rem">You have no overdue tasks. Great job!</div>\`;
+    html += `<div style="font-size:0.85rem">You have no overdue tasks. Great job!</div>`;
   } else {
-    html += \`<div style="font-size:0.85rem;margin-bottom:8px">You have \${tsks.length} overdue task(s):</div>\`;
-    html += \`<ul style="font-size:0.85rem;color:var(--text-secondary);margin:0 0 0 16px;padding:0">\`;
-    tsks.forEach(t => { html += \`<li>\${t.title} (Due: \${formatDate(t.dueDate)})</li>\`; });
-    html += \`</ul>\`;
+    html += `<div style="font-size:0.85rem;margin-bottom:8px">You have ${tsks.length} overdue task(s):</div>`;
+    html += `<ul style="font-size:0.85rem;color:var(--text-secondary);margin:0 0 0 16px;padding:0">`;
+    tsks.forEach(t => { html += `<li>${t.title} (Due: ${formatDate(t.dueDate)})</li>`; });
+    html += `</ul>`;
   }
   return html;
 }
@@ -2178,20 +2172,20 @@ function answerExams() {
   const tsks = allTasks().filter(t => t.status === 'pending' && (t.title.toLowerCase().includes('exam') || t.title.toLowerCase().includes('test') || t.title.toLowerCase().includes('quiz')));
   const nts = NOTICES.filter(n => n.category.toLowerCase().includes('exam') || n.title.toLowerCase().includes('exam') || n.title.toLowerCase().includes('test'));
   
-  let html = \`<div style="font-weight:600;margin-bottom:8px">Upcoming Exams & Tests</div>\`;
+  let html = `<div style="font-weight:600;margin-bottom:8px">Upcoming Exams & Tests</div>`;
   if (tsks.length === 0 && nts.length === 0) {
-    html += \`<div style="font-size:0.85rem">No exams or tests found in your tasks or notices.</div>\`;
+    html += `<div style="font-size:0.85rem">No exams or tests found in your tasks or notices.</div>`;
   } else {
-    html += \`<ul style="font-size:0.85rem;color:var(--text-secondary);margin:0 0 0 16px;padding:0">\`;
-    tsks.forEach(t => { html += \`<li>\${t.title} (Due: \${formatDate(t.dueDate)})</li>\`; });
-    nts.forEach(n => { html += \`<li>\${n.title} (Notice Date: \${formatDate(n.date)})</li>\`; });
-    html += \`</ul>\`;
+    html += `<ul style="font-size:0.85rem;color:var(--text-secondary);margin:0 0 0 16px;padding:0">`;
+    tsks.forEach(t => { html += `<li>${t.title} (Due: ${formatDate(t.dueDate)})</li>`; });
+    nts.forEach(n => { html += `<li>${n.title} (Notice Date: ${formatDate(n.date)})</li>`; });
+    html += `</ul>`;
   }
   return html;
 }
 
 function answerUnknown() {
-  return \`
+  return `
     <div style="font-weight:600;margin-bottom:8px">I'm not sure how to answer that yet.</div>
     <div style="font-size:0.85rem;color:var(--text-secondary)">Try asking:</div>
     <ul style="font-size:0.85rem;color:var(--text-muted);margin:8px 0 0 16px;padding:0">
@@ -2200,7 +2194,7 @@ function answerUnknown() {
       <li>"How many classes left tomorrow?"</li>
       <li>"Any overdue tasks?"</li>
     </ul>
-  \`;
+  `;
 }
 
 // ── Dashboard ─────────────────────────────────────────────────
@@ -3595,8 +3589,14 @@ function init() {
     if (e.key === 'Enter') handleGlobalSearch(e.target.value);
   });
 
-  const hash = window.location.hash.replace('#', '') || 'dashboard';
-  navigate(hash);
+  const pending = window._pendingNav;
+  if (pending) {
+    delete window._pendingNav;
+    navigate(pending);
+  } else {
+    const hash = window.location.hash.replace('#', '') || 'dashboard';
+    navigate(hash);
+  }
   updateNavBadges();
 
   // Initialize Firebase Auth & Firestore sync
@@ -3663,7 +3663,7 @@ function setupFABDrag() {
     
     // Convert current position to left-based so drag is 1:1
     fab.style.right = 'auto';
-    fab.style.left = ${initialLeft}px;
+    fab.style.left = initialLeft + 'px';
     fab.style.transform = 'none';
   };
 
@@ -3688,7 +3688,7 @@ function setupFABDrag() {
       const maxLeft = window.innerWidth - fab.offsetWidth - 16;
       if (newLeft < 16) newLeft = 16;
       if (newLeft > maxLeft) newLeft = maxLeft;
-      fab.style.left = ${newLeft}px;
+      fab.style.left = newLeft + 'px';
     }
   };
 
