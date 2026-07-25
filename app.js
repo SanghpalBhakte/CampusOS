@@ -143,11 +143,28 @@ function initFirebase() {
         firebase.initializeApp(cfg);
       }
       auth = firebase.auth();
-      db   = firebase.firestore();
 
-      db.enablePersistence({ synchronizeTabs: true }).catch(err => {
-        console.warn("Firestore persistence notice (non-fatal):", err);
-      });
+      // Initialize Firestore with modern multi-tab IndexedDB cache (avoids enablePersistence deprecation)
+      try {
+        db = firebase.initializeFirestore(firebase.app(), {
+          localCache: (firebase.firestore.persistentLocalCache ?
+            firebase.firestore.persistentLocalCache({ tabManager: firebase.firestore.persistentMultipleTabManager() }) :
+            undefined)
+        });
+      } catch (e) {
+        db = firebase.firestore();
+        try {
+          if (firebase.firestore.persistentLocalCache) {
+            db.settings({
+              localCache: firebase.firestore.persistentLocalCache({ tabManager: firebase.firestore.persistentMultipleTabManager() })
+            });
+          } else {
+            db.enablePersistence({ synchronizeTabs: true }).catch(() => {});
+          }
+        } catch (err) {
+          console.warn("Firestore cache init notice (non-fatal):", err);
+        }
+      }
 
       // Process redirect authentication result if Returning from redirect sign-in
       auth.getRedirectResult().then(result => {
