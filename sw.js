@@ -1,4 +1,4 @@
-const CACHE_NAME = 'campus-os-v13';
+const CACHE_NAME = 'campus-os-v14';
 const PRECACHE_ASSETS = [
   './',
   './index.html',

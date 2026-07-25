@@ -226,6 +226,33 @@ img { display: block; max-width: 100%; }
   box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
 }
 
+.btn-back {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.btn-back:hover:not([disabled]) {
+  background: var(--surface-3, var(--surface-2));
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.btn-back[disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .topbar-search {
   flex: 1;
   max-width: 340px;

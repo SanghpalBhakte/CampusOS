@@ -1537,10 +1537,18 @@ function updateThemeSelector(theme) {
 }
 
 // ── Routing ───────────────────────────────────────────────────
-const PAGES = ['dashboard', 'timetable', 'assignments', 'notices', 'resources', 'links', 'summary', 'settings'];
+const PAGES = ['dashboard', 'timetable', 'assignments', 'notices', 'resources', 'links', 'summary', 'settings', 'review'];
+const sectionHistory = [];
 
-function navigate(page) {
+function navigate(page, isBack = false) {
   if (!PAGES.includes(page)) page = 'dashboard';
+
+  const current = state.currentPage;
+  if (!isBack && current && current !== page) {
+    if (sectionHistory.length === 0 || sectionHistory[sectionHistory.length - 1] !== current) {
+      sectionHistory.push(current);
+    }
+  }
 
   if (page === 'links' || page === 'summary') {
     state.resourcesTab = page;
@@ -1565,12 +1573,31 @@ function navigate(page) {
     }
   });
 
+  updateBackButtonUI();
   renderPage(page);
 }
 
 // Immediately attach to window so inline onclick handlers work without waiting for full script load
-window.navigateTo = navigate;
-window.navigate   = navigate;
+window.navigateTo = function(page) { navigate(page, false); };
+window.navigate   = function(page) { navigate(page, false); };
+window.navigateBack = function() {
+  if (sectionHistory.length > 0) {
+    const prev = sectionHistory.pop();
+    navigate(prev, true);
+  }
+};
+
+function updateBackButtonUI() {
+  const backBtn = document.getElementById('nav-back-btn');
+  if (!backBtn) return;
+  if (sectionHistory.length > 0) {
+    backBtn.style.display = 'inline-flex';
+    backBtn.disabled = false;
+  } else {
+    backBtn.style.display = 'none';
+    backBtn.disabled = true;
+  }
+}
 
 function renderPage(page) {
   try {
@@ -1852,7 +1879,7 @@ window.handleQuickAdd = function() {
             <span style="font-size:0.8rem;color:var(--text-muted)">Due:</span>
             <input type="date" id="quick-add-date" style="flex:1;padding:4px 8px;border-radius:4px;border:1px solid var(--border);background:var(--surface-2);color:var(--text-primary)">
             <button class="btn btn-sm btn-primary" onclick="window._qaFinalize('${encodeURIComponent(text)}')">Save</button>
-            <button class="btn btn-sm" onclick="renderPage('dashboard')">Cancel</button>
+            <button class="btn btn-sm" onclick="cancelQuickAdd()">Cancel</button>
           </div>
         </div>
       `;
@@ -1865,6 +1892,20 @@ window.handleQuickAdd = function() {
     }
   } else {
     finalizeQuickAdd(dueDate.toISOString().split('T')[0]);
+  }
+};
+
+window.cancelQuickAdd = function() {
+  delete window._qaFinalize;
+  const container = document.getElementById('quick-add-container');
+  if (container) {
+    container.innerHTML = `
+      <div class="card" style="display:flex;align-items:center;gap:10px;padding:8px 12px">
+        <div style="color:var(--accent);opacity:0.8">${icons.plus()}</div>
+        <input type="text" id="quick-add-input" placeholder="Quick add: 'DS assignment due Friday'" style="flex:1;border:none;background:transparent;outline:none;font-size:0.9rem;color:var(--text-primary)" onkeypress="if(event.key==='Enter') handleQuickAdd()">
+        <button class="btn btn-sm btn-primary" onclick="handleQuickAdd()" style="padding:4px 12px">Add</button>
+      </div>
+    `;
   }
 };
 

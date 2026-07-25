@@ -54,9 +54,16 @@
 
   <!-- ── Topbar ──────────────────────────────────────── -->
   <header class="topbar">
-    <div class="topbar-brand">
-      <div class="logo-icon">OS</div>
-      <span>Campus OS</span>
+    <div style="display:flex;align-items:center">
+      <button id="nav-back-btn" class="btn-back" onclick="navigateBack()" title="Go back to previous page" aria-label="Go back" style="display:none">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
+        </svg>
+      </button>
+      <div class="topbar-brand">
+        <div class="logo-icon">OS</div>
+        <span>Campus OS</span>
+      </div>
     </div>
 
     <div class="topbar-search">
@@ -260,8 +267,8 @@
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
 <!-- Firebase Config & App Script -->
-<script src="firebase-config.js?v=13"></script>
-<script type="module" src="app.js?v=13"></script>
+<script src="firebase-config.js?v=14"></script>
+<script type="module" src="app.js?v=14"></script>
 
 </body>
 </html>
