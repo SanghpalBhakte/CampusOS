@@ -1568,6 +1568,16 @@ function navigate(page) {
   renderPage(page);
 }
 
+// Immediately attach to window so inline onclick handlers work without waiting for full script load
+window.navigateTo = navigate;
+window.navigate   = navigate;
+
+if (window._pendingNav) {
+  const pending = window._pendingNav;
+  delete window._pendingNav;
+  navigate(pending);
+}
+
 function renderPage(page) {
   try {
     switch (page) {
@@ -3572,6 +3582,14 @@ function init() {
   initTheme();
   updateTopbarProfile();
   setupFABDrag();
+
+  // Attach event listeners to all navigation items with data-nav
+  document.querySelectorAll('[data-nav]').forEach(el => {
+    el.addEventListener('click', (e) => {
+      const page = el.dataset.nav;
+      if (page) navigate(page);
+    });
+  });
 
   document.getElementById('global-search')?.addEventListener('keydown', e => {
     if (e.key === 'Enter') handleGlobalSearch(e.target.value);

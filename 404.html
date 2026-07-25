@@ -17,6 +17,15 @@
         document.documentElement.setAttribute('data-theme', t);
       } catch(e) {}
     })();
+
+    // Ensure navigateTo is immediately available globally for inline onclick handlers
+    window.navigateTo = window.navigateTo || function(page) {
+      if (typeof window.navigate === 'function') {
+        window.navigate(page);
+      } else {
+        window._pendingNav = page;
+      }
+    };
   </script>
   <meta name="description" content="Campus OS — Your personal college dashboard. Timetable, assignments, notices and resources in one place." />
   <title>Campus OS — Your College Dashboard</title>
@@ -251,8 +260,8 @@
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
 <!-- Firebase Config & App Script -->
-<script src="firebase-config.js?v=9"></script>
-<script type="module" src="app.js?v=9"></script>
+<script src="firebase-config.js?v=10"></script>
+<script type="module" src="app.js?v=10"></script>
 
 </body>
 </html>
