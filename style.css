@@ -579,7 +579,57 @@ img { display: block; max-width: 100%; }
 
 .greeting-text { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.3px; }
 .greeting-sub  { font-size: 0.85rem; opacity: 0.9; margin-top: 4px; font-weight: 500; }
-.greeting-date { font-size: 0.8rem; opacity: 0.75; margin-top: 14px; display: flex; align-items: center; gap: 4px; }
+.greeting-date { font-size: 0.8rem; opacity: 0.75; margin-top: 14px; display: flex; align-items: center; gap: 6px; }
+
+/* ── Dashboard Hero Header ───────────────────────────────────── */
+.dashboard-hero-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.dashboard-hero-header .greeting-banner {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.dashboard-hero-header .btn-review {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-radius: var(--radius-sm, 8px);
+  background: var(--surface-2);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.dashboard-hero-header .btn-review:hover {
+  background: var(--surface-3, var(--surface-2));
+  border-color: var(--accent);
+  color: var(--accent);
+  transform: translateY(-1px);
+}
+
+@media (max-width: 600px) {
+  .dashboard-hero-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .dashboard-hero-header .btn-review {
+    align-self: flex-start;
+  }
+}
 
 /* ── Section Heading ────────────────────────────────────────── */
 .section-heading {

@@ -2260,15 +2260,15 @@ function renderDashboard() {
   const tasksDueToday = allTasks().filter(a => a.status === 'pending' && a.dueDate === todayStr()).length;
 
   el.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-      <div class="greeting-banner" style="margin-bottom:0">
+    <div class="dashboard-hero-header">
+      <div class="greeting-banner">
         <div class="greeting-text">${greetingWord()}, ${displayName.split(' ')[0]}! 👋</div>
         <div class="greeting-date">
-          ${svg('<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>', 14)}
-          &nbsp;${DAY_NAMES[now.getDay()]}, ${now.getDate()} ${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}
+          ${icons.calendar()}
+          <span>${DAY_NAMES[now.getDay()]}, ${now.getDate()} ${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}</span>
         </div>
       </div>
-      <button class="btn btn-sm" onclick="navigateTo('review')" style="gap:6px;display:flex;align-items:center;background:var(--surface-2);color:var(--text-primary);border:1px solid var(--border)">
+      <button class="btn btn-sm btn-review" onclick="navigateTo('review')" title="Open Weekly Review">
         ${icons.calendar()} Review
       </button>
     </div>
