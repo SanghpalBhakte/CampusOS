@@ -1709,6 +1709,23 @@ function overdueCount() {
 }
 
 // ── Dynamic Timetable Loading ─────────────────────────────────
+function isBreakEntry(c) {
+  if (!c || typeof c !== 'object') return true;
+  if (c.isBreak === true) return true;
+  const type = (c.type || '').toLowerCase();
+  const subject = (c.subject || '').toLowerCase();
+  const code = (c.code || '').toLowerCase();
+
+  if (type === 'off' || type === 'break' || type === 'recess') return true;
+  if (subject === 'recess' || subject === 'break' || subject.includes('lunch')) return true;
+  if (code === 'rec' || code === 'break') return true;
+  return false;
+}
+
+function isTeachingClass(c) {
+  return !isBreakEntry(c);
+}
+
 function loadTimetable() {
   const saved = safeGetStorage(KEY_CUSTOM_TIMETABLE, null);
   if (saved && typeof saved === 'object') return saved;
@@ -1734,7 +1751,7 @@ function resetTimetableToDefault() {
 function todayClasses() {
   const tt = loadTimetable();
   const currentMin = currentTimeMinutes();
-  return (tt[new Date().getDay()] || []).filter(c => c.type !== 'off' && c.subject !== 'Recess' && timeToMinutes(c.end || '23:59') > currentMin).length;
+  return (tt[new Date().getDay()] || []).filter(c => isTeachingClass(c) && timeToMinutes(c.end || '23:59') > currentMin).length;
 }
 
 // ── SVG Icons ─────────────────────────────────────────────────
@@ -2153,7 +2170,7 @@ function renderWeeklyAttendanceTracker() {
   weekDays.forEach(d => {
     const dateStr = d.toISOString().split('T')[0];
     const dayIdx = d.getDay();
-    const dayClasses = (ttData[dayIdx] || []).filter(c => c.type !== 'off' && c.subject !== 'Recess');
+    const dayClasses = (ttData[dayIdx] || []).filter(isTeachingClass);
     
     if (dayClasses.length === 0) return;
     hasAnyClassesInWeek = true;
@@ -2579,9 +2596,9 @@ function renderDashboard() {
   const progress       = total === 0 ? 0 : Math.round((submittedCount / total) * 100);
 
   const liveTT     = loadTimetable();
-  const dayClasses = liveTT[now.getDay()] || [];
+  const dayClasses = (liveTT[now.getDay()] || []).filter(isTeachingClass);
   const currentMin = currentTimeMinutes();
-  const nextClass  = dayClasses.find(c => timeToMinutes(c.end || '23:59') > currentMin && c.type !== 'off' && c.subject !== 'Recess');
+  const nextClass  = dayClasses.find(c => timeToMinutes(c.end || '23:59') > currentMin);
   // Exam countdown
   let countdownHTML = '';
   if (liveProfile.examDate) {
@@ -2706,7 +2723,7 @@ function renderDashboard() {
       <span class="type-badge type-${nextClass.type || 'lecture'}">${nextClass.type || 'lecture'}</span>
     </div>` : `
     <div class="card card-sm" style="margin-bottom:20px;padding:24px;text-align:center;color:var(--text-muted)">
-      ${dayClasses.filter(c => c.type !== 'off' && c.subject !== 'Recess').length > 0 
+      ${dayClasses.length > 0 
           ? "🎉 All classes finished for today!" 
           : "🎉 No classes today — enjoy the break!"}
     </div>`}
@@ -2960,6 +2977,7 @@ function saveTimetableEntry(oldDay, idx) {
 
   const entry = { time, end, subject, code, room, teacher, type };
   if (notes) entry.notes = notes;
+  if (isBreakEntry(entry)) entry.isBreak = true;
 
   if (idx !== null && oldDay === newDay && tt[oldDay]?.[idx]) {
     tt[oldDay][idx] = entry;
