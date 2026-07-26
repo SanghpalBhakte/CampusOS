@@ -43,15 +43,28 @@ function safeSetStorage(key, val) {
 // ── Profile (read from localStorage, fallback to data.js) ─────
 function loadProfile() {
   const saved = safeGetStorage(KEY_PROFILE, {}) || {};
-  const savedName = (saved.name || '').trim();
-  const isDefaultName = !savedName || savedName.toLowerCase() === 'your name';
+  const isDummy = (val, dummies = []) => {
+    const s = (val || '').trim();
+    if (!s) return true;
+    return dummies.some(d => s.toLowerCase() === d.toLowerCase());
+  };
+
+  const getCleanVal = (val, fallback = '', dummies = []) => {
+    if (val !== undefined && val !== null) {
+      const s = String(val).trim();
+      if (!isDummy(s, dummies)) return s;
+    }
+    if (fallback && !isDummy(fallback, dummies)) return String(fallback).trim();
+    return '';
+  };
+
   return {
-    name:     isDefaultName ? '' : savedName,
-    college:  saved.college  ?? STUDENT.college,
-    branch:   saved.branch   ?? STUDENT.branch,
-    year:     saved.year     ?? STUDENT.year,
-    rollNo:   saved.rollNo   ?? STUDENT.rollNo,
-    examDate: saved.examDate ?? '',
+    name:     getCleanVal(saved.name, STUDENT.name, ['your name']),
+    college:  getCleanVal(saved.college, STUDENT.college, ['your college']),
+    branch:   getCleanVal(saved.branch, STUDENT.branch, ['artificial intelligence & data science', 'artificial intelligence']),
+    year:     getCleanVal(saved.year, STUDENT.year, ['2nd year — semester 3', '2nd year']),
+    rollNo:   getCleanVal(saved.rollNo, STUDENT.rollNo, ['your roll no.']),
+    examDate: (saved.examDate || '').trim(),
   };
 }
 
@@ -60,7 +73,7 @@ function getDisplayName() {
   if (nameVal && nameVal.toLowerCase() !== 'your name') {
     return nameVal;
   }
-  return 'Your Name';
+  return '';
 }
 
 // Mutable live profile — updated on settings save without page reload
@@ -80,8 +93,13 @@ function updateTopbarProfile() {
   const nameToDisplay = getDisplayName();
   const av = document.getElementById('topbar-avatar');
   if (av) {
-    av.textContent = getInitials(nameToDisplay);
-    av.title       = nameToDisplay;
+    if (nameToDisplay) {
+      av.textContent = getInitials(nameToDisplay);
+      av.title       = nameToDisplay;
+    } else {
+      av.textContent = '?';
+      av.title       = 'Set up your profile';
+    }
   }
 }
 
@@ -2281,14 +2299,16 @@ function renderDashboard() {
   }
 
   const displayName = getDisplayName();
-  const needsSetup = !liveProfile.name || liveProfile.name === 'Your Name';
+  const needsSetup = !displayName;
+  const greetingHeading = displayName ? `${greetingWord()}, ${displayName.split(' ')[0]}! 👋` : `${greetingWord()}! 👋`;
+
   const setupBanner = needsSetup ? `
     <div class="card" style="margin-bottom:20px;display:flex;align-items:center;gap:12px;background:var(--accent-dim);border-color:var(--accent)">
       <div style="color:var(--accent);flex-shrink:0">${icons.user()}</div>
       <div style="flex:1;font-size:0.87rem">
-        <strong>Set up your profile</strong> — enter your name, college, and roll number so the app feels personal.
+        <strong>Personalize CampusOS</strong> — set up your name, college, and roll number in Settings.
       </div>
-      <button class="btn-primary" onclick="navigateTo('settings')" style="flex-shrink:0;padding:6px 14px;font-size:0.8rem">Go to Settings</button>
+      <button class="btn-primary" onclick="navigateTo('settings')" style="flex-shrink:0;padding:6px 14px;font-size:0.8rem">Set Up Profile</button>
     </div>` : '';
 
   const importantNotices = NOTICES.filter(n => n.important).slice(0, 2);
@@ -2303,7 +2323,7 @@ function renderDashboard() {
   el.innerHTML = `
     <div class="dashboard-hero-header">
       <div class="greeting-banner">
-        <div class="greeting-text">${greetingWord()}, ${displayName.split(' ')[0]}! 👋</div>
+        <div class="greeting-text">${greetingHeading}</div>
         <div class="greeting-date">
           ${icons.calendar()}
           <span>${DAY_NAMES[now.getDay()]}, ${now.getDate()} ${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}</span>
@@ -3185,25 +3205,25 @@ function renderSettings() {
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">Full Name</label>
-          <input type="text" class="form-input" id="s-name" value="${p.name.replace(/"/g, '&quot;')}" placeholder="Your Name">
+          <input type="text" class="form-input" id="s-name" value="${(p.name || '').replace(/"/g, '&quot;')}" placeholder="Full name (e.g. Sanghpal Bhakte)">
         </div>
         <div class="form-group">
           <label class="form-label">Roll Number</label>
-          <input type="text" class="form-input" id="s-roll" value="${p.rollNo}" placeholder="e.g. 2K23/AIDS/042">
+          <input type="text" class="form-input" id="s-roll" value="${(p.rollNo || '').replace(/"/g, '&quot;')}" placeholder="Roll number (e.g. 2K23/AIDS/042)">
         </div>
       </div>
       <div class="form-group">
         <label class="form-label">College / University</label>
-        <input type="text" class="form-input" id="s-college" value="${p.college}" placeholder="e.g. Delhi Technological University">
+        <input type="text" class="form-input" id="s-college" value="${(p.college || '').replace(/"/g, '&quot;')}" placeholder="College / University">
       </div>
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">Branch</label>
-          <input type="text" class="form-input" id="s-branch" value="${p.branch}" placeholder="e.g. AI & Data Science">
+          <input type="text" class="form-input" id="s-branch" value="${(p.branch || '').replace(/"/g, '&quot;')}" placeholder="Branch (e.g. AI & Data Science)">
         </div>
         <div class="form-group">
           <label class="form-label">Year & Semester</label>
-          <input type="text" class="form-input" id="s-year" value="${p.year}" placeholder="e.g. 2nd Year — Semester 3">
+          <input type="text" class="form-input" id="s-year" value="${(p.year || '').replace(/"/g, '&quot;')}" placeholder="Year & semester (e.g. 2nd Year)">
         </div>
       </div>
     </div>
@@ -3281,13 +3301,18 @@ function renderSettings() {
 function saveSettings() {
   const rawName = (document.getElementById('s-name').value || '').trim();
   const nameToSave = (rawName.toLowerCase() === 'your name') ? '' : rawName;
+  const rawCollege = (document.getElementById('s-college').value || '').trim();
+  const rawBranch = (document.getElementById('s-branch').value || '').trim();
+  const rawYear = (document.getElementById('s-year').value || '').trim();
+  const rawRoll = (document.getElementById('s-roll').value || '').trim();
+
   const profile = {
     name:     nameToSave,
-    college:  (document.getElementById('s-college').value  || '').trim(),
-    branch:   (document.getElementById('s-branch').value   || '').trim(),
-    year:     (document.getElementById('s-year').value     || '').trim(),
-    rollNo:   (document.getElementById('s-roll').value     || '').trim(),
-    examDate:  document.getElementById('s-exam-date').value || '',
+    college:  (rawCollege.toLowerCase() === 'your college') ? '' : rawCollege,
+    branch:   (rawBranch.toLowerCase().includes('artificial intelligence & data science')) ? '' : rawBranch,
+    year:     (rawYear.toLowerCase().includes('2nd year — semester 3')) ? '' : rawYear,
+    rollNo:   (rawRoll.toLowerCase() === 'your roll no.') ? '' : rawRoll,
+    examDate: document.getElementById('s-exam-date').value || '',
   };
   safeSetStorage(KEY_PROFILE, profile);
   Object.assign(liveProfile, profile);

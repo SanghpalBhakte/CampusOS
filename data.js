@@ -5,11 +5,11 @@
 
 // Default profile — overridden by Settings (localStorage)
 export const STUDENT = {
-  name:    "Your Name",
-  branch:  "Artificial Intelligence & Data Science",
-  year:    "2nd Year — Semester 3",
-  college: "Your College",
-  rollNo:  "Your Roll No.",
+  name:    "",
+  branch:  "",
+  year:    "",
+  college: "",
+  rollNo:  "",
 };
 
 // ── Timetable ─────────────────────────────────────────────────
