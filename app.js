@@ -219,6 +219,36 @@ function initFirebase() {
   }
 }
 
+function showToast(msg, type = 'info') {
+  let toastContainer = document.getElementById('toast-container');
+  if (!toastContainer) {
+    toastContainer = document.createElement('div');
+    toastContainer.id = 'toast-container';
+    toastContainer.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:99999;display:flex;flex-direction:column;gap:8px;pointer-events:none';
+    document.body.appendChild(toastContainer);
+  }
+
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  const bgColor = type === 'error' ? 'var(--red)' : type === 'success' ? 'var(--green)' : 'var(--surface-2)';
+  const textColor = type === 'error' || type === 'success' ? '#ffffff' : 'var(--text-primary)';
+  
+  toast.style.cssText = `background:${bgColor};color:${textColor};padding:10px 16px;border-radius:8px;font-size:0.85rem;font-weight:600;box-shadow:0 4px 12px rgba(0,0,0,0.15);pointer-events:auto;transition:all 0.2s ease;opacity:0;transform:translateY(10px)`;
+  toast.textContent = msg;
+
+  toastContainer.appendChild(toast);
+  requestAnimationFrame(() => {
+    toast.style.opacity = '1';
+    toast.style.transform = 'translateY(0)';
+  });
+
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(10px)';
+    setTimeout(() => toast.remove(), 200);
+  }, 3500);
+}
+
 function updateSyncUI(status = null) {
   const label = document.getElementById('sync-label');
   const icon  = document.getElementById('sync-icon');
@@ -1308,6 +1338,7 @@ function logoutUser() {
     auth.signOut().then(() => {
       currentUser = null;
       updateSyncUI();
+      showToast('Signed out of CampusOS', 'info');
       renderPage(state.currentPage);
     });
   }
@@ -3571,19 +3602,19 @@ function renderSettings() {
       <div class="form-group" style="margin-bottom:0">
         <label class="form-label" style="margin-bottom:12px">Select Theme</label>
         <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(150px, 1fr));gap:10px">
-          <button class="filter-chip ${['paper','soft-neutral','light'].includes(document.documentElement.getAttribute('data-theme'))?'active':''}" onclick="setTheme('paper')" style="justify-content:flex-start">
+          <button class="filter-chip ${['paper','soft-neutral','light'].includes(document.documentElement?.getAttribute('data-theme') || 'paper')?'active':''}" onclick="setTheme('paper')" style="justify-content:flex-start">
             <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#147980;margin-right:6px"></span>
             📄 Paper (Default)
           </button>
-          <button class="filter-chip ${['cloud','mist-blue','glass'].includes(document.documentElement.getAttribute('data-theme'))?'active':''}" onclick="setTheme('cloud')" style="justify-content:flex-start">
+          <button class="filter-chip ${['cloud','mist-blue','glass'].includes(document.documentElement?.getAttribute('data-theme'))?'active':''}" onclick="setTheme('cloud')" style="justify-content:flex-start">
             <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#1e3a8a;margin-right:6px"></span>
             ☁️ Cloud (Navy)
           </button>
-          <button class="filter-chip ${['stone','sandstone','emerald'].includes(document.documentElement.getAttribute('data-theme'))?'active':''}" onclick="setTheme('stone')" style="justify-content:flex-start">
+          <button class="filter-chip ${['stone','sandstone','emerald'].includes(document.documentElement?.getAttribute('data-theme'))?'active':''}" onclick="setTheme('stone')" style="justify-content:flex-start">
             <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#2c6e63;margin-right:6px"></span>
             🪨 Stone (Mineral)
           </button>
-          <button class="filter-chip ${['quiet-dark','dark','cocoa-night','sunset'].includes(document.documentElement.getAttribute('data-theme'))?'active':''}" onclick="setTheme('quiet-dark')" style="justify-content:flex-start">
+          <button class="filter-chip ${['quiet-dark','dark','cocoa-night','sunset'].includes(document.documentElement?.getAttribute('data-theme'))?'active':''}" onclick="setTheme('quiet-dark')" style="justify-content:flex-start">
             <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#52719a;margin-right:6px"></span>
             🌒 Quiet Dark
           </button>
