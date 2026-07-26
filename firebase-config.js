@@ -1,5 +1,5 @@
 // ============================================================
-// Campus OS — Unified Firebase Environment & Config Loader
+// Clarity Desk — Unified Firebase Environment & Config Loader
 // Supports: Standard Static JS, Vite (VITE_), Next.js (NEXT_PUBLIC_),
 // Window ENV (window.ENV / window.CAMPUS_OS_FIREBASE_CONFIG), & LocalStorage
 // ============================================================

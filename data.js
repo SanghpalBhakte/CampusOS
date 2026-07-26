@@ -1,5 +1,5 @@
 // ============================================================
-// Campus OS — Personal Data
+// Clarity Desk — Personal Data
 // Timetable & Quick Links updated with your official schedule.
 // ============================================================
 

@@ -1,6 +1,5 @@
 // ============================================================
-// Campus OS — App Logic
-// Routing, rendering, profile, persistent tasks, settings
+// Clarity Desk — App Logic & Interactive Functions
 // ============================================================
 
 import { STUDENT, TIMETABLE, ASSIGNMENTS, NOTICES, QUICK_LINKS } from './data.js';
@@ -1338,7 +1337,7 @@ function logoutUser() {
     auth.signOut().then(() => {
       currentUser = null;
       updateSyncUI();
-      showToast('Signed out of CampusOS', 'info');
+      showToast('Signed out of Clarity Desk', 'info');
       renderPage(state.currentPage);
     });
   }
@@ -2357,7 +2356,7 @@ window.showOnboardingModal = function() {
     <div class="modal-content" style="max-width:440px;padding:24px" id="onboarding-modal-box">
       <div id="onboarding-step-1">
         <div style="font-size:2.2rem;margin-bottom:8px">👋</div>
-        <h2 style="margin:0 0 8px 0;font-size:1.35rem;font-weight:700">Welcome to CampusOS 👋</h2>
+        <h2 style="margin:0 0 8px 0;font-size:1.35rem;font-weight:700">Welcome to Clarity Desk 👋</h2>
         <div style="font-size:0.88rem;color:var(--text-secondary);line-height:1.5;margin-bottom:24px">
           You can customize your profile and dashboard to match your timetable and semester.
         </div>
@@ -2663,7 +2662,7 @@ function renderDashboard() {
     <div class="card" style="margin-bottom:20px;display:flex;align-items:center;gap:12px;background:var(--accent-dim);border-color:var(--accent)">
       <div style="color:var(--accent);flex-shrink:0">${icons.user()}</div>
       <div style="flex:1;font-size:0.87rem">
-        <strong>Personalize CampusOS</strong> — set up your name, college, and roll number in Settings.
+        <strong>Personalize Clarity Desk</strong> — set up your name, college, and roll number in Settings.
       </div>
       <button class="btn-primary" onclick="navigateTo('settings')" style="flex-shrink:0;padding:6px 14px;font-size:0.8rem">Set Up Profile</button>
     </div>` : '';
@@ -2702,7 +2701,7 @@ function renderDashboard() {
     <div style="margin-bottom:12px">
       <div class="card" style="display:flex;align-items:center;gap:10px;padding:8px 12px">
         <div style="color:var(--accent);opacity:0.8">✨</div>
-        <input type="text" id="assistant-input" placeholder="Ask CampusOS (e.g. 'What do I need to do today?')" style="flex:1;border:none;background:transparent;outline:none;font-size:0.9rem;color:var(--text-primary)" onkeypress="if(event.key==='Enter') handleAssistantQuestion()">
+        <input type="text" id="assistant-input" placeholder="Ask Clarity Desk (e.g. 'What do I need to do today?')" style="flex:1;border:none;background:transparent;outline:none;font-size:0.9rem;color:var(--text-primary)" onkeypress="if(event.key==='Enter') handleAssistantQuestion()">
       </div>
     </div>
     <div id="assistant-answer-container"></div>
@@ -3983,7 +3982,7 @@ function updateNavBadges() {
   const pending = pendingCount();
 
   // Update browser tab title with pending count
-  document.title = pending > 0 ? `(${pending}) Campus OS` : 'Campus OS';
+  document.title = pending > 0 ? `(${pending}) Clarity Desk` : 'Clarity Desk';
 
   document.querySelectorAll('[data-nav="assignments"]').forEach(el => {
     const badge = el.querySelector('.nav-badge');
@@ -3993,6 +3992,7 @@ function updateNavBadges() {
     if (dot) dot.style.display = pending > 0 ? 'block' : 'none';
   });
 }
+window.updateNavBadges = updateNavBadges;
 
 // ── Init ──────────────────────────────────────────────────────
 function init() {

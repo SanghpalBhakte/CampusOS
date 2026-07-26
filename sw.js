@@ -1,4 +1,4 @@
-const CACHE_NAME = 'campus-os-v19';
+const CACHE_NAME = 'clarity-desk-v20';
 const PRECACHE_ASSETS = [
   './',
   './index.html',
