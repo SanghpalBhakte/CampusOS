@@ -11,6 +11,7 @@ const KEY_ASSIGNMENTS      = 'cos_assignments';
 const KEY_CUSTOM_TASKS     = 'cos_custom_tasks';
 const KEY_CUSTOM_TIMETABLE = 'cos_custom_timetable';
 const KEY_CUSTOM_LINKS     = 'cos_custom_links';
+const KEY_ATTENDANCE       = 'cos_attendance';
 const KEY_GEMINI_KEY       = 'cos_gemini_key';
 const KEY_THEME            = 'cos_theme';
 
@@ -1410,6 +1411,9 @@ function applyCloudDataToLocalState(data) {
     safeSetStorage(KEY_ASSIGNMENTS, data.assignmentStatuses);
     state.assignments = loadAssignments();
   }
+  if (data.attendance && typeof data.attendance === 'object') {
+    safeSetStorage(KEY_ATTENDANCE, data.attendance);
+  }
   if (data.theme && ['quiet-dark', 'cocoa-night', 'paper', 'cloud', 'stone', 'soft-neutral', 'mist-blue', 'sandstone', 'dark', 'light', 'glass', 'emerald', 'sunset'].includes(data.theme)) {
     localStorage.setItem(KEY_THEME, data.theme);
     initTheme();
@@ -1433,6 +1437,7 @@ function pushLocalDataToCloud(uid) {
     customTimetable:    safeGetStorage(KEY_CUSTOM_TIMETABLE, null),
     customLinks:        safeGetStorage(KEY_CUSTOM_LINKS, null),
     assignmentStatuses: safeGetStorage(KEY_ASSIGNMENTS, {}),
+    attendance:         safeGetStorage(KEY_ATTENDANCE, {}),
     theme:              localStorage.getItem(KEY_THEME) || 'glass',
     updatedAt:          firebase.firestore.FieldValue.serverTimestamp()
   };
@@ -2084,10 +2089,269 @@ function renderReview() {
       `).join('')}
     </div>` : ''}
 
+    <div class="section-heading">Weekly Class Attendance Tracker</div>
+    ${renderWeeklyAttendanceTracker()}
+
     <div class="section-heading">Lookahead (Next 7 Days)</div>
     ${lookaheadHTML}
   `;
 }
+
+// ── Weekly Attendance Helper Functions ───────────────────────
+function getCurrentWeekDays() {
+  const now = new Date();
+  const currentDay = now.getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
+  const distanceToMon = currentDay === 0 ? -6 : 1 - currentDay;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() + distanceToMon);
+  monday.setHours(0,0,0,0);
+
+  const week = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    week.push(d);
+  }
+  return week;
+}
+
+window.setAttendance = function(dateStr, classKey, status) {
+  const data = safeGetStorage(KEY_ATTENDANCE, {}) || {};
+  if (!data[dateStr]) data[dateStr] = {};
+  
+  if (data[dateStr][classKey] === status) {
+    delete data[dateStr][classKey];
+  } else {
+    data[dateStr][classKey] = status;
+  }
+  
+  safeSetStorage(KEY_ATTENDANCE, data);
+  syncToCloud();
+  renderReview();
+};
+
+function renderWeeklyAttendanceTracker() {
+  const ttData = loadTimetable();
+  const attendanceData = safeGetStorage(KEY_ATTENDANCE, {}) || {};
+  const weekDays = getCurrentWeekDays();
+
+  let totalAttended = 0;
+  let totalLabsAttended = 0;
+  let totalSkipped = 0;
+
+  let attendanceDaysHTML = '';
+  let hasAnyClassesInWeek = false;
+
+  weekDays.forEach(d => {
+    const dateStr = d.toISOString().split('T')[0];
+    const dayIdx = d.getDay();
+    const dayClasses = (ttData[dayIdx] || []).filter(c => c.type !== 'off' && c.subject !== 'Recess');
+    
+    if (dayClasses.length === 0) return;
+    hasAnyClassesInWeek = true;
+
+    const dayName = DAY_NAMES[dayIdx];
+    const isToday = dateStr === todayStr();
+
+    let classListHTML = dayClasses.map(c => {
+      const classKey = `${c.code || c.subject}_${c.time}`.replace(/[^a-zA-Z0-9_]/g, '');
+      const status = attendanceData[dateStr]?.[classKey] || 'unset';
+      const isLab = c.type === 'lab';
+
+      if (status === 'attended') {
+        totalAttended++;
+        if (isLab) totalLabsAttended++;
+      } else if (status === 'skipped') {
+        totalSkipped++;
+      }
+
+      return `
+        <div class="card card-sm" style="margin-bottom:8px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+          <div>
+            <div style="font-weight:600;font-size:0.88rem;display:flex;align-items:center;gap:6px">
+              ${c.subject}
+              <span class="type-badge" style="font-size:0.65rem;padding:2px 6px;background:${isLab ? 'rgba(16,185,129,0.15)' : 'var(--accent-dim)'};color:${isLab ? 'var(--green)' : 'var(--accent)'}">
+                ${isLab ? 'Lab' : 'Lecture'}
+              </span>
+            </div>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px">
+              ${c.time} ${c.end ? '- ' + c.end : ''} ${c.room ? '· ' + c.room : ''}
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <button class="btn btn-sm" onclick="setAttendance('${dateStr}', '${classKey}', 'attended')" style="padding:4px 10px;font-size:0.75rem;font-weight:600;background:${status==='attended'?'var(--green)':'var(--surface-2)'};color:${status==='attended'?'white':'var(--text-primary)'};border:1px solid ${status==='attended'?'var(--green)':'var(--border)'}">
+              ${status==='attended'?'✓ Attended':'Attended'}
+            </button>
+            <button class="btn btn-sm" onclick="setAttendance('${dateStr}', '${classKey}', 'skipped')" style="padding:4px 10px;font-size:0.75rem;font-weight:600;background:${status==='skipped'?'var(--red)':'var(--surface-2)'};color:${status==='skipped'?'white':'var(--text-primary)'};border:1px solid ${status==='skipped'?'var(--red)':'var(--border)'}">
+              ${status==='skipped'?'✕ Skipped':'Skipped'}
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    attendanceDaysHTML += `
+      <div style="margin-bottom:14px">
+        <div style="font-size:0.82rem;font-weight:600;color:var(--text-secondary);margin-bottom:6px">
+          ${dayName}, ${formatDate(dateStr)} ${isToday ? '<span style="color:var(--accent)">· Today</span>' : ''}
+        </div>
+        ${classListHTML}
+      </div>
+    `;
+  });
+
+  if (!hasAnyClassesInWeek) {
+    return `
+      <div class="card" style="padding:20px;text-align:center;color:var(--text-muted);margin-bottom:20px">
+        <div style="font-size:1.5rem;margin-bottom:6px">📅</div>
+        <div style="font-weight:600;font-size:0.9rem;margin-bottom:4px;color:var(--text-primary)">Set up your timetable to start tracking classes</div>
+        <div style="font-size:0.8rem;margin-bottom:12px">Add your weekly schedule to mark class attendance and view weekly totals.</div>
+        <button class="btn-primary" onclick="navigateTo('timetable')" style="font-size:0.8rem;padding:6px 14px">Go to Timetable</button>
+      </div>
+    `;
+  }
+
+  const totalMarked = totalAttended + totalSkipped;
+  const attendancePct = totalMarked > 0 ? Math.round((totalAttended / totalMarked) * 100) : 0;
+
+  return `
+    <div style="margin-bottom:24px">
+      ${attendanceDaysHTML}
+
+      <!-- Weekly Summary Card -->
+      <div class="card" style="padding:16px;background:var(--surface-2);border-left:3px solid var(--accent)">
+        <div style="font-weight:700;font-size:0.95rem;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
+          <span>Weekly Attendance Summary</span>
+          <span style="font-size:0.85rem;color:var(--accent);font-weight:700">${totalMarked > 0 ? `Attendance: ${attendancePct}%` : 'No classes marked yet'}</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(110px, 1fr));gap:10px">
+          <div style="background:var(--background);padding:10px;border-radius:6px;text-align:center">
+            <div style="font-size:1.1rem;font-weight:700;color:var(--green)">${totalAttended}</div>
+            <div style="font-size:0.72rem;color:var(--text-muted)">Classes Attended</div>
+          </div>
+          <div style="background:var(--background);padding:10px;border-radius:6px;text-align:center">
+            <div style="font-size:1.1rem;font-weight:700;color:var(--accent)">${totalLabsAttended}</div>
+            <div style="font-size:0.72rem;color:var(--text-muted)">Labs Attended</div>
+          </div>
+          <div style="background:var(--background);padding:10px;border-radius:6px;text-align:center">
+            <div style="font-size:1.1rem;font-weight:700;color:var(--red)">${totalSkipped}</div>
+            <div style="font-size:0.72rem;color:var(--text-muted)">Classes Skipped</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ── Onboarding Flow ───────────────────────────────────────────
+function checkOnboarding() {
+  const p = loadProfile();
+  if (!p.name && !localStorage.getItem('cos_onboarding_dismissed')) {
+    setTimeout(showOnboardingModal, 400);
+  }
+}
+
+window.showOnboardingModal = function() {
+  if (document.getElementById('onboarding-backdrop')) return;
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  backdrop.id = 'onboarding-backdrop';
+  
+  const p = loadProfile();
+
+  backdrop.innerHTML = `
+    <div class="modal-content" style="max-width:440px;padding:24px" id="onboarding-modal-box">
+      <div id="onboarding-step-1">
+        <div style="font-size:2.2rem;margin-bottom:8px">👋</div>
+        <h2 style="margin:0 0 8px 0;font-size:1.35rem;font-weight:700">Welcome to CampusOS 👋</h2>
+        <div style="font-size:0.88rem;color:var(--text-secondary);line-height:1.5;margin-bottom:24px">
+          You can customize your profile and dashboard to match your timetable and semester.
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <button class="btn-primary" onclick="showOnboardingStep2()" style="width:100%;padding:10px;font-weight:600;justify-content:center">Set up my profile</button>
+          <button class="btn-secondary" onclick="dismissOnboarding()" style="width:100%;padding:8px;font-size:0.82rem;justify-content:center">Skip for now</button>
+        </div>
+      </div>
+
+      <div id="onboarding-step-2" style="display:none">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+          <h2 style="margin:0;font-size:1.15rem;font-weight:700">Profile Setup</h2>
+          <span style="font-size:0.75rem;color:var(--text-muted)">Step 1 of 1</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:20px">
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Full Name <span style="color:var(--red)">*</span></label>
+            <input type="text" class="form-input" id="ob-name" value="${(p.name||'').replace(/"/g, '&quot;')}" placeholder="Full name (e.g. Sanghpal Bhakte)">
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Roll Number <span style="color:var(--text-muted);font-weight:normal">(optional)</span></label>
+            <input type="text" class="form-input" id="ob-roll" value="${(p.rollNo||'').replace(/"/g, '&quot;')}" placeholder="Roll number (optional)">
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">College / University <span style="color:var(--red)">*</span></label>
+            <input type="text" class="form-input" id="ob-college" value="${(p.college||'').replace(/"/g, '&quot;')}" placeholder="College / University">
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Branch</label>
+            <input type="text" class="form-input" id="ob-branch" value="${(p.branch||'').replace(/"/g, '&quot;')}" placeholder="Branch (e.g. AI & Data Science)">
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Year & Semester</label>
+            <input type="text" class="form-input" id="ob-year" value="${(p.year||'').replace(/"/g, '&quot;')}" placeholder="Year & semester (e.g. 2nd Year)">
+          </div>
+          <div id="ob-error" style="color:var(--red);font-size:0.78rem;display:none">Please enter your Full Name and College to finish setup.</div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:flex-end;gap:10px">
+          <button class="btn-secondary" onclick="dismissOnboarding()" style="font-size:0.82rem">Skip</button>
+          <button class="btn-primary" onclick="finishOnboarding()" style="font-size:0.85rem;padding:8px 16px">Finish Setup</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(backdrop);
+};
+
+window.showOnboardingStep2 = function() {
+  const s1 = document.getElementById('onboarding-step-1');
+  const s2 = document.getElementById('onboarding-step-2');
+  if (s1) s1.style.display = 'none';
+  if (s2) s2.style.display = 'block';
+};
+
+window.dismissOnboarding = function() {
+  localStorage.setItem('cos_onboarding_dismissed', 'true');
+  document.getElementById('onboarding-backdrop')?.remove();
+};
+
+window.finishOnboarding = function() {
+  const nameVal = (document.getElementById('ob-name')?.value || '').trim();
+  const collegeVal = (document.getElementById('ob-college')?.value || '').trim();
+  const errEl = document.getElementById('ob-error');
+
+  if (!nameVal || !collegeVal) {
+    if (errEl) errEl.style.display = 'block';
+    return;
+  }
+
+  const profile = {
+    name: nameVal,
+    rollNo: (document.getElementById('ob-roll')?.value || '').trim(),
+    college: collegeVal,
+    branch: (document.getElementById('ob-branch')?.value || '').trim(),
+    year: (document.getElementById('ob-year')?.value || '').trim(),
+    examDate: liveProfile.examDate || '',
+  };
+
+  safeSetStorage(KEY_PROFILE, profile);
+  Object.assign(liveProfile, profile);
+  localStorage.setItem('cos_onboarding_dismissed', 'true');
+
+  updateTopbarProfile();
+  document.getElementById('onboarding-backdrop')?.remove();
+  renderPage(state.currentPage);
+};
 
 // ── Ask CampusOS Assistant ────────────────────────────────────
 
@@ -3059,7 +3323,7 @@ function showLinkResourceModal(si, ri, existing) {
   `;
   backdrop.addEventListener('click', e => { if (e.target === backdrop) backdrop.remove(); });
   document.body.appendChild(backdrop);
-}
+};
 
 window.saveLinkResource = function(si, ri) {
   const label = document.getElementById('lrm-label')?.value?.trim();
@@ -3169,7 +3433,7 @@ function renderSummaryContent(container) {
   `;
 }
 
-// ── Settings ──────────────────────────────────────────────────
+// ── Settings ────────────────────────────────────────────────
 function renderSettings() {
   const el = document.getElementById('page-settings');
   const p  = liveProfile;
@@ -3238,8 +3502,6 @@ function renderSettings() {
         </div>
       </div>
     </div>
-
-
 
     <div class="section-heading">${icons.layers()} Visual Theme</div>
     <div class="card" style="padding:20px;margin-bottom:20px">
@@ -3665,6 +3927,7 @@ function init() {
     navigate(hash);
   }
   updateNavBadges();
+  checkOnboarding();
 
   // Initialize Firebase Auth & Firestore sync
   initFirebase();
