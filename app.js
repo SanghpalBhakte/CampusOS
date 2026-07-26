@@ -2098,8 +2098,9 @@ function renderReview() {
 }
 
 // ── Weekly Attendance Helper Functions ───────────────────────
-function getCurrentWeekDays() {
+function getWeekDays(offset = 0) {
   const now = new Date();
+  now.setDate(now.getDate() + (offset * 7));
   const currentDay = now.getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
   const distanceToMon = currentDay === 0 ? -6 : 1 - currentDay;
   const monday = new Date(now);
@@ -2114,6 +2115,11 @@ function getCurrentWeekDays() {
   }
   return week;
 }
+
+window.setAttendanceWeekOffset = function(offset) {
+  state.attendanceWeekOffset = offset;
+  renderReview();
+};
 
 window.setAttendance = function(dateStr, classKey, status) {
   const data = safeGetStorage(KEY_ATTENDANCE, {}) || {};
@@ -2133,11 +2139,13 @@ window.setAttendance = function(dateStr, classKey, status) {
 function renderWeeklyAttendanceTracker() {
   const ttData = loadTimetable();
   const attendanceData = safeGetStorage(KEY_ATTENDANCE, {}) || {};
-  const weekDays = getCurrentWeekDays();
+  const weekOffset = state.attendanceWeekOffset || 0;
+  const weekDays = getWeekDays(weekOffset);
 
   let totalAttended = 0;
   let totalLabsAttended = 0;
   let totalSkipped = 0;
+  const subjectStats = {};
 
   let attendanceDaysHTML = '';
   let hasAnyClassesInWeek = false;
@@ -2157,9 +2165,14 @@ function renderWeeklyAttendanceTracker() {
       const classKey = `${c.code || c.subject}_${c.time}`.replace(/[^a-zA-Z0-9_]/g, '');
       const status = attendanceData[dateStr]?.[classKey] || 'unset';
       const isLab = c.type === 'lab';
+      const subjKey = `${c.subject} ${isLab ? '(Lab)' : ''}`;
+
+      subjectStats[subjKey] = subjectStats[subjKey] || { total: 0, attended: 0 };
+      subjectStats[subjKey].total++;
 
       if (status === 'attended') {
         totalAttended++;
+        subjectStats[subjKey].attended++;
         if (isLab) totalLabsAttended++;
       } else if (status === 'skipped') {
         totalSkipped++;
@@ -2179,10 +2192,10 @@ function renderWeeklyAttendanceTracker() {
             </div>
           </div>
           <div style="display:flex;align-items:center;gap:6px">
-            <button class="btn btn-sm" onclick="setAttendance('${dateStr}', '${classKey}', 'attended')" style="padding:4px 10px;font-size:0.75rem;font-weight:600;background:${status==='attended'?'var(--green)':'var(--surface-2)'};color:${status==='attended'?'white':'var(--text-primary)'};border:1px solid ${status==='attended'?'var(--green)':'var(--border)'}">
+            <button class="btn btn-sm" onclick="setAttendance('${dateStr}', '${classKey}', 'attended')" aria-label="Mark ${c.subject} as attended on ${formatDate(dateStr)}" aria-pressed="${status === 'attended'}" style="padding:4px 10px;font-size:0.75rem;font-weight:600;background:${status==='attended'?'var(--green)':'var(--surface-2)'};color:${status==='attended'?'white':'var(--text-primary)'};border:1px solid ${status==='attended'?'var(--green)':'var(--border)'}">
               ${status==='attended'?'✓ Attended':'Attended'}
             </button>
-            <button class="btn btn-sm" onclick="setAttendance('${dateStr}', '${classKey}', 'skipped')" style="padding:4px 10px;font-size:0.75rem;font-weight:600;background:${status==='skipped'?'var(--red)':'var(--surface-2)'};color:${status==='skipped'?'white':'var(--text-primary)'};border:1px solid ${status==='skipped'?'var(--red)':'var(--border)'}">
+            <button class="btn btn-sm" onclick="setAttendance('${dateStr}', '${classKey}', 'skipped')" aria-label="Mark ${c.subject} as skipped on ${formatDate(dateStr)}" aria-pressed="${status === 'skipped'}" style="padding:4px 10px;font-size:0.75rem;font-weight:600;background:${status==='skipped'?'var(--red)':'var(--surface-2)'};color:${status==='skipped'?'white':'var(--text-primary)'};border:1px solid ${status==='skipped'?'var(--red)':'var(--border)'}">
               ${status==='skipped'?'✕ Skipped':'Skipped'}
             </button>
           </div>
@@ -2200,8 +2213,21 @@ function renderWeeklyAttendanceTracker() {
     `;
   });
 
+  const weekSelectorHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+      <div style="font-size:0.85rem;color:var(--text-muted);font-weight:500">
+        ${formatDate(weekDays[0].toISOString().split('T')[0])} – ${formatDate(weekDays[6].toISOString().split('T')[0])}
+      </div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-sm ${weekOffset === 0 ? 'btn-primary' : ''}" onclick="setAttendanceWeekOffset(0)" aria-pressed="${weekOffset === 0}" style="padding:4px 12px;font-size:0.75rem">This Week</button>
+        <button class="btn btn-sm ${weekOffset === -1 ? 'btn-primary' : ''}" onclick="setAttendanceWeekOffset(-1)" aria-pressed="${weekOffset === -1}" style="padding:4px 12px;font-size:0.75rem">Last Week</button>
+      </div>
+    </div>
+  `;
+
   if (!hasAnyClassesInWeek) {
     return `
+      ${weekSelectorHTML}
       <div class="card" style="padding:20px;text-align:center;color:var(--text-muted);margin-bottom:20px">
         <div style="font-size:1.5rem;margin-bottom:6px">📅</div>
         <div style="font-weight:600;font-size:0.9rem;margin-bottom:4px;color:var(--text-primary)">Set up your timetable to start tracking classes</div>
@@ -2214,8 +2240,20 @@ function renderWeeklyAttendanceTracker() {
   const totalMarked = totalAttended + totalSkipped;
   const attendancePct = totalMarked > 0 ? Math.round((totalAttended / totalMarked) * 100) : 0;
 
+  const subjectBreakdownHTML = Object.keys(subjectStats).map(subj => {
+    const st = subjectStats[subj];
+    const pct = st.total > 0 ? Math.round((st.attended / st.total) * 100) : 0;
+    return `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px dotted var(--border);font-size:0.8rem">
+        <span style="font-weight:600">${subj}</span>
+        <span style="color:var(--text-secondary)">${st.attended} / ${st.total} attended (${pct}%)</span>
+      </div>
+    `;
+  }).join('');
+
   return `
     <div style="margin-bottom:24px">
+      ${weekSelectorHTML}
       ${attendanceDaysHTML}
 
       <!-- Weekly Summary Card -->
@@ -2224,7 +2262,7 @@ function renderWeeklyAttendanceTracker() {
           <span>Weekly Attendance Summary</span>
           <span style="font-size:0.85rem;color:var(--accent);font-weight:700">${totalMarked > 0 ? `Attendance: ${attendancePct}%` : 'No classes marked yet'}</span>
         </div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(110px, 1fr));gap:10px">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(110px, 1fr));gap:10px;margin-bottom:14px">
           <div style="background:var(--background);padding:10px;border-radius:6px;text-align:center">
             <div style="font-size:1.1rem;font-weight:700;color:var(--green)">${totalAttended}</div>
             <div style="font-size:0.72rem;color:var(--text-muted)">Classes Attended</div>
@@ -2238,6 +2276,13 @@ function renderWeeklyAttendanceTracker() {
             <div style="font-size:0.72rem;color:var(--text-muted)">Classes Skipped</div>
           </div>
         </div>
+
+        ${subjectBreakdownHTML ? `
+          <div style="margin-top:10px">
+            <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);margin-bottom:6px">Per-Subject Breakdown</div>
+            ${subjectBreakdownHTML}
+          </div>
+        ` : ''}
       </div>
     </div>
   `;
