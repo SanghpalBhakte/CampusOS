@@ -1583,12 +1583,25 @@ async function requestNotificationPermission() {
   }
 }
 
+const NOTIF_DEFAULT_ICON = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='128' fill='%236366f1'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='central' text-anchor='middle' font-family='sans-serif' font-weight='700' font-size='200' fill='white'%3ECD%3C/text%3E%3C/svg%3E";
+
 function dispatchNotification(title, options = {}) {
-  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+  if (typeof Notification === 'undefined') return;
+
+  if (Notification.permission !== 'granted') {
+    if (options.showInAppFallback !== false) {
+      if (Notification.permission === 'denied') {
+        showToast('Notifications blocked in browser settings. Enable in site settings to receive alerts.', 'error');
+      } else if (Notification.permission === 'default') {
+        showToast('Notification permission not requested yet. Click Enable Notifications in Settings.', 'info');
+      }
+    }
+    return;
+  }
 
   const notifOptions = {
-    icon: './manifest.json',
-    badge: './manifest.json',
+    icon: NOTIF_DEFAULT_ICON,
+    badge: NOTIF_DEFAULT_ICON,
     vibrate: [100, 50, 100],
     ...options
   };
@@ -1607,6 +1620,7 @@ function dispatchNotification(title, options = {}) {
     try { new Notification(title, notifOptions); } catch(e) {}
   }
 }
+window.dispatchNotification = dispatchNotification;
 
 function checkScheduledNotifications() {
   if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
