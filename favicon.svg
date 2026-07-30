@@ -1,25 +1,31 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
-  <!-- Background: teal rounded square -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none" role="img" aria-label="Clarity Desk">
+  <title>Clarity Desk</title>
+
+  <!-- Teal rounded-square background -->
   <rect width="32" height="32" rx="7" fill="#147980"/>
 
-  <!-- C arc: stroke arc, open on right side (~115deg each side) -->
-  <!-- Center at (13, 16), radius 7, stroke 2.2, open right gap ~62deg -->
+  <!--
+    Mark layout at 32px:
+    strokeW ≈ 3.0px, arcR ≈ 5.0px
+    C center  ≈ (11, 16)
+    D bar     ≈ x 17.5..20.5
+    D arc cx  ≈ 20.5
+  -->
+
+  <!-- C: open arc, gap on right ~62deg each side -->
   <path
-    d="M 13,9
-       A 7,7 0 1,0 13,23"
-    stroke="white" stroke-width="2.2" stroke-linecap="round"
-    fill="none"/>
+    d="M 14.0,11.2 A 5,5 0 1,0 14.0,20.8"
+    stroke="white" stroke-width="3.0" stroke-linecap="round" fill="none"/>
 
-  <!-- D vertical bar -->
-  <line x1="19.2" y1="9" x2="19.2" y2="23" stroke="white" stroke-width="2.2" stroke-linecap="round"/>
+  <!-- D: vertical bar -->
+  <rect x="18.0" y="11.0" width="3.0" height="10" rx="1.2" fill="white"/>
 
-  <!-- D right arc: semicircle on right of bar -->
+  <!-- D: right semicircle arc -->
   <path
-    d="M 19.2,9
-       A 7,7 0 0,1 19.2,23"
-    stroke="white" stroke-width="2.2" stroke-linecap="round"
-    fill="none"/>
+    d="M 18.0,11.0 A 5,5 0 0,1 18.0,21.0"
+    stroke="white" stroke-width="3.0" stroke-linecap="round" fill="none"/>
 
-  <!-- Desk rule: thin horizontal line through midpoint of the mark -->
-  <line x1="7" y1="16" x2="25" y2="16" stroke="white" stroke-width="0.85" stroke-linecap="round" opacity="0.55"/>
+  <!-- Desk rule: thin line at midpoint -->
+  <line x1="7.5" y1="16" x2="26" y2="16"
+        stroke="white" stroke-width="0.9" stroke-linecap="round" opacity="0.5"/>
 </svg>
