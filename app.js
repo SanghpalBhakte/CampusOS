@@ -237,10 +237,15 @@ function showToast(msg, type = 'info') {
   toast.textContent = msg;
 
   toastContainer.appendChild(toast);
-  requestAnimationFrame(() => {
+  if (typeof requestAnimationFrame !== 'undefined') {
+    requestAnimationFrame(() => {
+      toast.style.opacity = '1';
+      toast.style.transform = 'translateY(0)';
+    });
+  } else {
     toast.style.opacity = '1';
     toast.style.transform = 'translateY(0)';
-  });
+  }
 
   setTimeout(() => {
     toast.style.opacity = '0';
@@ -1571,19 +1576,24 @@ function dispatchNotification(title, options = {}) {
   if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
 
   const notifOptions = {
-    icon: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"%3E%3Crect width="32" height="32" rx="8" fill="%236366f1"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="central" text-anchor="middle" font-family="sans-serif" font-weight="700" font-size="13" fill="white"%3ECD%3C/text%3E%3C/svg%3E',
-    badge: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"%3E%3Crect width="32" height="32" rx="8" fill="%236366f1"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="central" text-anchor="middle" font-family="sans-serif" font-weight="700" font-size="13" fill="white"%3ECD%3C/text%3E%3C/svg%3E',
+    icon: './manifest.json',
+    badge: './manifest.json',
+    vibrate: [100, 50, 100],
     ...options
   };
 
   if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
     navigator.serviceWorker.ready.then(reg => {
-      reg.showNotification(title, notifOptions);
+      if (reg && reg.showNotification) {
+        reg.showNotification(title, notifOptions);
+      } else {
+        new Notification(title, notifOptions);
+      }
     }).catch(() => {
-      new Notification(title, notifOptions);
+      try { new Notification(title, notifOptions); } catch(e) {}
     });
   } else {
-    new Notification(title, notifOptions);
+    try { new Notification(title, notifOptions); } catch(e) {}
   }
 }
 
@@ -1651,7 +1661,7 @@ function checkScheduledNotifications() {
     const currentHHMM = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
     const summaryKey = `daily_summary_${today}`;
 
-    if (currentHHMM === prefs.dailySummaryTime && !notifiedMap[summaryKey]) {
+    if (currentHHMM >= prefs.dailySummaryTime && !notifiedMap[summaryKey]) {
       const pendingCountVal = tasks.length;
       const dueTodayCount = tasks.filter(t => t.dueDate === today).length;
       dispatchNotification(`Clarity Desk — Daily Summary`, {
@@ -1663,7 +1673,14 @@ function checkScheduledNotifications() {
     }
   }
 
-  safeSetStorage('cos_notified_history', notifiedMap);
+  const keys = Object.keys(notifiedMap);
+  if (keys.length > 100) {
+    const pruned = {};
+    keys.slice(-50).forEach(k => { pruned[k] = notifiedMap[k]; });
+    safeSetStorage('cos_notified_history', pruned);
+  } else {
+    safeSetStorage('cos_notified_history', notifiedMap);
+  }
 }
 
 function triggerNoticeNotification(notice) {
