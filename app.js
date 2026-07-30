@@ -1600,12 +1600,14 @@ function dispatchNotification(title, options = {}) {
     return;
   }
 
+  const merged = { ...options };
   const notifOptions = {
     icon: NOTIF_DEFAULT_ICON,
     badge: NOTIF_DEFAULT_BADGE,
     vibrate: [100, 50, 100],
-    renotify: options.tag ? true : false,
-    ...options
+    ...merged,
+    // Always derive renotify from the final tag so it cannot be overridden by caller accidentally
+    renotify: !!(merged.tag)
   };
 
   if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {

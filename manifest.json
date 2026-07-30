@@ -3,6 +3,7 @@
   "short_name": "Clarity Desk",
   "description": "Student workflow layer that cuts app chaos and makes it clear what to do today instead of juggling five tools.",
   "start_url": "./index.html",
+  "id": "/clarity-desk",
   "scope": ".",
   "display": "standalone",
   "background_color": "#0f1117",

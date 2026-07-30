@@ -1,4 +1,4 @@
-const CACHE_NAME = 'clarity-desk-v26';
+const CACHE_NAME = 'clarity-desk-v27';
 const PRECACHE_ASSETS = [
   './',
   './index.html',
@@ -85,16 +85,23 @@ const NOTIF_DEFAULT_BADGE = './icon-192.png';
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const targetUrl = event.notification.data?.url || './#dashboard';
+  const absoluteTarget = new URL(targetUrl, self.location.origin).href;
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      // Find an existing app window and navigate it to the right screen
       for (const client of clientList) {
-        if (client.url.includes(self.location.origin) && 'focus' in client) {
-          return client.focus();
+        if (client.url.startsWith(self.location.origin) && 'focus' in client) {
+          return client.focus().then(() => {
+            if ('navigate' in client) {
+              return client.navigate(absoluteTarget);
+            }
+          });
         }
       }
+      // No existing window — open a new one
       if (clients.openWindow) {
-        return clients.openWindow(targetUrl);
+        return clients.openWindow(absoluteTarget);
       }
     })
   );
