@@ -1,4 +1,4 @@
-const CACHE_NAME = 'clarity-desk-v28';
+const CACHE_NAME = 'clarity-desk-v29';
 const PRECACHE_ASSETS = [
   './',
   './index.html',
@@ -10,6 +10,9 @@ const PRECACHE_ASSETS = [
   './data.js',
   './firebase-config.js',
   './manifest.json',
+  './favicon.svg',
+  './favicon-32.png',
+  './apple-touch-icon.png',
   './icon-192.png',
   './icon-512.png',
   './badge-96.png'
