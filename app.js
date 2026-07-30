@@ -1550,6 +1550,17 @@ async function requestNotificationPermission() {
     showToast('Notifications not supported by your browser', 'error');
     return false;
   }
+
+  const currentPermission = Notification.permission;
+  if (currentPermission === 'denied') {
+    showToast('Notifications blocked in browser settings. Please allow in address bar site settings.', 'error');
+    const prefs = loadNotifPrefs();
+    prefs.enabled = false;
+    saveNotifPrefs(prefs);
+    if (state.currentPage === 'settings') renderSettings();
+    return false;
+  }
+
   try {
     const permission = await Notification.requestPermission();
     const prefs = loadNotifPrefs();
@@ -1562,7 +1573,7 @@ async function requestNotificationPermission() {
         tag: 'welcome-notif'
       });
     } else if (permission === 'denied') {
-      showToast('Notification permission was blocked in browser settings', 'error');
+      showToast('Notifications blocked. Please enable them in browser site settings.', 'error');
     }
     if (state.currentPage === 'settings') renderSettings();
     return permission === 'granted';
@@ -3738,6 +3749,8 @@ function renderSettings() {
   const p  = liveProfile;
   const nPrefs = loadNotifPrefs();
   const notifPermission = (typeof Notification !== 'undefined') ? Notification.permission : 'unsupported';
+  const isGranted = notifPermission === 'granted';
+  const isDenied  = notifPermission === 'denied';
 
   el.innerHTML = `
     <div class="page-header">
@@ -3831,19 +3844,27 @@ function renderSettings() {
 
     <div class="section-heading">${icons.bell()} Notifications</div>
     <div class="card" style="padding:20px;margin-bottom:20px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;padding-bottom:14px;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:10px;padding-bottom:14px;border-bottom:1px solid var(--border)">
         <div>
           <div style="font-weight:600;font-size:0.9rem">Browser Notification Permission</div>
           <div style="font-size:0.78rem;color:var(--text-muted);margin-top:2px">
-            Status: <strong style="color:${notifPermission === 'granted' ? 'var(--green)' : notifPermission === 'denied' ? 'var(--red)' : 'var(--yellow)'}">
-              ${notifPermission === 'granted' ? 'Granted ✓' : notifPermission === 'denied' ? 'Blocked ✕' : 'Not Requested'}
+            Status: <strong style="color:${isGranted ? 'var(--green)' : isDenied ? 'var(--red)' : 'var(--yellow)'}">
+              ${isGranted ? 'Granted ✓' : isDenied ? 'Blocked ✕' : 'Not Requested'}
             </strong>
           </div>
         </div>
-        <button class="btn btn-sm ${notifPermission === 'granted' ? 'btn-secondary' : 'btn-primary'}" onclick="requestNotificationPermission()" style="font-size:0.8rem;padding:6px 14px">
-          ${notifPermission === 'granted' ? 'Re-check Permission' : 'Enable Notifications'}
+        <button class="btn btn-sm ${isGranted ? 'btn-secondary' : 'btn-primary'}" onclick="requestNotificationPermission()" style="font-size:0.8rem;padding:6px 14px">
+          ${isGranted ? 'Test Notification' : isDenied ? 'Re-check Permission' : 'Enable Notifications'}
         </button>
       </div>
+
+      ${isDenied ? `
+      <div style="margin-bottom:16px;font-size:0.78rem;color:var(--red);background:rgba(239,68,68,0.08);padding:10px 12px;border-radius:6px;border:1px solid rgba(239,68,68,0.25);line-height:1.5;display:flex;align-items:flex-start;gap:8px">
+        <span style="font-size:0.9rem">🔒</span>
+        <div>
+          <strong>Notifications are blocked by your browser.</strong> To receive alerts, click the lock or tune icon (🔒) near your browser address bar, set <strong>Notifications</strong> to <strong>Allow</strong>, and then click <strong>Re-check Permission</strong>.
+        </div>
+      </div>` : ''}
 
       <div style="display:flex;flex-direction:column;gap:14px">
         <div style="font-weight:700;font-size:0.8rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted)">Task Deadlines</div>
