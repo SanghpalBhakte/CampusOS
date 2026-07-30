@@ -13,6 +13,7 @@ const KEY_CUSTOM_LINKS     = 'cos_custom_links';
 const KEY_ATTENDANCE       = 'cos_attendance';
 const KEY_GEMINI_KEY       = 'cos_gemini_key';
 const KEY_THEME            = 'cos_theme';
+const KEY_NOTIF_PREFS      = 'cos_notif_prefs';
 
 // ── Safe Storage Helpers ─────────────────────────────────────
 function safeGetStorage(key, fallback = null) {
@@ -1448,6 +1449,9 @@ function applyCloudDataToLocalState(data) {
     localStorage.setItem(KEY_THEME, data.theme);
     initTheme();
   }
+  if (data.notificationPrefs && typeof data.notificationPrefs === 'object') {
+    safeSetStorage(KEY_NOTIF_PREFS, data.notificationPrefs);
+  }
   updateTopbarProfile();
   setupFABDrag();
   updateNavBadges();
@@ -1469,6 +1473,7 @@ function pushLocalDataToCloud(uid) {
     assignmentStatuses: safeGetStorage(KEY_ASSIGNMENTS, {}),
     attendance:         safeGetStorage(KEY_ATTENDANCE, {}),
     theme:              localStorage.getItem(KEY_THEME) || 'glass',
+    notificationPrefs:  safeGetStorage(KEY_NOTIF_PREFS, null),
     updatedAt:          firebase.firestore.FieldValue.serverTimestamp()
   };
   db.collection('users').doc(uid).set(payload, { merge: true }).catch(err => {
@@ -1512,6 +1517,189 @@ document.addEventListener('visibilitychange', () => {
     subscribeUserCloudData(currentUser.uid);
   }
 });
+
+// ── Notification Preferences & Service ───────────────────────
+function loadNotifPrefs() {
+  const saved = safeGetStorage(KEY_NOTIF_PREFS, null);
+  const defaults = {
+    enabled: typeof Notification !== 'undefined' && Notification.permission === 'granted',
+    taskDueToday: true,
+    taskOverdue: true,
+    taskUpcoming: true,
+    dailySummaryTime: "08:00",
+    noticeMode: "instant", // "instant" | "digest" | "off"
+  };
+  if (saved && typeof saved === 'object') {
+    return { ...defaults, ...saved };
+  }
+  return defaults;
+}
+
+function saveNotifPrefs(prefs) {
+  safeSetStorage(KEY_NOTIF_PREFS, prefs);
+  syncToCloud();
+}
+
+async function requestNotificationPermission() {
+  if (typeof Notification === 'undefined') {
+    showToast('Notifications not supported by your browser', 'error');
+    return false;
+  }
+  try {
+    const permission = await Notification.requestPermission();
+    const prefs = loadNotifPrefs();
+    prefs.enabled = (permission === 'granted');
+    saveNotifPrefs(prefs);
+    if (permission === 'granted') {
+      showToast('Notifications enabled!', 'success');
+      dispatchNotification('Clarity Desk Notifications', {
+        body: 'You will now receive alerts for task deadlines and notices.',
+        tag: 'welcome-notif'
+      });
+    } else if (permission === 'denied') {
+      showToast('Notification permission was blocked in browser settings', 'error');
+    }
+    if (state.currentPage === 'settings') renderSettings();
+    return permission === 'granted';
+  } catch (err) {
+    console.warn("Notification permission error:", err);
+    return false;
+  }
+}
+
+function dispatchNotification(title, options = {}) {
+  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+
+  const notifOptions = {
+    icon: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"%3E%3Crect width="32" height="32" rx="8" fill="%236366f1"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="central" text-anchor="middle" font-family="sans-serif" font-weight="700" font-size="13" fill="white"%3ECD%3C/text%3E%3C/svg%3E',
+    badge: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"%3E%3Crect width="32" height="32" rx="8" fill="%236366f1"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="central" text-anchor="middle" font-family="sans-serif" font-weight="700" font-size="13" fill="white"%3ECD%3C/text%3E%3C/svg%3E',
+    ...options
+  };
+
+  if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+    navigator.serviceWorker.ready.then(reg => {
+      reg.showNotification(title, notifOptions);
+    }).catch(() => {
+      new Notification(title, notifOptions);
+    });
+  } else {
+    new Notification(title, notifOptions);
+  }
+}
+
+function checkScheduledNotifications() {
+  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+  const prefs = loadNotifPrefs();
+
+  const today = todayStr();
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = tomorrow.toISOString().split('T')[0];
+
+  const tasks = allTasks().filter(t => t.status === 'pending');
+  const notifiedMap = safeGetStorage('cos_notified_history', {}) || {};
+
+  // 1. Task Due Today
+  if (prefs.taskDueToday) {
+    tasks.filter(t => t.dueDate === today).forEach(t => {
+      const key = `due_today_${t.id}_${today}`;
+      if (!notifiedMap[key]) {
+        dispatchNotification(`Task Due Today: ${t.title}`, {
+          body: `${t.subject || 'Task'} · Due today! Keep going!`,
+          tag: key,
+          data: { url: './#assignments' }
+        });
+        notifiedMap[key] = true;
+      }
+    });
+  }
+
+  // 2. Task Overdue
+  if (prefs.taskOverdue) {
+    tasks.filter(t => t.dueDate < today).forEach(t => {
+      const key = `overdue_${t.id}_${today}`;
+      if (!notifiedMap[key]) {
+        const days = Math.abs(dueDaysLeft(t.dueDate));
+        dispatchNotification(`Task Overdue: ${t.title}`, {
+          body: `${t.subject || 'Task'} is ${days} day${days > 1 ? 's' : ''} overdue.`,
+          tag: key,
+          data: { url: './#assignments' }
+        });
+        notifiedMap[key] = true;
+      }
+    });
+  }
+
+  // 3. Task Upcoming (Due Tomorrow)
+  if (prefs.taskUpcoming) {
+    tasks.filter(t => t.dueDate === tomorrowStr).forEach(t => {
+      const key = `upcoming_${t.id}_${today}`;
+      if (!notifiedMap[key]) {
+        dispatchNotification(`Upcoming Task: ${t.title}`, {
+          body: `${t.subject || 'Task'} · Due tomorrow!`,
+          tag: key,
+          data: { url: './#assignments' }
+        });
+        notifiedMap[key] = true;
+      }
+    });
+  }
+
+  // 4. Daily Summary Notification Check
+  if (prefs.dailySummaryTime) {
+    const now = new Date();
+    const currentHHMM = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+    const summaryKey = `daily_summary_${today}`;
+
+    if (currentHHMM === prefs.dailySummaryTime && !notifiedMap[summaryKey]) {
+      const pendingCountVal = tasks.length;
+      const dueTodayCount = tasks.filter(t => t.dueDate === today).length;
+      dispatchNotification(`Clarity Desk — Daily Summary`, {
+        body: `You have ${pendingCountVal} pending task${pendingCountVal !== 1 ? 's' : ''} (${dueTodayCount} due today).`,
+        tag: summaryKey,
+        data: { url: './#dashboard' }
+      });
+      notifiedMap[summaryKey] = true;
+    }
+  }
+
+  safeSetStorage('cos_notified_history', notifiedMap);
+}
+
+function triggerNoticeNotification(notice) {
+  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+  const prefs = loadNotifPrefs();
+  if (prefs.noticeMode === 'off') return;
+
+  if (prefs.noticeMode === 'instant') {
+    dispatchNotification(`New Notice: ${notice.title}`, {
+      body: (notice.content || '').slice(0, 120),
+      tag: `notice_${notice.id}`,
+      data: { url: './#notices' }
+    });
+  } else if (prefs.noticeMode === 'digest') {
+    const digestList = safeGetStorage('cos_notice_digest', []) || [];
+    if (!digestList.some(n => n.id === notice.id)) {
+      digestList.push(notice);
+      safeSetStorage('cos_notice_digest', digestList);
+    }
+  }
+}
+
+function checkNoticeNotifications() {
+  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+  const prefs = loadNotifPrefs();
+  if (prefs.noticeMode === 'off') return;
+
+  const notifiedNotices = safeGetStorage('cos_notified_notices', {}) || {};
+  NOTICES.forEach(n => {
+    if (!notifiedNotices[n.id]) {
+      triggerNoticeNotification(n);
+      notifiedNotices[n.id] = true;
+    }
+  });
+  safeSetStorage('cos_notified_notices', notifiedNotices);
+}
 
 // ── Custom Tasks (fully persisted) ────────────────────────────
 function loadCustomTasks() {
@@ -1795,6 +1983,7 @@ const icons = {
   calendar:    () => svg('<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>'),
   assignments: () => svg('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/>'),
   notices:     () => svg('<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>'),
+  bell:        () => svg('<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>'),
   links:       () => svg('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>'),
   summary:     () => svg('<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>'),
   settings:    () => svg('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>'),
@@ -3530,6 +3719,8 @@ function renderSummaryContent(container) {
 function renderSettings() {
   const el = document.getElementById('page-settings');
   const p  = liveProfile;
+  const nPrefs = loadNotifPrefs();
+  const notifPermission = (typeof Notification !== 'undefined') ? Notification.permission : 'unsupported';
 
   el.innerHTML = `
     <div class="page-header">
@@ -3621,6 +3812,64 @@ function renderSettings() {
       </div>
     </div>
 
+    <div class="section-heading">${icons.bell()} Notifications</div>
+    <div class="card" style="padding:20px;margin-bottom:20px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;padding-bottom:14px;border-bottom:1px solid var(--border)">
+        <div>
+          <div style="font-weight:600;font-size:0.9rem">Browser Notification Permission</div>
+          <div style="font-size:0.78rem;color:var(--text-muted);margin-top:2px">
+            Status: <strong style="color:${notifPermission === 'granted' ? 'var(--green)' : notifPermission === 'denied' ? 'var(--red)' : 'var(--yellow)'}">
+              ${notifPermission === 'granted' ? 'Granted ✓' : notifPermission === 'denied' ? 'Blocked ✕' : 'Not Requested'}
+            </strong>
+          </div>
+        </div>
+        <button class="btn btn-sm ${notifPermission === 'granted' ? 'btn-secondary' : 'btn-primary'}" onclick="requestNotificationPermission()" style="font-size:0.8rem;padding:6px 14px">
+          ${notifPermission === 'granted' ? 'Re-check Permission' : 'Enable Notifications'}
+        </button>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div style="font-weight:700;font-size:0.8rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted)">Task Deadlines</div>
+        
+        <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;font-size:0.88rem">
+          <span>Alert when a task is due today</span>
+          <input type="checkbox" id="np-due-today" ${nPrefs.taskDueToday ? 'checked' : ''} style="width:16px;height:16px">
+        </label>
+
+        <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;font-size:0.88rem">
+          <span>Alert when a task is overdue</span>
+          <input type="checkbox" id="np-overdue" ${nPrefs.taskOverdue ? 'checked' : ''} style="width:16px;height:16px">
+        </label>
+
+        <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;font-size:0.88rem">
+          <span>Alert day before task is due</span>
+          <input type="checkbox" id="np-upcoming" ${nPrefs.taskUpcoming ? 'checked' : ''} style="width:16px;height:16px">
+        </label>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;font-size:0.88rem;margin-top:4px">
+          <div>
+            <span>Daily Tasks Summary Time</span>
+            <div style="font-size:0.75rem;color:var(--text-muted)">Daily overview of pending tasks</div>
+          </div>
+          <input type="time" class="form-input" id="np-summary-time" value="${nPrefs.dailySummaryTime || '08:00'}" style="width:120px;padding:4px 8px;font-size:0.85rem">
+        </div>
+
+        <div style="font-weight:700;font-size:0.8rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);margin-top:8px">Notices & Announcements</div>
+        
+        <div style="display:flex;align-items:center;justify-content:space-between;font-size:0.88rem">
+          <div>
+            <span>Notice Alert Frequency</span>
+            <div style="font-size:0.75rem;color:var(--text-muted)">Choose how to receive admin notice updates</div>
+          </div>
+          <select class="form-select" id="np-notice-mode" style="width:140px;padding:4px 8px;font-size:0.85rem">
+            <option value="instant" ${nPrefs.noticeMode === 'instant' ? 'selected' : ''}>Instant Alert</option>
+            <option value="digest" ${nPrefs.noticeMode === 'digest' ? 'selected' : ''}>Daily Digest</option>
+            <option value="off" ${nPrefs.noticeMode === 'off' ? 'selected' : ''}>Muted (Off)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:32px">
       <button class="btn-primary" onclick="saveSettings()" style="display:flex;align-items:center;gap:6px">
         ${icons.save()} Save Changes
@@ -3672,10 +3921,22 @@ function saveSettings() {
   safeSetStorage(KEY_PROFILE, profile);
   Object.assign(liveProfile, profile);
 
+  const nPrefs = {
+    enabled: (typeof Notification !== 'undefined') && Notification.permission === 'granted',
+    taskDueToday: document.getElementById('np-due-today')?.checked ?? true,
+    taskOverdue: document.getElementById('np-overdue')?.checked ?? true,
+    taskUpcoming: document.getElementById('np-upcoming')?.checked ?? true,
+    dailySummaryTime: document.getElementById('np-summary-time')?.value || '08:00',
+    noticeMode: document.getElementById('np-notice-mode')?.value || 'instant',
+  };
+  saveNotifPrefs(nPrefs);
+
   // Show "Saved" feedback
   const saved = document.getElementById('settings-saved');
-  saved.style.display = 'flex';
-  setTimeout(() => { saved.style.display = 'none'; }, 2500);
+  if (saved) {
+    saved.style.display = 'flex';
+    setTimeout(() => { saved.style.display = 'none'; }, 2500);
+  }
 
   // Refresh topbar avatar / name
   updateTopbarProfile();
@@ -3688,13 +3949,14 @@ function exportData() {
     profile:            loadProfile(),
     customTasks:        state.customTasks,
     assignmentStatuses: safeGetStorage(KEY_ASSIGNMENTS, {}),
+    notificationPrefs:  loadNotifPrefs(),
     theme:              localStorage.getItem(KEY_THEME) || 'dark',
     exportedAt:         new Date().toISOString(),
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
-  a.href = url; a.download = `campus-os-backup-${todayStr()}.json`;
+  a.href = url; a.download = `clarity-desk-backup-${todayStr()}.json`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -3717,6 +3979,9 @@ function importData(event) {
       if (data.assignmentStatuses) {
         safeSetStorage(KEY_ASSIGNMENTS, data.assignmentStatuses);
         state.assignments = loadAssignments();
+      }
+      if (data.notificationPrefs) {
+        safeSetStorage(KEY_NOTIF_PREFS, data.notificationPrefs);
       }
       if (data.theme) {
         localStorage.setItem(KEY_THEME, data.theme);
@@ -3994,6 +4259,8 @@ function updateNavBadges() {
 }
 window.updateNavBadges = updateNavBadges;
 
+window.requestNotificationPermission = requestNotificationPermission;
+
 // ── Init ──────────────────────────────────────────────────────
 function init() {
   initTheme();
@@ -4022,6 +4289,14 @@ function init() {
   }
   updateNavBadges();
   checkOnboarding();
+
+  // Check and schedule task & notice notifications
+  checkScheduledNotifications();
+  checkNoticeNotifications();
+  setInterval(() => {
+    checkScheduledNotifications();
+    checkNoticeNotifications();
+  }, 60000);
 
   // Initialize Firebase Auth & Firestore sync
   initFirebase();

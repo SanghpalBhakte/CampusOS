@@ -1,4 +1,4 @@
-const CACHE_NAME = 'clarity-desk-v21';
+const CACHE_NAME = 'clarity-desk-v22';
 const PRECACHE_ASSETS = [
   './',
   './index.html',
@@ -72,6 +72,40 @@ self.addEventListener('fetch', (e) => {
         .catch(() => cachedResponse);
 
       return cachedResponse || fetchPromise;
+    })
+  );
+});
+
+// ── Notification Click & Web Push Handlers ──────────────────────
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const targetUrl = event.notification.data?.url || './#dashboard';
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if (client.url.includes(self.location.origin) && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) {
+        return clients.openWindow(targetUrl);
+      }
+    })
+  );
+});
+
+self.addEventListener('push', (event) => {
+  let data = { title: 'Clarity Desk Notice', body: 'New notice update available' };
+  if (event.data) {
+    try { data = event.data.json(); } catch(err) { data.body = event.data.text(); }
+  }
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: data.icon || './manifest.json',
+      badge: data.badge || './manifest.json',
+      data: data.data || { url: './#notices' }
     })
   );
 });
