@@ -2391,13 +2391,17 @@ window.setAttendance = function(dateStr, classKey, status) {
   
   if (data[dateStr][classKey] === status) {
     delete data[dateStr][classKey];
+    showToast('Attendance status cleared', 'info');
   } else {
     data[dateStr][classKey] = status;
+    showToast(status === 'attended' ? 'Marked Attended ✓' : 'Marked Skipped ✕', status === 'attended' ? 'success' : 'error');
   }
   
   safeSetStorage(KEY_ATTENDANCE, data);
   syncToCloud();
-  renderReview();
+  if (['timetable', 'review', 'dashboard'].includes(state.currentPage)) {
+    renderPage(state.currentPage);
+  }
 };
 
 function renderWeeklyAttendanceTracker() {
@@ -3045,6 +3049,10 @@ function renderTimetable() {
   const classes    = liveTT[day] || [];
   const currentMin = currentTimeMinutes();
   const isCustom   = isCustomTimetableActive();
+  const attendanceData = safeGetStorage(KEY_ATTENDANCE, {}) || {};
+  const weekDays   = getWeekDays(0);
+  const targetDayObj = weekDays.find(d => d.getDay() === day) || new Date();
+  const dateStr    = targetDayObj.toISOString().split('T')[0];
 
   const tabs = [1,2,3,4,5,6,0].map(d => `
     <button class="tt-tab ${d===day?'active':''}" onclick="setTTDay(${d})">${DAY_SHORT[d]}${d===today?' ·':''}</button>
@@ -3064,6 +3072,34 @@ function renderTimetable() {
       const endMin    = timeToMinutes(c.end || '11:00');
       const isCurrent = day === today && currentMin >= startMin && currentMin < endMin;
       const isPast    = day === today && currentMin >= endMin;
+      const isTeaching = isTeachingClass(c);
+      const classKey  = isTeaching ? `${c.code || c.subject}_${c.time}`.replace(/[^a-zA-Z0-9_]/g, '') : null;
+      const status    = isTeaching ? (attendanceData[dateStr]?.[classKey] || 'unset') : 'unset';
+
+      const isAttended = status === 'attended';
+      const isSkipped  = status === 'skipped';
+
+      const attendanceControlsHTML = isTeaching ? `
+        <div style="display:flex;align-items:center;gap:4px;margin-right:2px">
+          <button class="btn btn-sm" onclick="setAttendance('${dateStr}', '${classKey}', 'attended')"
+                  title="Mark ${c.subject} Attended" aria-label="Mark ${c.subject} as attended" aria-pressed="${isAttended}"
+                  style="padding:3px 8px;font-size:0.75rem;font-weight:700;border-radius:6px;min-width:30px;height:26px;
+                         background:${isAttended ? 'var(--green)' : 'var(--surface-2)'};
+                         color:${isAttended ? '#ffffff' : 'var(--text-primary)'};
+                         border:1px solid ${isAttended ? 'var(--green)' : 'var(--border)'}">
+            ${isAttended ? '✓' : '✓'}
+          </button>
+          <button class="btn btn-sm" onclick="setAttendance('${dateStr}', '${classKey}', 'skipped')"
+                  title="Mark ${c.subject} Skipped" aria-label="Mark ${c.subject} as skipped" aria-pressed="${isSkipped}"
+                  style="padding:3px 8px;font-size:0.75rem;font-weight:700;border-radius:6px;min-width:30px;height:26px;
+                         background:${isSkipped ? 'var(--red)' : 'var(--surface-2)'};
+                         color:${isSkipped ? '#ffffff' : 'var(--text-primary)'};
+                         border:1px solid ${isSkipped ? 'var(--red)' : 'var(--border)'}">
+            ${isSkipped ? '✕' : '✕'}
+          </button>
+        </div>
+      ` : '';
+
       return `
         <div class="tt-entry ${isCurrent?'current':''} ${isPast?'past':''}">
           <div class="tt-time-col">
@@ -3077,6 +3113,7 @@ function renderTimetable() {
             ${c.notes ? `<div style="font-size:0.78rem;color:var(--yellow);margin-top:3px;display:flex;align-items:center;gap:4px">📌 ${c.notes}</div>` : ''}
           </div>
           <div style="display:flex;align-items:center;gap:6px">
+            ${attendanceControlsHTML}
             <span class="type-badge type-${c.type || 'lecture'}">${c.type || 'lecture'}</span>
             <button class="task-delete-btn" onclick="showTimetableEntryModal(${day}, ${idx})" title="Edit class entry" style="padding:4px 6px">
               ${icons.edit()}
