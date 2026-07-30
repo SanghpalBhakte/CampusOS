@@ -1,4 +1,4 @@
-const CACHE_NAME = 'clarity-desk-v25';
+const CACHE_NAME = 'clarity-desk-v26';
 const PRECACHE_ASSETS = [
   './',
   './index.html',
@@ -9,7 +9,9 @@ const PRECACHE_ASSETS = [
   'app.js',
   './data.js',
   './firebase-config.js',
-  './manifest.json'
+  './manifest.json',
+  './icon-192.png',
+  './icon-512.png'
 ];
 
 self.addEventListener('install', (e) => {
@@ -77,7 +79,8 @@ self.addEventListener('fetch', (e) => {
 });
 
 // ── Notification Click & Web Push Handlers ──────────────────────
-const NOTIF_DEFAULT_ICON = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='128' fill='%236366f1'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='central' text-anchor='middle' font-family='sans-serif' font-weight='700' font-size='200' fill='white'%3ECD%3C/text%3E%3C/svg%3E";
+const NOTIF_DEFAULT_ICON = './icon-192.png';
+const NOTIF_DEFAULT_BADGE = './icon-192.png';
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
@@ -106,7 +109,9 @@ self.addEventListener('push', (event) => {
     self.registration.showNotification(data.title, {
       body: data.body,
       icon: data.icon || NOTIF_DEFAULT_ICON,
-      badge: data.badge || NOTIF_DEFAULT_ICON,
+      badge: data.badge || NOTIF_DEFAULT_BADGE,
+      renotify: data.tag ? true : false,
+      tag: data.tag || undefined,
       data: data.data || { url: './#notices' }
     })
   );
