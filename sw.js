@@ -1,4 +1,4 @@
-const CACHE_NAME = 'clarity-desk-v27';
+const CACHE_NAME = 'clarity-desk-v28';
 const PRECACHE_ASSETS = [
   './',
   './index.html',
@@ -11,7 +11,8 @@ const PRECACHE_ASSETS = [
   './firebase-config.js',
   './manifest.json',
   './icon-192.png',
-  './icon-512.png'
+  './icon-512.png',
+  './badge-96.png'
 ];
 
 self.addEventListener('install', (e) => {
@@ -80,7 +81,7 @@ self.addEventListener('fetch', (e) => {
 
 // ── Notification Click & Web Push Handlers ──────────────────────
 const NOTIF_DEFAULT_ICON = './icon-192.png';
-const NOTIF_DEFAULT_BADGE = './icon-192.png';
+const NOTIF_DEFAULT_BADGE = './badge-96.png'; // monochrome transparent PNG for Android status bar
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
@@ -108,18 +109,21 @@ self.addEventListener('notificationclick', (event) => {
 });
 
 self.addEventListener('push', (event) => {
-  let data = { title: 'Clarity Desk Notice', body: 'New notice update available' };
+  let data = { title: 'Clarity Desk', body: 'You have a new update.' };
   if (event.data) {
-    try { data = event.data.json(); } catch(err) { data.body = event.data.text(); }
+    try { data = event.data.json(); } catch(err) { data.body = event.data.text() || data.body; }
   }
+  const title = data.title || 'Clarity Desk';
+  const body  = data.body  || 'Tap to open the app.';
+  const tag   = data.tag   || 'cd-push-default';
   event.waitUntil(
-    self.registration.showNotification(data.title, {
-      body: data.body,
-      icon: data.icon || NOTIF_DEFAULT_ICON,
-      badge: data.badge || NOTIF_DEFAULT_BADGE,
-      renotify: data.tag ? true : false,
-      tag: data.tag || undefined,
-      data: data.data || { url: './#notices' }
+    self.registration.showNotification(title, {
+      body,
+      icon:      data.icon  || NOTIF_DEFAULT_ICON,
+      badge:     data.badge || NOTIF_DEFAULT_BADGE,
+      tag,
+      renotify:  true,
+      data:      data.data  || { url: './#dashboard' }
     })
   );
 });

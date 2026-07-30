@@ -1584,7 +1584,7 @@ async function requestNotificationPermission() {
 }
 
 const NOTIF_DEFAULT_ICON = './icon-192.png';
-const NOTIF_DEFAULT_BADGE = './icon-192.png';
+const NOTIF_DEFAULT_BADGE = './badge-96.png'; // monochrome transparent PNG for Android status bar
 
 function dispatchNotification(title, options = {}) {
   if (typeof Notification === 'undefined') return;
