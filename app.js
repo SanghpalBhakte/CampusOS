@@ -1875,7 +1875,7 @@ function updateThemeSelector(theme) {
 }
 
 // ── Routing ───────────────────────────────────────────────────
-const PAGES = ['dashboard', 'timetable', 'assignments', 'notices', 'resources', 'links', 'summary', 'settings', 'review'];
+const PAGES = ['dashboard', 'timetable', 'subjects', 'assignments', 'notices', 'resources', 'links', 'summary', 'settings', 'review'];
 const sectionHistory = [];
 
 function navigate(page, isBack = false) {
@@ -1943,6 +1943,7 @@ function renderPage(page) {
       case 'dashboard':   renderDashboard();   break;
       case 'review':      renderReview();      break;
       case 'timetable':   renderTimetable();   break;
+      case 'subjects':    renderSubjects();    break;
       case 'assignments': renderAssignments(); break;
       case 'notices':     renderNotices();     break;
       case 'resources':
@@ -3295,7 +3296,7 @@ function renderTimetable() {
           </div>
           <div class="tt-divider"></div>
           <div class="tt-info" style="flex:1;min-width:0">
-            <div class="tt-subject">${c.subject}</div>
+            <div class="tt-subject" style="cursor:pointer" onclick="openSubjectHub('${c.subject}')" title="Open ${c.subject} Hub">${c.subject}</div>
             <div class="tt-meta">${c.code} &nbsp;·&nbsp; ${c.room} &nbsp;·&nbsp; ${c.teacher}</div>
             ${c.notes ? `<div style="font-size:0.78rem;color:var(--yellow);margin-top:3px;display:flex;align-items:center;gap:4px">📌 ${c.notes}</div>` : ''}
           </div>
@@ -3332,6 +3333,298 @@ function renderTimetable() {
     <div class="tt-day-tabs">${tabs}</div>
     ${content}
     ${day===today&&classes.length?'<div class="text-xs text-muted" style="margin-top:12px;text-align:center">Highlighted = current class &nbsp;|&nbsp; Faded = past</div>':''}
+  `;
+}
+
+// ── Subject Hub System ─────────────────────────────────────────
+window.openSubjectHub = function(subjName) {
+  state.activeSubject = subjName;
+  navigateTo('subjects');
+};
+
+function getSubjectList() {
+  const map = new Map();
+  const liveTT = loadTimetable();
+
+  // 1. Collect from Timetable
+  [1, 2, 3, 4, 5, 6, 0].forEach(d => {
+    (liveTT[d] || []).forEach(c => {
+      if (isTeachingClass(c) && c.subject) {
+        const key = c.subject.trim();
+        if (!map.has(key)) {
+          map.set(key, {
+            name: key,
+            code: c.code || key,
+            teacher: c.teacher || '',
+            room: c.room || '',
+            color: c.color || 'var(--accent)',
+            slots: []
+          });
+        }
+        const item = map.get(key);
+        if (!item.teacher && c.teacher) item.teacher = c.teacher;
+        if (!item.room && c.room) item.room = c.room;
+        if (!item.code && c.code) item.code = c.code;
+        item.slots.push({ day: d, time: c.time, end: c.end, room: c.room, teacher: c.teacher, code: c.code || item.code });
+      }
+    });
+  });
+
+  // 2. Collect from Tasks
+  allTasks().forEach(t => {
+    if (t.subject && t.subject.trim()) {
+      const key = t.subject.trim();
+      if (!map.has(key)) {
+        map.set(key, {
+          name: key,
+          code: key,
+          teacher: '',
+          room: '',
+          color: 'var(--accent)',
+          slots: []
+        });
+      }
+    }
+  });
+
+  // 3. Collect from Quick Links
+  loadCustomLinks().forEach(l => {
+    if (l.subject && l.subject.trim()) {
+      const key = l.subject.trim();
+      if (!map.has(key)) {
+        map.set(key, {
+          name: key,
+          code: key,
+          teacher: '',
+          room: '',
+          color: l.color || 'var(--accent)',
+          slots: []
+        });
+      }
+    }
+  });
+
+  return Array.from(map.values());
+}
+
+function getSubjectAttendance(subjItem) {
+  const attendanceData = safeGetStorage(KEY_ATTENDANCE, {}) || {};
+  let attended = 0;
+  let skipped = 0;
+
+  const targetCode = (subjItem.code || '').toLowerCase().replace(/[^a-zA-Z0-9]/g, '');
+  const targetName = (subjItem.name || '').toLowerCase().replace(/[^a-zA-Z0-9]/g, '');
+
+  Object.values(attendanceData).forEach(dayObj => {
+    if (dayObj && typeof dayObj === 'object') {
+      Object.entries(dayObj).forEach(([key, status]) => {
+        const cleanKey = key.toLowerCase();
+        const matchesCode = targetCode && cleanKey.startsWith(targetCode + '_');
+        const matchesName = targetName && cleanKey.startsWith(targetName + '_');
+        if (matchesCode || matchesName) {
+          if (status === 'attended') attended++;
+          else if (status === 'skipped') skipped++;
+        }
+      });
+    }
+  });
+
+  const total = attended + skipped;
+  const pct = total > 0 ? Math.round((attended / total) * 100) : null;
+  return { attended, skipped, total, pct };
+}
+
+function renderSubjects() {
+  const el = document.getElementById('page-subjects');
+  if (!el) return;
+
+  const subjects = getSubjectList();
+  const activeName = state.activeSubject;
+  const activeSubject = activeName ? subjects.find(s => s.name.toLowerCase() === activeName.toLowerCase() || s.code.toLowerCase() === activeName.toLowerCase()) : null;
+
+  if (activeSubject) {
+    renderSingleSubjectHub(el, activeSubject, subjects);
+  } else {
+    renderSubjectsOverview(el, subjects);
+  }
+}
+
+function renderSubjectsOverview(el, subjects) {
+  if (!subjects.length) {
+    el.innerHTML = `
+      <div class="page-header">
+        <div>
+          <div class="page-title">Subject Hubs</div>
+          <div class="page-subtitle">All your course schedules, tasks, attendance & resources in one place</div>
+        </div>
+      </div>
+      <div class="card" style="padding:40px;text-align:center;color:var(--text-muted)">
+        📚 No subjects found yet. Set up your timetable or add tasks to automatically generate subject hubs!
+      </div>
+    `;
+    return;
+  }
+
+  const cardsHTML = subjects.map(s => {
+    const att = getSubjectAttendance(s);
+    const tasks = allTasks().filter(t => (t.subject || '').toLowerCase() === s.name.toLowerCase() || (t.subject || '').toLowerCase() === s.code.toLowerCase());
+    const pendingTasks = tasks.filter(t => t.status === 'pending');
+    const links = loadCustomLinks().filter(l => (l.subject || '').toLowerCase() === s.name.toLowerCase() || (l.subject || '').toLowerCase() === s.code.toLowerCase());
+
+    const attStatusClass = att.pct === null ? 'muted' : att.pct >= 75 ? 'green' : 'red';
+    const attLabel = att.pct !== null ? `${att.pct}% Attendance` : 'No Classes Marked';
+
+    return `
+      <div class="card" style="padding:16px;cursor:pointer;transition:transform 0.15s, border-color 0.15s;border-left:4px solid ${s.color || 'var(--accent)'}" onclick="openSubjectHub('${s.name}')">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px">
+          <div>
+            <div style="font-weight:700;font-size:1rem;color:var(--text-primary)">${s.name}</div>
+            <div style="font-size:0.78rem;color:var(--text-muted);margin-top:2px">${s.code} ${s.teacher ? '· Prof. ' + s.teacher : ''} ${s.room ? '· ' + s.room : ''}</div>
+          </div>
+          <span class="type-badge" style="font-size:0.7rem;padding:3px 8px;background:${attStatusClass==='green'?'rgba(16,185,129,0.15)':attStatusClass==='red'?'rgba(239,68,68,0.15)':'var(--surface-2)'};color:${attStatusClass==='green'?'var(--green)':attStatusClass==='red'?'var(--red)':'var(--text-muted)'}">
+            ${attLabel}
+          </span>
+        </div>
+
+        <div style="display:flex;gap:12px;font-size:0.78rem;color:var(--text-secondary);margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
+          <div>📅 <strong>${s.slots.length}</strong> slot${s.slots.length!==1?'s':''}/wk</div>
+          <div>📝 <strong>${pendingTasks.length}</strong> task${pendingTasks.length!==1?'s':''} pending</div>
+          <div>🔗 <strong>${links.length}</strong> resource${links.length!==1?'s':''}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="page-header">
+      <div>
+        <div class="page-title">Subject Hubs</div>
+        <div class="page-subtitle">Course schedules, attendance, tasks & study resources grouped per subject</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(280px, 1fr));gap:14px">
+      ${cardsHTML}
+    </div>
+  `;
+}
+
+function renderSingleSubjectHub(el, subj, allSubjects) {
+  const att = getSubjectAttendance(subj);
+  const tasks = allTasks().filter(t => (t.subject || '').toLowerCase() === subj.name.toLowerCase() || (t.subject || '').toLowerCase() === subj.code.toLowerCase());
+  const pendingTasks = tasks.filter(t => t.status === 'pending');
+  const doneTasks = tasks.filter(t => t.status === 'submitted');
+
+  const links = loadCustomLinks().filter(l => (l.subject || '').toLowerCase() === subj.name.toLowerCase() || (l.subject || '').toLowerCase() === subj.code.toLowerCase());
+
+  // Timetable slots
+  const slotsHTML = subj.slots.length > 0 ? subj.slots.map(sl => `
+    <div class="card card-sm" style="margin-bottom:6px;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+      <div>
+        <div style="font-weight:600;font-size:0.85rem">${DAY_NAMES[sl.day]} · ${sl.time} ${sl.end ? '- ' + sl.end : ''}</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px">${sl.room || subj.room || 'Classroom'} ${sl.teacher ? '· ' + sl.teacher : subj.teacher ? '· ' + subj.teacher : ''}</div>
+      </div>
+      <span class="type-badge">${sl.code || subj.code}</span>
+    </div>
+  `).join('') : `<div style="font-size:0.82rem;color:var(--text-muted);padding:10px 0">No timetable slots set for this subject.</div>`;
+
+  // Tasks list
+  const tasksHTML = tasks.length > 0 ? tasks.map(a => {
+    const days  = dueDaysLeft(a.dueDate);
+    const label = days < 0 ? 'Overdue' : days === 0 ? 'Due Today' : `${days}d left`;
+    const cls   = days < 0 ? 'overdue' : days === 0 ? 'today' : days <= 3 ? 'soon' : '';
+    const done  = a.status === 'submitted';
+    return `
+      <div class="card card-sm assignment-card" style="margin-bottom:6px;display:flex;align-items:center;gap:10px;padding:10px 12px">
+        <div onclick="toggleAssignment('${a.id}')" title="Click to mark done" style="width:18px;height:18px;border-radius:4px;border:2px solid ${done ? 'var(--green)' : a.priority==='high' ? 'var(--red)' : a.priority==='medium' ? 'var(--yellow)' : 'var(--border)'};background:${done ? 'var(--green)' : 'transparent'};display:grid;place-items:center;flex-shrink:0;color:white;cursor:pointer;transition:all 0.15s">
+          ${done ? icons.check() : ''}
+        </div>
+        <div style="flex:1;min-width:0">
+          <div class="font-semibold" style="font-size:0.88rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${done?'text-decoration:line-through;opacity:0.5':''}">${a.title}</div>
+          <div class="text-xs text-muted">Due ${formatDate(a.dueDate)}</div>
+        </div>
+        <span class="due-badge ${cls}">${label}</span>
+      </div>`;
+  }).join('') : `<div style="font-size:0.82rem;color:var(--text-muted);padding:10px 0">No tasks created for this subject yet.</div>`;
+
+  // Links list
+  const linksHTML = links.length > 0 ? links.map(l => `
+    <div class="card card-sm" style="margin-bottom:6px;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+      <div style="display:flex;align-items:center;gap:8px;min-width:0;flex:1">
+        <span style="width:8px;height:8px;border-radius:50%;background:${l.color || 'var(--accent)'};flex-shrink:0"></span>
+        <a href="${l.url}" target="_blank" rel="noopener noreferrer" style="font-weight:600;font-size:0.85rem;color:var(--accent);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${l.subject}</a>
+      </div>
+      <a href="${l.url}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-secondary" style="font-size:0.75rem;padding:3px 8px">Open ↗</a>
+    </div>
+  `).join('') : `<div style="font-size:0.82rem;color:var(--text-muted);padding:10px 0">No quick links attached to this subject yet.</div>`;
+
+  el.innerHTML = `
+    <div style="margin-bottom:16px">
+      <button class="btn btn-sm btn-secondary" onclick="state.activeSubject = null; renderSubjects()" style="margin-bottom:12px;font-size:0.8rem">
+        ← Back to All Subjects
+      </button>
+
+      <div class="card" style="padding:20px;border-left:4px solid ${subj.color || 'var(--accent)'}">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
+          <div>
+            <div style="font-size:1.35rem;font-weight:800;color:var(--text-primary)">${subj.name}</div>
+            <div style="font-size:0.85rem;color:var(--text-muted);margin-top:2px">
+              ${subj.code ? 'Course Code: <strong>' + subj.code + '</strong> · ' : ''}
+              ${subj.teacher ? 'Faculty: <strong>Prof. ' + subj.teacher + '</strong> · ' : ''}
+              ${subj.room ? 'Room: <strong>' + subj.room + '</strong>' : ''}
+            </div>
+          </div>
+          <span class="type-badge" style="font-size:0.8rem;padding:4px 10px;background:${att.pct===null?'var(--surface-2)':att.pct>=75?'rgba(16,185,129,0.15)':'rgba(239,68,68,0.15)'};color:${att.pct===null?'var(--text-muted)':att.pct>=75?'var(--green)':'var(--red)'}">
+            ${att.pct !== null ? `${att.pct}% Attendance (${att.attended}/${att.total})` : 'No Attendance Marked'}
+          </span>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:10px;margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
+          <div style="background:var(--surface-2);padding:10px 12px;border-radius:8px">
+            <div style="font-size:0.75rem;color:var(--text-muted)">Weekly Slots</div>
+            <div style="font-size:1.1rem;font-weight:700;margin-top:2px">${subj.slots.length} class${subj.slots.length!==1?'es':''}</div>
+          </div>
+          <div style="background:var(--surface-2);padding:10px 12px;border-radius:8px">
+            <div style="font-size:0.75rem;color:var(--text-muted)">Pending Tasks</div>
+            <div style="font-size:1.1rem;font-weight:700;color:${pendingTasks.length>0?'var(--red)':'inherit'};margin-top:2px">${pendingTasks.length} pending</div>
+          </div>
+          <div style="background:var(--surface-2);padding:10px 12px;border-radius:8px">
+            <div style="font-size:0.75rem;color:var(--text-muted)">Completed Tasks</div>
+            <div style="font-size:1.1rem;font-weight:700;color:var(--green);margin-top:2px">${doneTasks.length} done</div>
+          </div>
+          <div style="background:var(--surface-2);padding:10px 12px;border-radius:8px">
+            <div style="font-size:0.75rem;color:var(--text-muted)">Resources</div>
+            <div style="font-size:1.1rem;font-weight:700;margin-top:2px">${links.length} link${links.length!==1?'s':''}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1. Timetable Slots -->
+    <div style="margin-bottom:20px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div class="section-heading" style="margin-bottom:0">Weekly Schedule Slots</div>
+        <button class="btn btn-sm btn-action" onclick="navigateTo('timetable')">Open Timetable →</button>
+      </div>
+      ${slotsHTML}
+    </div>
+
+    <!-- 2. Tasks & Assignments -->
+    <div style="margin-bottom:20px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div class="section-heading" style="margin-bottom:0">Subject Tasks & Assignments</div>
+        <button class="btn btn-sm btn-primary" onclick="showAssignmentModal(null, '${subj.name}')" style="font-size:0.75rem;padding:3px 9px">+ Add Task</button>
+      </div>
+      ${tasksHTML}
+    </div>
+
+    <!-- 3. Resources & Links -->
+    <div style="margin-bottom:20px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div class="section-heading" style="margin-bottom:0">Subject Resources & Links</div>
+        <button class="btn btn-sm btn-primary" onclick="showAddLinkModal()" style="font-size:0.75rem;padding:3px 9px">+ Add Link</button>
+      </div>
+      ${linksHTML}
+    </div>
   `;
 }
 
