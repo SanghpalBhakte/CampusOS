@@ -217,6 +217,17 @@ function initFirebase() {
     console.warn(firebaseInitError);
     updateSyncUI();
   }
+function triggerConfetti() {
+  try {
+    if (typeof confetti === 'function') {
+      confetti({
+        particleCount: 38,
+        spread: 55,
+        origin: { y: 0.82 },
+        colors: ['#6366f1', '#10b981', '#f59e0b', '#ec4899']
+      });
+    }
+  } catch (_) {}
 }
 
 function showToast(msg, type = 'info') {
@@ -224,34 +235,31 @@ function showToast(msg, type = 'info') {
   if (!toastContainer) {
     toastContainer = document.createElement('div');
     toastContainer.id = 'toast-container';
-    toastContainer.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:99999;display:flex;flex-direction:column;gap:8px;pointer-events:none';
     document.body.appendChild(toastContainer);
   }
 
   const toast = document.createElement('div');
   toast.className = `toast toast-${type}`;
-  const bgColor = type === 'error' ? 'var(--red)' : type === 'success' ? 'var(--green)' : 'var(--surface-2)';
-  const textColor = type === 'error' || type === 'success' ? '#ffffff' : 'var(--text-primary)';
   
-  toast.style.cssText = `background:${bgColor};color:${textColor};padding:10px 16px;border-radius:8px;font-size:0.85rem;font-weight:600;box-shadow:0 4px 12px rgba(0,0,0,0.15);pointer-events:auto;transition:all 0.2s ease;opacity:0;transform:translateY(10px)`;
-  toast.textContent = msg;
+  const iconSpan = document.createElement('span');
+  iconSpan.style.fontSize = '0.95rem';
+  iconSpan.textContent = type === 'success' ? '✓' : type === 'error' ? '⚠️' : 'ℹ️';
+  
+  const textSpan = document.createElement('span');
+  textSpan.textContent = msg;
 
+  toast.appendChild(iconSpan);
+  toast.appendChild(textSpan);
   toastContainer.appendChild(toast);
-  if (typeof requestAnimationFrame !== 'undefined') {
-    requestAnimationFrame(() => {
-      toast.style.opacity = '1';
-      toast.style.transform = 'translateY(0)';
-    });
-  } else {
-    toast.style.opacity = '1';
-    toast.style.transform = 'translateY(0)';
-  }
+
+  requestAnimationFrame(() => {
+    toast.classList.add('toast-show');
+  });
 
   setTimeout(() => {
-    toast.style.opacity = '0';
-    toast.style.transform = 'translateY(10px)';
-    setTimeout(() => toast.remove(), 200);
-  }, 3500);
+    toast.classList.remove('toast-show');
+    setTimeout(() => toast.remove(), 250);
+  }, 3200);
 }
 
 function updateSyncUI(status = null) {
@@ -1477,7 +1485,7 @@ function pushLocalDataToCloud(uid) {
     customLinks:        safeGetStorage(KEY_CUSTOM_LINKS, null),
     assignmentStatuses: safeGetStorage(KEY_ASSIGNMENTS, {}),
     attendance:         safeGetStorage(KEY_ATTENDANCE, {}),
-    theme:              localStorage.getItem(KEY_THEME) || 'glass',
+    theme:              localStorage.getItem(KEY_THEME) || 'paper',
     notificationPrefs:  safeGetStorage(KEY_NOTIF_PREFS, null),
     updatedAt:          firebase.firestore.FieldValue.serverTimestamp()
   };
@@ -1830,13 +1838,14 @@ const state = {
 };
 
 // ── Theme ─────────────────────────────────────────────────────
-const ALL_THEMES = ['paper', 'cloud', 'stone', 'quiet-dark', 'cafe-night', 'warm-study'];
+const ALL_THEMES = ['paper', 'cloud', 'stone', 'quiet-dark', 'cafe-night'];
 const LEGACY_THEME_MAP = {
   'soft-neutral': 'paper', light: 'paper',
   'mist-blue': 'cloud', glass: 'cloud',
   sandstone: 'stone', emerald: 'stone',
+  'warm-study': 'stone', 'espresso-paper': 'stone',
   dark: 'quiet-dark', 'cocoa-night': 'quiet-dark', sunset: 'quiet-dark',
-  'espresso-paper': 'warm-study', 'cafe': 'cafe-night',
+  cafe: 'cafe-night',
 };
 
 function initTheme() {
@@ -2771,13 +2780,14 @@ window.showOnboardingModal = function() {
     <div class="modal-content" style="max-width:440px;padding:24px" id="onboarding-modal-box">
       <div id="onboarding-step-1">
         <div style="font-size:2.2rem;margin-bottom:8px">👋</div>
-        <h2 style="margin:0 0 8px 0;font-size:1.35rem;font-weight:700">Welcome to Clarity Desk 👋</h2>
-        <div style="font-size:0.88rem;color:var(--text-secondary);line-height:1.5;margin-bottom:24px">
-          You can customize your profile and dashboard to match your timetable and semester.
+        <h2 style="margin:0 0 4px 0;font-size:1.35rem;font-weight:700">Welcome to Clarity Desk</h2>
+        <div style="font-size:0.8rem;font-weight:600;color:var(--accent);margin-bottom:12px;letter-spacing:0.02em">Less app chaos, more clarity.</div>
+        <div style="font-size:0.88rem;color:var(--text-secondary);line-height:1.55;margin-bottom:24px">
+          Your calm student desk for timetables, attendance health, coursework deadlines, and daily focus.
         </div>
         <div style="display:flex;flex-direction:column;gap:10px">
-          <button class="btn-primary" onclick="showOnboardingStep2()" style="width:100%;padding:10px;font-weight:600;justify-content:center">Set up my profile</button>
-          <button class="btn-secondary" onclick="dismissOnboarding()" style="width:100%;padding:8px;font-size:0.82rem;justify-content:center">Skip for now</button>
+          <button class="btn-primary" onclick="showOnboardingStep2()" style="width:100%;padding:10px;font-weight:600;justify-content:center">Set Up My Desk →</button>
+          <button class="btn-secondary" onclick="dismissOnboarding()" style="width:100%;padding:8px;font-size:0.82rem;justify-content:center">Explore First</button>
         </div>
       </div>
 
@@ -2801,11 +2811,11 @@ window.showOnboardingModal = function() {
           </div>
           <div class="form-group" style="margin-bottom:0">
             <label class="form-label">Branch</label>
-            <input type="text" class="form-input" id="ob-branch" value="${(p.branch||'').replace(/"/g, '&quot;')}" placeholder="Branch (e.g. AI & Data Science)">
+            <input type="text" class="form-input" id="ob-branch" value="${(p.branch||'').replace(/"/g, '&quot;')}" placeholder="Branch (e.g. AI &amp; Data Science)">
           </div>
           <div class="form-group" style="margin-bottom:0">
-            <label class="form-label">Year & Semester</label>
-            <input type="text" class="form-input" id="ob-year" value="${(p.year||'').replace(/"/g, '&quot;')}" placeholder="Year & semester (e.g. 2nd Year)">
+            <label class="form-label">Year &amp; Semester</label>
+            <input type="text" class="form-input" id="ob-year" value="${(p.year||'').replace(/"/g, '&quot;')}" placeholder="Year &amp; semester (e.g. 2nd Year)">
           </div>
           <div id="ob-error" style="color:var(--red);font-size:0.78rem;display:none">Please enter your Full Name and College to finish setup.</div>
         </div>
@@ -2860,7 +2870,7 @@ window.finishOnboarding = function() {
   renderPage(state.currentPage);
 };
 
-// ── Ask CampusOS Assistant ────────────────────────────────────
+// ── Ask Clarity Assistant ─────────────────────────────────────
 
 window.handleAssistantQuestion = function() {
   const el = document.getElementById('assistant-input');
@@ -2874,7 +2884,7 @@ window.handleAssistantQuestion = function() {
   let intentType = 'unknown';
   let intentData = {};
 
-  if ((text.includes('today') && text.includes('need to')) || (text.includes('today') && text.includes('due')) || text.includes('what do i need to do today')) {
+  if ((text.includes('today') && text.includes('need to')) || (text.includes('today') && text.includes('due')) || text.includes('what do i need to do today') || text.includes('what should i focus on')) {
     intentType = 'today-summary';
   } else if ((text.includes('overdue') || text.includes('late') || text.includes('pending')) && (text.includes('any') || text.includes('what'))) {
     intentType = 'overdue';
@@ -2919,10 +2929,10 @@ function answerTodaySummary() {
   const classesLeft = todayClasses();
   const tsks = allTasks().filter(a => a.status === 'pending' && a.dueDate === todayStr());
   
-  let html = `<div style="font-weight:600;margin-bottom:8px">Today's Summary</div>`;
-  html += `<div style="font-size:0.85rem;margin-bottom:8px">You have ${classesLeft} classes left and ${tsks.length} tasks due today.</div>`;
+  let html = `<div style="font-weight:600;margin-bottom:8px">Today's Focus &amp; Summary</div>`;
+  html += `<div style="font-size:0.85rem;margin-bottom:8px">You have ${classesLeft} class${classesLeft!==1?'es':''} left and ${tsks.length} task${tsks.length!==1?'s':''} due today.</div>`;
   if (nextClass) {
-    html += `<div style="font-size:0.85rem;color:var(--text-secondary)">👉 Next class: <strong>${nextClass.subject}</strong> at ${nextClass.time} in ${nextClass.room}</div>`;
+    html += `<div style="font-size:0.85rem;color:var(--text-secondary)">👉 Next session: <strong>${nextClass.subject}</strong> at ${nextClass.time} (${nextClass.room})</div>`;
   }
   if (tsks.length > 0) {
     html += `<ul style="font-size:0.85rem;color:var(--text-secondary);margin:8px 0 0 16px;padding:0">`;
@@ -2977,9 +2987,9 @@ function answerTimetableDay(dayMatch) {
   if (classes.length === 0) {
     html += `<div style="font-size:0.85rem">You have no classes scheduled.</div>`;
   } else {
-    html += `<div style="font-size:0.85rem;margin-bottom:8px">You have ${classes.length} classes:</div>`;
+    html += `<div style="font-size:0.85rem;margin-bottom:8px">You have ${classes.length} class${classes.length!==1?'es':''}:</div>`;
     html += `<ul style="font-size:0.85rem;color:var(--text-secondary);margin:0 0 0 16px;padding:0">`;
-    classes.forEach(c => { html += `<li><strong>${c.subject}</strong> (${c.time} - ${c.room})</li>`; });
+    classes.forEach(c => { html += `<li><strong>${c.subject}</strong> (${c.time} · ${c.room})</li>`; });
     html += `</ul>`;
   }
   return html;
@@ -2989,7 +2999,7 @@ function answerOverdueTasks() {
   const tsks = allTasks().filter(t => t.status === 'pending' && t.dueDate < todayStr());
   let html = `<div style="font-weight:600;margin-bottom:8px">Overdue Tasks</div>`;
   if (tsks.length === 0) {
-    html += `<div style="font-size:0.85rem">You have no overdue tasks. Great job!</div>`;
+    html += `<div style="font-size:0.85rem">You have no overdue tasks — all clear!</div>`;
   } else {
     html += `<div style="font-size:0.85rem;margin-bottom:8px">You have ${tsks.length} overdue task(s):</div>`;
     html += `<ul style="font-size:0.85rem;color:var(--text-secondary);margin:0 0 0 16px;padding:0">`;
@@ -3003,9 +3013,9 @@ function answerExams() {
   const tsks = allTasks().filter(t => t.status === 'pending' && (t.title.toLowerCase().includes('exam') || t.title.toLowerCase().includes('test') || t.title.toLowerCase().includes('quiz')));
   const nts = NOTICES.filter(n => n.category.toLowerCase().includes('exam') || n.title.toLowerCase().includes('exam') || n.title.toLowerCase().includes('test'));
   
-  let html = `<div style="font-weight:600;margin-bottom:8px">Upcoming Exams & Tests</div>`;
+  let html = `<div style="font-weight:600;margin-bottom:8px">Upcoming Exams &amp; Tests</div>`;
   if (tsks.length === 0 && nts.length === 0) {
-    html += `<div style="font-size:0.85rem">No exams or tests found in your tasks or notices.</div>`;
+    html += `<div style="font-size:0.85rem">No upcoming exams or tests found in your tasks or notice board.</div>`;
   } else {
     html += `<ul style="font-size:0.85rem;color:var(--text-secondary);margin:0 0 0 16px;padding:0">`;
     tsks.forEach(t => { html += `<li>${t.title} (Due: ${formatDate(t.dueDate)})</li>`; });
@@ -3017,13 +3027,13 @@ function answerExams() {
 
 function answerUnknown() {
   return `
-    <div style="font-weight:600;margin-bottom:8px">I'm not sure how to answer that yet.</div>
-    <div style="font-size:0.85rem;color:var(--text-secondary)">Try asking:</div>
+    <div style="font-weight:600;margin-bottom:8px">Here are a few questions you can ask Clarity Desk:</div>
     <ul style="font-size:0.85rem;color:var(--text-muted);margin:8px 0 0 16px;padding:0">
-      <li>"What do I need to do today?"</li>
+      <li>"What should I focus on today?"</li>
       <li>"Show DS tasks due this week"</li>
-      <li>"How many classes left tomorrow?"</li>
+      <li>"How many classes do I have tomorrow?"</li>
       <li>"Any overdue tasks?"</li>
+      <li>"When are my upcoming exams?"</li>
     </ul>
   `;
 }
@@ -3063,6 +3073,7 @@ function renderDashboard() {
   const totalMarked = totalAttended + totalSkipped;
   const attendancePct = totalMarked > 0 ? Math.round((totalAttended / totalMarked) * 100) : null;
   const isAttendanceAtRisk = attendancePct !== null && attendancePct < 75;
+  const dashGuidance = calculateSmartAttendanceGuidance(totalAttended, totalSkipped, 75);
 
   // Active class (now) or next class
   let activeClass = null;
@@ -3082,27 +3093,15 @@ function renderDashboard() {
   }
 
   // Exam countdown
-  let countdownHTML = '';
+  let countdownText = '';
   if (liveProfile.examDate) {
     const today    = new Date(); today.setHours(0,0,0,0);
     const examDay  = new Date(liveProfile.examDate + 'T00:00:00');
     const daysLeft = Math.ceil((examDay - today) / 86400000);
     if (daysLeft > 0) {
-      countdownHTML = `
-        <div class="card" style="margin-bottom:16px;display:flex;align-items:center;gap:14px;border-left:3px solid var(--yellow)">
-          <div style="width:36px;height:36px;border-radius:8px;background:rgba(245,158,11,0.12);color:var(--yellow);display:grid;place-items:center;flex-shrink:0">
-            ${icons.clock()}
-          </div>
-          <div>
-            <div style="font-weight:700;font-size:0.95rem">${daysLeft} days to End-Sem Exams</div>
-            <div style="font-size:0.78rem;color:var(--text-muted)">${formatDate(liveProfile.examDate)} · Keep going! 📚</div>
-          </div>
-        </div>`;
+      countdownText = `${daysLeft} days to End-Sem Exams (${formatDate(liveProfile.examDate)})`;
     } else if (daysLeft === 0) {
-      countdownHTML = `
-        <div class="card" style="margin-bottom:16px;border-left:3px solid var(--accent);padding:14px;font-weight:600">
-          🎯 Exam is today — all the best!
-        </div>`;
+      countdownText = `🎯 Exam is today — all the best!`;
     }
   }
 
@@ -3110,13 +3109,38 @@ function renderDashboard() {
   const needsSetup = !displayName;
   const greetingHeading = displayName ? `${greetingWord()}, ${displayName.split(' ')[0]}! 👋` : `${greetingWord()}! 👋`;
 
+  // Focus status pill for the hero
+  let focusStatusHTML = '';
+  if (activeClass) {
+    focusStatusHTML = `
+      <div class="greeting-focus-pill">
+        <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green)"></span>
+        <span>In Session: <strong>${activeClass.subject}</strong> · ${activeClass.room || 'Classroom'} (${activeClass.time}–${activeClass.end})</span>
+      </div>`;
+  } else if (nextClass) {
+    focusStatusHTML = `
+      <div class="greeting-focus-pill">
+        <span>⏳ Next Class: <strong>${nextClass.subject}</strong> at ${nextClass.time} · ${nextClass.room || 'Classroom'}</span>
+      </div>`;
+  } else if (dayClasses.length > 0) {
+    focusStatusHTML = `
+      <div class="greeting-focus-pill">
+        <span>✨ All classes wrapped up for today</span>
+      </div>`;
+  } else {
+    focusStatusHTML = `
+      <div class="greeting-focus-pill">
+        <span>🏖️ Free Day — No classes scheduled</span>
+      </div>`;
+  }
+
   const setupBanner = needsSetup ? `
-    <div class="card" style="margin-bottom:16px;display:flex;align-items:center;gap:12px;background:var(--accent-dim);border-color:var(--accent)">
+    <div class="card" style="margin-bottom:18px;display:flex;align-items:center;gap:12px;background:var(--accent-dim);border-color:var(--accent)">
       <div style="color:var(--accent);flex-shrink:0">${icons.user()}</div>
       <div style="flex:1;font-size:0.87rem">
-        <strong>Personalize Clarity Desk</strong> — set up your profile in Settings.
+        <strong>Personalize your desk</strong> — set up your name, college, and semester in Settings.
       </div>
-      <button class="btn-primary" onclick="navigateTo('settings')" style="flex-shrink:0;padding:6px 14px;font-size:0.8rem">Set Up Profile</button>
+      <button class="btn-primary" onclick="navigateTo('settings')" style="flex-shrink:0;padding:6px 14px;font-size:0.8rem">Set Up Desk</button>
     </div>` : '';
 
   // Urgent tasks: Overdue or Due Today first, then due soon
@@ -3136,246 +3160,233 @@ function renderDashboard() {
   const quickLinksPreview = loadCustomLinks().slice(0, 4);
 
   el.innerHTML = `
-    <div class="dashboard-hero-header" style="margin-bottom:20px">
-      <div class="greeting-banner">
-        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap">
+    <!-- 1. DOMINANT TODAY DESK HERO -->
+    <div class="dashboard-hero-header">
+      <div class="today-hero-surface">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
           <div>
             <div class="greeting-text">${greetingHeading}</div>
             <div class="greeting-date">
               ${icons.calendar()}
               <span>${DAY_NAMES[now.getDay()]}, ${now.getDate()} ${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}</span>
             </div>
+            ${focusStatusHTML}
           </div>
-          <button class="btn btn-sm btn-review" onclick="navigateTo('review')" title="Open Weekly Review & Reflection">
-            ${icons.calendar()} Weekly Review
+          <button class="btn btn-sm btn-review" onclick="navigateTo('review')" title="Weekly reset & reflection">
+            📋 Weekly Review
           </button>
         </div>
-        ${countdownHTML ? `<div style="margin-top:14px;padding-top:12px;border-top:1px dashed rgba(255,255,255,0.2);font-size:0.82rem">${countdownHTML}</div>` : ''}
+        ${countdownText ? `
+          <div style="margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.18);font-size:0.8rem;opacity:0.92;display:flex;align-items:center;gap:6px">
+            <span>🎯</span> <strong>${countdownText}</strong>
+          </div>` : ''}
       </div>
     </div>
 
-    <!-- ACTION STRIP (Quick Add & Assistant) -->
-    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:10px;margin-bottom:20px">
-      <div class="card card-sm" style="display:flex;align-items:center;gap:8px;padding:8px 12px">
-        <div style="color:var(--accent);opacity:0.8">${icons.plus()}</div>
-        <input type="text" id="quick-add-input" placeholder="Quick add: 'DS assignment due Friday'" style="flex:1;border:none;background:transparent;outline:none;font-size:0.88rem;color:var(--text-primary)" onkeypress="if(event.key==='Enter') handleQuickAdd()">
-        <button class="btn btn-xs btn-primary" onclick="handleQuickAdd()">Add</button>
+    <!-- 2. STREAMLINED DESK VITALS PULSE STRIP -->
+    <div class="vitals-strip">
+      <div class="vital-item" onclick="navigateTo('timetable')" title="View today's timetable">
+        <div class="vital-top">
+          <span class="vital-label">Classes</span>
+          <span style="color:var(--accent)">${icons.timetable()}</span>
+        </div>
+        <div class="vital-num">${classesLeftCount}</div>
+        <div class="vital-hint">${dayClasses.length} scheduled today</div>
       </div>
 
-      <div class="card card-sm" style="display:flex;align-items:center;gap:8px;padding:8px 12px">
-        <div style="color:var(--accent);opacity:0.8">✨</div>
-        <input type="text" id="assistant-input" placeholder="Ask Clarity Desk (e.g. 'What do I need to do today?')" style="flex:1;border:none;background:transparent;outline:none;font-size:0.88rem;color:var(--text-primary)" onkeypress="if(event.key==='Enter') handleAssistantQuestion()">
+      <div class="vital-item" onclick="navigateTo('assignments')" title="View pending tasks">
+        <div class="vital-top">
+          <span class="vital-label">Pending</span>
+          <span style="color:${pending>0?'var(--red)':'var(--accent)'}">${icons.assignments()}</span>
+        </div>
+        <div class="vital-num" style="color:${pending>0?'var(--red)':'inherit'}">${pending}</div>
+        <div class="vital-hint">${submittedCount} completed</div>
+      </div>
+
+      <div class="vital-item" onclick="navigateTo('assignments')" title="View overdue tasks">
+        <div class="vital-top">
+          <span class="vital-label">Overdue</span>
+          <span style="color:${overdue>0?'var(--red)':'var(--yellow)'}">${icons.alert()}</span>
+        </div>
+        <div class="vital-num" style="color:${overdue>0?'var(--red)':'var(--text-primary)'}">${overdue}</div>
+        <div class="vital-hint">${overdue>0?'Needs attention':'All clear ✓'}</div>
+      </div>
+
+      <div class="vital-item" onclick="navigateTo('review')" title="View attendance guidance">
+        <div class="vital-top">
+          <span class="vital-label">Attendance</span>
+          <span style="color:${isAttendanceAtRisk?'var(--red)':'var(--green)'}">${isAttendanceAtRisk?'⚠️':'📊'}</span>
+        </div>
+        <div class="vital-num" style="color:${isAttendanceAtRisk?'var(--red)':attendancePct!==null?'var(--green)':'inherit'}">${attendancePct !== null ? attendancePct + '%' : '—'}</div>
+        <div class="vital-hint">${dashGuidance.isSafe ? 'Safe zone (≥75%)' : 'Below target (<75%)'}</div>
       </div>
     </div>
-    <div id="assistant-answer-container"></div>
 
     ${setupBanner}
 
-    <!-- WEEKLY REVIEW & PREP BANNER -->
-    ${!isWeeklyReviewDismissed() ? `
-      <div class="card card-sm" style="margin-bottom:20px;padding:12px 16px;background:var(--accent-dim);border:1px solid var(--accent);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
-        <div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1">
-          <span style="font-size:1.2rem;flex-shrink:0">🗓️</span>
-          <div style="min-width:0">
-            <div style="font-weight:700;font-size:0.88rem;color:var(--text-primary)">Weekly Reflection & Prep</div>
-            <div style="font-size:0.76rem;color:var(--text-muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Reflect on past week's attendance, completed tasks, and upcoming deadlines.</div>
-          </div>
+    <!-- 3. MAIN DESK GRID (SCHEDULE & WORKLOAD) -->
+    <div class="dashboard-grid-2col">
+      <!-- LEFT COLUMN: TODAY'S SCHEDULE & ATTENDANCE INSIGHT -->
+      <div class="dashboard-panel">
+        <div class="panel-header">
+          <div class="panel-title">Today's Class Schedule</div>
+          <button class="panel-action" onclick="navigateTo('timetable')">Open Timetable →</button>
         </div>
-        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-          <button class="btn btn-sm btn-primary" onclick="navigateTo('review')" style="font-size:0.75rem;padding:4px 10px">Start Review →</button>
-          <button class="btn btn-sm btn-secondary" onclick="dismissWeeklyReview()" style="font-size:0.75rem;padding:4px 8px" title="Dismiss for this week">✕</button>
-        </div>
-      </div>
-    ` : ''}
 
-    <!-- 1. ATTENDANCE RISK WARNING BLOCK -->
-    ${(() => {
-      const dashGuidance = calculateSmartAttendanceGuidance(totalAttended, totalSkipped, 75);
-      return `
-        <div class="card card-sm" style="margin-bottom:20px;padding:12px 16px;border-left:3px solid ${isAttendanceAtRisk ? 'var(--red)' : attendancePct !== null ? 'var(--green)' : 'var(--accent)'};background:${isAttendanceAtRisk ? 'rgba(239,68,68,0.06)' : 'var(--surface-2)'}">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
-            <div style="display:flex;align-items:center;gap:10px">
-              <div style="font-size:1.15rem;display:grid;place-items:center">${isAttendanceAtRisk ? '⚠️' : attendancePct !== null ? '✅' : '📊'}</div>
-              <div>
-                <div style="font-weight:700;font-size:0.88rem;color:${isAttendanceAtRisk ? 'var(--red)' : 'var(--text-primary)'}">
-                  ${isAttendanceAtRisk ? `Attendance at Risk (${attendancePct}%)` : attendancePct !== null ? `Attendance on Track (${attendancePct}%)` : 'Attendance Tracker'}
-                </div>
-                <div style="font-size:0.76rem;color:var(--text-muted);margin-top:1px">
-                  ${attendancePct !== null ? `${totalAttended} of ${totalMarked} attended (${attendancePct}%) · ${dashGuidance.isSafe ? (dashGuidance.safeSkips > 0 ? `Can skip ${dashGuidance.safeSkips} class${dashGuidance.safeSkips!==1?'es':''} safely` : 'On track for 75% target') : `Attend next ${dashGuidance.classesToAttend} class${dashGuidance.classesToAttend!==1?'es':''} to reach 75%`}` : 'No classes marked yet — tap today\'s classes below to track'}
-                </div>
+        <div class="card" style="padding:14px">
+          ${dayClasses.length > 0 ? `
+            <div style="display:flex;flex-direction:column;gap:8px">
+              ${dayClasses.map(c => {
+                const classKey = `${c.code || c.subject}_${c.time}`.replace(/[^a-zA-Z0-9_]/g, '');
+                const status = attendanceData[dateStr]?.[classKey] || 'unset';
+                const isNow = (currentMin >= timeToMinutes(c.time || '00:00') && currentMin < timeToMinutes(c.end || '23:59'));
+                const isPast = (currentMin >= timeToMinutes(c.end || '23:59'));
+                return `
+                  <div class="timeline-row ${isNow ? 'current-active' : ''} ${isPast ? 'past-completed' : ''}">
+                    <div style="flex:1;min-width:120px;cursor:pointer" onclick="openSubjectHub('${c.subject}')" title="Open ${c.subject} Notes &amp; Resources">
+                      <div style="font-weight:700;font-size:0.88rem;display:flex;align-items:center;gap:6px">
+                        <span>${c.subject}</span>
+                        ${isNow ? '<span class="type-badge" style="background:var(--accent);color:white;font-size:0.6rem;padding:1px 5px">NOW</span>' : ''}
+                        <span class="type-badge type-${c.type || 'lecture'}" style="font-size:0.62rem">${c.type || 'lecture'}</span>
+                      </div>
+                      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px">
+                        ${c.time}${c.end ? '–' + c.end : ''} ${c.room ? '· ' + c.room : ''} ${c.teacher ? '· Prof. ' + c.teacher : ''}
+                      </div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+                      <button class="btn btn-sm ${status==='attended'?'btn-primary':'btn-secondary'}" onclick="event.stopPropagation(); setAttendance('${dateStr}', '${classKey}', 'attended')" aria-label="Mark ${c.subject} as attended" style="padding:3px 8px;font-size:0.72rem;font-weight:600;${status==='attended'?'background:var(--green);border-color:var(--green);color:white;':''}">
+                        ${status==='attended'?'✓ Attended':'Attended'}
+                      </button>
+                      <button class="btn btn-sm ${status==='skipped'?'btn-primary':'btn-secondary'}" onclick="event.stopPropagation(); setAttendance('${dateStr}', '${classKey}', 'skipped')" aria-label="Mark ${c.subject} as skipped" style="padding:3px 8px;font-size:0.72rem;font-weight:600;${status==='skipped'?'background:var(--red);border-color:var(--red);color:white;':''}">
+                        ${status==='skipped'?'✕ Skipped':'Skipped'}
+                      </button>
+                      <button class="btn btn-xs btn-secondary" onclick="event.stopPropagation(); openSubjectHub('${c.subject}')" title="Open ${c.subject} Hub" style="font-size:0.7rem;padding:2px 6px">
+                        Hub →
+                      </button>
+                    </div>
+                  </div>`;
+              }).join('')}
+            </div>
+          ` : `
+            <div style="padding:24px 12px;text-align:center;color:var(--text-muted);font-size:0.85rem">
+              🏖️ No classes scheduled for today. Take time to study or rest!
+            </div>
+          `}
+        </div>
+
+        <!-- ATTENDANCE GUIDANCE CARD -->
+        <div class="card card-sm" style="padding:12px 14px;border-left:3px solid ${isAttendanceAtRisk ? 'var(--red)' : attendancePct !== null ? 'var(--green)' : 'var(--accent)'};background:${isAttendanceAtRisk ? 'rgba(239,68,68,0.06)' : 'var(--surface)'}">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+            <div style="flex:1;min-width:180px">
+              <div style="font-weight:700;font-size:0.84rem;color:${isAttendanceAtRisk ? 'var(--red)' : 'var(--text-primary)'}">
+                ${isAttendanceAtRisk ? `Attendance Alert (${attendancePct}%)` : attendancePct !== null ? `Attendance Health (${attendancePct}%)` : 'Attendance Health Tracker'}
+              </div>
+              <div style="font-size:0.76rem;color:var(--text-muted);margin-top:2px">
+                ${dashGuidance.message}
               </div>
             </div>
-            <button class="btn btn-sm btn-action" onclick="navigateTo('review')">
-              Open Attendance →
+            <button class="btn btn-sm btn-secondary" onclick="navigateTo('review')" style="font-size:0.72rem;padding:3px 8px">
+              Review Guidance →
             </button>
           </div>
         </div>
-      `;
-    })()}
+      </div>
 
-    <!-- 2. QUICK STATS GRID -->
-    <div class="stat-grid" style="margin-bottom:24px">
-      <div class="stat-card" onclick="navigateTo('timetable')" style="cursor:pointer">
-        <div class="stat-icon" style="background:var(--accent-dim);color:var(--accent)">${icons.timetable()}</div>
-        <div class="stat-value">${classesLeftCount}</div>
-        <div class="stat-label">Classes Left</div>
-      </div>
-      <div class="stat-card" onclick="navigateTo('assignments')" style="cursor:pointer">
-        <div class="stat-icon" style="background:rgba(239,68,68,0.12);color:var(--red)">${icons.assignments()}</div>
-        <div class="stat-value" style="color:${pending>0?'var(--red)':'inherit'}">${pending}</div>
-        <div class="stat-label">Pending Tasks</div>
-      </div>
-      <div class="stat-card" onclick="navigateTo('assignments')" style="cursor:pointer">
-        <div class="stat-icon" style="background:rgba(245,158,11,0.12);color:var(--yellow)">${icons.alert()}</div>
-        <div class="stat-value" style="color:${overdue>0?'var(--red)':'inherit'}">${overdue}</div>
-        <div class="stat-label">Overdue</div>
-      </div>
-      <div class="stat-card" onclick="navigateTo('assignments')" style="cursor:pointer">
-        <div class="stat-icon" style="background:rgba(16,185,129,0.12);color:var(--green)">${icons.check()}</div>
-        <div class="stat-value" style="color:var(--green)">${submittedCount}</div>
-        <div class="stat-label">Submitted</div>
-      </div>
-    </div>
-
-    <!-- 3. CLASS NOW / NEXT HIGHLIGHT CARD -->
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-      <div class="section-heading" style="margin-bottom:0;margin-top:0">Class Schedule</div>
-      <button class="btn btn-sm btn-action" onclick="navigateTo('timetable')">Open Timetable →</button>
-    </div>
-
-    ${activeClass ? `
-      <div class="card" style="display:flex;gap:14px;align-items:center;margin-bottom:12px;border-left:4px solid var(--accent);background:var(--accent-dim)">
-        <div style="width:40px;height:40px;border-radius:10px;background:var(--accent);color:white;display:grid;place-items:center;flex-shrink:0;font-size:0.7rem;font-weight:700">
-          NOW
+      <!-- RIGHT COLUMN: URGENT TASKS & WORKLOAD -->
+      <div class="dashboard-panel">
+        <div class="panel-header">
+          <div class="panel-title">Urgent Tasks &amp; Workload</div>
+          <button class="panel-action" onclick="navigateTo('assignments')">Open Tasks (${pending}) →</button>
         </div>
-        <div style="flex:1;min-width:0">
-          <div style="font-weight:700;font-size:0.95rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${activeClass.subject}">${activeClass.subject}</div>
-          <div class="text-xs text-muted" style="margin-top:2px">${activeClass.time} ${activeClass.end ? '- ' + activeClass.end : ''} ${activeClass.room ? '· ' + activeClass.room : ''} ${activeClass.teacher ? '· ' + activeClass.teacher : ''}</div>
-        </div>
-        <span class="type-badge type-${activeClass.type || 'lecture'}">${activeClass.type || 'lecture'}</span>
-      </div>
-    ` : nextClass ? `
-      <div class="card" style="display:flex;gap:14px;align-items:center;margin-bottom:12px">
-        <div style="width:40px;height:40px;border-radius:10px;background:var(--surface-2);color:var(--accent);display:grid;place-items:center;flex-shrink:0;font-size:0.68rem;font-weight:700;border:1px solid var(--border)">
-          NEXT
-        </div>
-        <div style="flex:1;min-width:0">
-          <div style="font-weight:700;font-size:0.95rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${nextClass.subject}">${nextClass.subject}</div>
-          <div class="text-xs text-muted" style="margin-top:2px">${nextClass.time} ${nextClass.end ? '- ' + nextClass.end : ''} ${nextClass.room ? '· ' + nextClass.room : ''} ${nextClass.teacher ? '· ' + nextClass.teacher : ''}</div>
-        </div>
-        <span class="type-badge type-${nextClass.type || 'lecture'}">${nextClass.type || 'lecture'}</span>
-      </div>
-    ` : `
-      <div class="card card-sm" style="margin-bottom:12px;padding:16px;text-align:center;color:var(--text-muted);font-size:0.85rem">
-        ${dayClasses.length > 0 ? '🎉 All classes finished for today!' : '🎉 No classes scheduled today — enjoy your day!'}
-      </div>
-    `}
 
-    <!-- TODAY'S CLASSES SEQUENCE WITH QUICK ATTEND / SKIP -->
-    ${dayClasses.length > 0 ? `
-      <div style="margin-bottom:16px">
-        ${dayClasses.map(c => {
-          const classKey = `${c.code || c.subject}_${c.time}`.replace(/[^a-zA-Z0-9_]/g, '');
-          const status = attendanceData[dateStr]?.[classKey] || 'unset';
-          const isNow = (currentMin >= timeToMinutes(c.time || '00:00') && currentMin < timeToMinutes(c.end || '23:59'));
-          return `
-            <div class="card card-sm" style="margin-bottom:6px;padding:8px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;${isNow ? 'border-left:3px solid var(--accent)' : ''}">
-              <div style="flex:1;min-width:140px">
-                <div style="font-weight:600;font-size:0.85rem;display:flex;align-items:center;gap:6px">
-                  ${c.subject}
-                  ${isNow ? '<span class="type-badge" style="background:var(--accent);color:white;font-size:0.6rem;padding:1px 5px">NOW</span>' : ''}
-                </div>
-                <div style="font-size:0.72rem;color:var(--text-muted);margin-top:1px">
-                  ${c.time}${c.end ? ' - ' + c.end : ''} ${c.room ? '· ' + c.room : ''}
-                </div>
-              </div>
-              <div style="display:flex;align-items:center;gap:4px">
-                <button class="btn btn-sm ${status==='attended'?'btn-primary':'btn-secondary'}" onclick="setAttendance('${dateStr}', '${classKey}', 'attended')" aria-label="Mark ${c.subject} as attended" style="padding:3px 8px;font-size:0.72rem;font-weight:600;${status==='attended'?'background:var(--green);border-color:var(--green);':''}">
-                  ${status==='attended'?'✓ Attended':'Attended'}
-                </button>
-                <button class="btn btn-sm ${status==='skipped'?'btn-primary':'btn-secondary'}" onclick="setAttendance('${dateStr}', '${classKey}', 'skipped')" aria-label="Mark ${c.subject} as skipped" style="padding:3px 8px;font-size:0.72rem;font-weight:600;${status==='skipped'?'background:var(--red);border-color:var(--red);':''}">
-                  ${status==='skipped'?'✕ Skipped':'Skipped'}
-                </button>
-              </div>
-            </div>`;
-        }).join('')}
-      </div>
-    ` : ''}
-
-    <!-- 4. URGENT TASKS -->
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;margin-top:16px">
-      <div class="section-heading" style="margin-bottom:0">Urgent Tasks</div>
-      <button class="btn btn-sm btn-action" onclick="navigateTo('assignments')">Open Tasks (${pending}) →</button>
-    </div>
-
-    ${urgentTasks.length > 0 ? `
-      <div style="margin-bottom:16px">
-        ${urgentTasks.map(a => {
-          const days  = dueDaysLeft(a.dueDate);
-          const label = days < 0 ? 'Overdue' : days === 0 ? 'Due Today' : `${days}d left`;
-          const cls   = days < 0 ? 'overdue' : days === 0 ? 'today' : days <= 3 ? 'soon' : '';
-          const done  = a.status === 'submitted';
-          return `
-            <div class="card card-sm assignment-card" style="margin-bottom:6px;display:flex;align-items:center;gap:10px;padding:10px 12px">
-              <div onclick="toggleAssignment('${a.id}')" title="Click to mark done" style="width:18px;height:18px;border-radius:4px;border:2px solid ${done ? 'var(--green)' : a.priority==='high' ? 'var(--red)' : a.priority==='medium' ? 'var(--yellow)' : 'var(--border)'};background:${done ? 'var(--green)' : 'transparent'};display:grid;place-items:center;flex-shrink:0;color:white;cursor:pointer;transition:all 0.15s">
-                ${done ? icons.check() : ''}
-              </div>
-              <div style="flex:1;min-width:0;cursor:pointer" onclick="navigateTo('assignments')">
-                <div class="font-semibold" style="font-size:0.88rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${done?'text-decoration:line-through;opacity:0.5':''}">${a.title}</div>
-                <div class="text-xs text-muted">${a.subject || 'Task'}</div>
-              </div>
-              <span class="due-badge ${cls}">${label}</span>
-            </div>`;
-        }).join('')}
-      </div>
-    ` : `
-      <div class="card card-sm" style="margin-bottom:16px;padding:12px 14px;text-align:center;color:var(--text-muted);font-size:0.85rem">
-        ✨ All caught up! No urgent tasks due today.
-      </div>
-    `}
-
-    <!-- 5. LATEST NOTICE -->
-    ${latestNotice ? `
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;margin-top:16px">
-        <div class="section-heading" style="margin-bottom:0">Latest Notice</div>
-        <button class="btn btn-sm btn-action" onclick="navigateTo('notices')">Open Notices →</button>
-      </div>
-      <div class="card card-sm notice-card ${latestNotice.important ? 'important' : ''}" onclick="navigateTo('notices')" style="margin-bottom:16px;padding:12px 14px;cursor:pointer">
-        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
-          <div style="font-weight:600;font-size:0.88rem;color:var(--text-primary)">${latestNotice.title}</div>
-          <span class="cat-badge cat-${latestNotice.category}">${latestNotice.category}</span>
-        </div>
-        <div style="font-size:0.78rem;color:var(--text-secondary);margin-top:4px;line-height:1.4">
-          ${latestNotice.content.length > 110 ? latestNotice.content.slice(0, 107) + '…' : latestNotice.content}
-        </div>
-        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;display:flex;align-items:center;justify-content:space-between">
-          <span>${formatDate(latestNotice.date)}</span>
-          <span style="color:var(--accent-light, var(--accent));font-weight:600">Read Notice →</span>
-        </div>
-      </div>
-    ` : ''}
-
-    <!-- 6. ASSIGNMENT PROGRESS & QUICK LINKS -->
-    <div class="section-heading" style="margin-top:16px">Assignment Progress</div>
-    <div class="card" style="margin-bottom:16px;cursor:pointer" onclick="navigateTo('assignments')">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <span class="text-xs font-semibold">Submitted ${submittedCount} of ${total}</span>
-        <span class="text-xs text-muted">${progress}%</span>
-      </div>
-      <div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:${progress}%"></div></div>
-    </div>
-
-    ${quickLinksPreview.length > 0 ? `
-      <div class="section-heading">Quick Links <button class="icon-btn-xs" style="float:right" onclick="navigateTo('resources')">→</button></div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(160px, 1fr));gap:8px;margin-bottom:16px">
-        ${quickLinksPreview.map(s => `
-          <div class="card card-sm" style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px 12px" onclick="navigateTo('resources')">
-            <span style="width:8px;height:8px;border-radius:50%;background:${s.color || 'var(--accent)'};flex-shrink:0"></span>
-            <span style="font-weight:600;font-size:0.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${s.subject}</span>
+        <div class="card" style="padding:14px">
+          <!-- WORKLOAD PROGRESS -->
+          <div style="margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+              <span class="text-xs font-semibold">Completed ${submittedCount} of ${total} tasks</span>
+              <span class="text-xs text-muted font-semibold">${progress}%</span>
+            </div>
+            <div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:${progress}%"></div></div>
           </div>
-        `).join('')}
+
+          <!-- URGENT TASKS LIST -->
+          ${urgentTasks.length > 0 ? `
+            <div style="display:flex;flex-direction:column;gap:6px">
+              ${urgentTasks.map(a => {
+                const days = dueDaysLeft(a.dueDate);
+                const label = days < 0 ? `${Math.abs(days)}d overdue` : days === 0 ? 'Due Today' : `${days}d left`;
+                const cls = days < 0 ? 'overdue' : days === 0 ? 'today' : days <= 3 ? 'soon' : '';
+                const done = a.status === 'submitted';
+                return `
+                  <div class="card card-sm assignment-card" style="margin-bottom:0;display:flex;align-items:center;gap:10px;padding:9px 12px">
+                    <div onclick="toggleAssignment('${a.id}')" title="Click to mark done" style="width:18px;height:18px;border-radius:4px;border:2px solid ${done ? 'var(--green)' : a.priority==='high' ? 'var(--red)' : a.priority==='medium' ? 'var(--yellow)' : 'var(--border)'};background:${done ? 'var(--green)' : 'transparent'};display:grid;place-items:center;flex-shrink:0;color:white;cursor:pointer;transition:all 0.15s">
+                      ${done ? icons.check() : ''}
+                    </div>
+                    <div style="flex:1;min-width:0;cursor:pointer" onclick="navigateTo('assignments')">
+                      <div class="font-semibold" style="font-size:0.86rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${done?'text-decoration:line-through;opacity:0.5':''}">${a.title}</div>
+                      <div class="text-xs text-muted" style="display:flex;align-items:center;gap:6px">
+                        <span onclick="event.stopPropagation(); openSubjectHub('${a.subject}')" style="color:var(--accent);font-weight:600;cursor:pointer" title="Open ${a.subject} Hub">${a.subject || 'Academic'}</span>
+                        <span>· ${formatDate(a.dueDate)}</span>
+                      </div>
+                    </div>
+                    <span class="due-badge ${cls}" style="font-size:0.7rem;padding:2px 6px">${label}</span>
+                  </div>`;
+              }).join('')}
+            </div>
+          ` : `
+            <div style="padding:16px;text-align:center;color:var(--text-muted);font-size:0.84rem">
+              🌿 All caught up! No urgent tasks due today.
+            </div>
+          `}
+        </div>
+
+        <!-- NOTICE HIGHLIGHT -->
+        ${latestNotice ? `
+          <div class="card card-sm notice-card ${latestNotice.important ? 'important' : ''}" onclick="navigateTo('notices')" style="padding:12px 14px;cursor:pointer">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+              <div style="font-weight:700;font-size:0.86rem;color:var(--text-primary)">${latestNotice.title}</div>
+              <span class="cat-badge cat-${latestNotice.category}" style="font-size:0.65rem">${latestNotice.category}</span>
+            </div>
+            <div style="font-size:0.76rem;color:var(--text-secondary);margin-top:3px;line-height:1.4">
+              ${latestNotice.content.length > 95 ? latestNotice.content.slice(0, 92) + '…' : latestNotice.content}
+            </div>
+            <div style="font-size:0.72rem;color:var(--text-muted);margin-top:5px;display:flex;align-items:center;justify-content:space-between">
+              <span>${formatDate(latestNotice.date)}</span>
+              <span style="color:var(--accent);font-weight:600">Read Notice →</span>
+            </div>
+          </div>
+        ` : ''}
       </div>
-    ` : ''}
+    </div>
+
+    <!-- 4. QUICK TOOLS & STUDY SHORTCUTS -->
+    <div style="margin-top:6px;margin-bottom:24px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:8px;margin-bottom:12px">
+        <div class="card card-sm" style="display:flex;align-items:center;gap:8px;padding:8px 12px">
+          <div style="color:var(--accent);opacity:0.8;flex-shrink:0">${icons.plus()}</div>
+          <input type="text" id="quick-add-input" placeholder="Quick add task — e.g. 'DS lab report due Friday'" style="flex:1;border:none;background:transparent;outline:none;font-size:0.85rem;color:var(--text-primary);font-family:var(--font)" onkeypress="if(event.key==='Enter') handleQuickAdd()">
+          <button class="btn btn-xs btn-primary" onclick="handleQuickAdd()">Add</button>
+        </div>
+
+        <div class="card card-sm" style="display:flex;align-items:center;gap:8px;padding:8px 12px">
+          <div style="color:var(--accent);opacity:0.8;flex-shrink:0">✨</div>
+          <input type="text" id="assistant-input" placeholder="Ask Clarity — e.g. 'What classes do I have today?'" style="flex:1;border:none;background:transparent;outline:none;font-size:0.85rem;color:var(--text-primary);font-family:var(--font)" onkeypress="if(event.key==='Enter') handleAssistantQuestion()">
+        </div>
+      </div>
+      <div id="assistant-answer-container"></div>
+
+      ${quickLinksPreview.length > 0 ? `
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:10px">
+          <span style="font-size:0.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;margin-right:4px">Study Shortcuts:</span>
+          ${quickLinksPreview.map(s => `
+            <div class="filter-chip" style="font-size:0.74rem;padding:3px 10px;cursor:pointer;display:flex;align-items:center;gap:6px" onclick="navigateTo('resources')">
+              <span style="width:6px;height:6px;border-radius:50%;background:${s.color || 'var(--accent)'}"></span>
+              <span>${s.subject}</span>
+            </div>
+          `).join('')}
+        </div>
+      ` : ''}
+    </div>
   `;
 }
 
@@ -3399,12 +3410,16 @@ function renderTimetable() {
 
   let content = '';
   if (!classes.length) {
-    content = `<div class="card" style="text-align:center;padding:40px;color:var(--text-muted);border-style:dashed">
-      🏖️ No classes on ${DAY_NAMES[day]} — enjoy the day!
-      <div style="margin-top:12px">
-        <button class="btn-primary" onclick="showTimetableEntryModal(${day}, null)" style="font-size:0.8rem;padding:6px 14px">+ Add Class Entry</button>
-      </div>
-    </div>`;
+    content = `
+      <div class="empty-state-card" style="margin-top:8px">
+        <span class="empty-state-icon">🏖️</span>
+        <div class="empty-state-title">Free Day on ${DAY_NAMES[day]}</div>
+        <div class="empty-state-desc">No classes scheduled for today. Relax, study, or add a custom class entry to your weekly schedule.</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:4px">
+          <button class="btn-primary" onclick="showTimetableEntryModal(${day}, null)" style="font-size:0.82rem;padding:6px 14px">+ Add Class Entry</button>
+          <button class="btn-secondary" onclick="triggerTimetableImport()" style="font-size:0.82rem;padding:6px 14px">📷 Scan Photo</button>
+        </div>
+      </div>`;
   } else {
     content = classes.map((c, idx) => {
       const startMin  = timeToMinutes(c.time || '10:00');
@@ -3434,54 +3449,62 @@ function renderTimetable() {
                          ${isSkipped ? 'background:var(--red);border-color:var(--red);color:#ffffff;' : ''}">
             ✕
           </button>
-        </div>
-      ` : '';
+        </div>` : '';
 
       return `
-        <div class="tt-entry ${isCurrent?'current':''} ${isPast?'past':''}">
+        <div class="tt-entry ${isCurrent ? 'current' : ''} ${isPast ? 'past' : ''}">
           <div class="tt-time-col">
             <div class="tt-time-start">${c.time}</div>
-            <div class="tt-time-end">${c.end}</div>
+            <div class="tt-time-end">${c.end || ''}</div>
           </div>
           <div class="tt-divider"></div>
-          <div class="tt-info" style="flex:1;min-width:0">
-            <div class="tt-subject" style="cursor:pointer" onclick="openSubjectHub('${c.subject}')" title="Open ${c.subject} Hub">${c.subject}</div>
-            <div class="tt-meta">${c.code} &nbsp;·&nbsp; ${c.room} &nbsp;·&nbsp; ${c.teacher}</div>
-            ${c.notes ? `<div style="font-size:0.78rem;color:var(--yellow);margin-top:3px;display:flex;align-items:center;gap:4px">📌 ${c.notes}</div>` : ''}
+          <div class="tt-info">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+              <div class="tt-subject" onclick="openSubjectHub('${c.subject}')" style="cursor:pointer;font-weight:700" title="Open ${c.subject} Hub">
+                ${c.subject} ${c.code ? '· ' + c.code : ''}
+              </div>
+              <div style="display:flex;align-items:center;gap:6px">
+                <span class="type-badge type-${c.type || 'lecture'}">${c.type || 'lecture'}</span>
+                <button class="btn btn-xs btn-secondary" onclick="openSubjectHub('${c.subject}')" style="font-size:0.7rem;padding:2px 6px">Hub →</button>
+              </div>
+            </div>
+            <div class="tt-meta">
+              ${c.room ? `Room: <strong>${c.room}</strong>` : ''}
+              ${c.teacher ? ` · Prof. <strong>${c.teacher}</strong>` : ''}
+              ${c.notes ? ` · <span style="font-style:italic">${c.notes}</span>` : ''}
+            </div>
           </div>
           <div style="display:flex;align-items:center;gap:6px">
             ${attendanceControlsHTML}
-            <span class="type-badge type-${c.type || 'lecture'}">${c.type || 'lecture'}</span>
-            <button class="task-delete-btn" onclick="showTimetableEntryModal(${day}, ${idx})" title="Edit class entry" style="padding:4px 6px">
-              ${icons.edit()}
-            </button>
+            <button class="icon-btn-sm" onclick="showTimetableEntryModal(${day}, ${idx})" title="Edit class" aria-label="Edit class">✏️</button>
           </div>
-        </div>`;
+        </div>
+      `;
     }).join('');
   }
 
   el.innerHTML = `
     <div class="page-header">
       <div>
-        <div class="page-title">Timetable</div>
-        <div class="page-subtitle">${classes.length} class${classes.length!==1?'es':''} on ${DAY_NAMES[day]} ${isCustom ? '· (Customized Schedule)' : ''}</div>
+        <div class="page-title">Timetable &amp; Schedule</div>
+        <div class="page-subtitle">${classes.length} class${classes.length!==1?'es':''} on ${DAY_NAMES[day]} ${isCustom ? '· Custom Schedule' : '· Regular Schedule'}</div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn-primary" onclick="showTimetableEntryModal(${day}, null)" style="display:flex;align-items:center;gap:6px;font-size:0.8rem;padding:7px 14px">
           ${icons.plus()} Add Class
         </button>
         <button class="btn-secondary" onclick="triggerTimetableImport()" style="display:flex;align-items:center;gap:6px;font-size:0.8rem;padding:7px 14px">
-          📷 Scan Photo
+          📷 Scan Timetable
         </button>
         ${isCustom ? `
           <button class="btn-secondary" onclick="resetTimetableToDefault()" style="font-size:0.8rem;padding:7px 12px;color:var(--text-muted)">
-            Reset Default
+            Reset Timetable
           </button>` : ''}
       </div>
     </div>
     <div class="tt-day-tabs">${tabs}</div>
     ${content}
-    ${day===today&&classes.length?'<div class="text-xs text-muted" style="margin-top:12px;text-align:center">Highlighted = current class &nbsp;|&nbsp; Faded = past</div>':''}
+    ${day===today&&classes.length?'<div class="text-xs text-muted" style="margin-top:12px;text-align:center">Highlighted = current session · Faded = completed · Tap subject to open notes &amp; syllabus</div>':''}
   `;
 }
 
@@ -3604,11 +3627,11 @@ function renderSubjectsOverview(el, subjects) {
       <div class="page-header">
         <div>
           <div class="page-title">Subject Hubs</div>
-          <div class="page-subtitle">All your course schedules, tasks, attendance & resources in one place</div>
+          <div class="page-subtitle">Course schedules, tasks, attendance &amp; study resources organized per subject</div>
         </div>
       </div>
-      <div class="card" style="padding:40px;text-align:center;color:var(--text-muted)">
-        📚 No subjects found yet. Set up your timetable or add tasks to automatically generate subject hubs!
+      <div class="card" style="padding:40px;text-align:center;color:var(--text-muted);border-style:dashed">
+        📚 No subjects found yet. Set up your timetable or add tasks to automatically build your subject hubs!
       </div>
     `;
     return;
@@ -3648,7 +3671,7 @@ function renderSubjectsOverview(el, subjects) {
     <div class="page-header">
       <div>
         <div class="page-title">Subject Hubs</div>
-        <div class="page-subtitle">Course schedules, attendance, tasks & study resources grouped per subject</div>
+        <div class="page-subtitle">Course schedules, attendance, tasks &amp; study resources organized per subject</div>
       </div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(280px, 1fr));gap:14px">
@@ -3674,7 +3697,7 @@ function renderSingleSubjectHub(el, subj, allSubjects) {
       </div>
       <span class="type-badge">${sl.code || subj.code}</span>
     </div>
-  `).join('') : `<div style="font-size:0.82rem;color:var(--text-muted);padding:10px 0">No timetable slots set for this subject.</div>`;
+  `).join('') : `<div style="font-size:0.82rem;color:var(--text-muted);padding:10px 0">No weekly timetable slots assigned to this subject yet.</div>`;
 
   // Tasks list
   const tasksHTML = tasks.length > 0 ? tasks.map(a => {
@@ -3693,7 +3716,7 @@ function renderSingleSubjectHub(el, subj, allSubjects) {
         </div>
         <span class="due-badge ${cls}">${label}</span>
       </div>`;
-  }).join('') : `<div style="font-size:0.82rem;color:var(--text-muted);padding:10px 0">No tasks created for this subject yet.</div>`;
+  }).join('') : `<div style="font-size:0.82rem;color:var(--text-muted);padding:10px 0">No active tasks for this subject. Tap + Add Task to create one.</div>`;
 
   // Links list
   const linksHTML = links.length > 0 ? links.map(l => `
@@ -3704,12 +3727,12 @@ function renderSingleSubjectHub(el, subj, allSubjects) {
       </div>
       <a href="${l.url}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-secondary" style="font-size:0.75rem;padding:3px 8px">Open ↗</a>
     </div>
-  `).join('') : `<div style="font-size:0.82rem;color:var(--text-muted);padding:10px 0">No quick links attached to this subject yet.</div>`;
+  `).join('') : `<div style="font-size:0.82rem;color:var(--text-muted);padding:10px 0">No study links or notes saved for this subject yet.</div>`;
 
   el.innerHTML = `
     <div style="margin-bottom:16px">
       <button class="btn btn-sm btn-secondary" onclick="state.activeSubject = null; renderSubjects()" style="margin-bottom:12px;font-size:0.8rem">
-        ← Back to All Subjects
+        ← All Subjects
       </button>
 
       <div class="card" style="padding:20px;border-left:4px solid ${subj.color || 'var(--accent)'}">
@@ -3741,7 +3764,7 @@ function renderSingleSubjectHub(el, subj, allSubjects) {
             <div style="font-size:1.1rem;font-weight:700;color:var(--green);margin-top:2px">${doneTasks.length} done</div>
           </div>
           <div style="background:var(--surface-2);padding:10px 12px;border-radius:8px">
-            <div style="font-size:0.75rem;color:var(--text-muted)">Resources</div>
+            <div style="font-size:0.75rem;color:var(--text-muted)">Study Resources</div>
             <div style="font-size:1.1rem;font-weight:700;margin-top:2px">${links.length} link${links.length!==1?'s':''}</div>
           </div>
         </div>
@@ -3761,7 +3784,7 @@ function renderSingleSubjectHub(el, subj, allSubjects) {
     <!-- 1. Timetable Slots -->
     <div style="margin-bottom:20px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <div class="section-heading" style="margin-bottom:0">Weekly Schedule Slots</div>
+        <div class="section-heading" style="margin-bottom:0">Timetable Schedule</div>
         <button class="btn btn-sm btn-action" onclick="navigateTo('timetable')">Open Timetable →</button>
       </div>
       ${slotsHTML}
@@ -3770,7 +3793,7 @@ function renderSingleSubjectHub(el, subj, allSubjects) {
     <!-- 2. Tasks & Assignments -->
     <div style="margin-bottom:20px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <div class="section-heading" style="margin-bottom:0">Subject Tasks & Assignments</div>
+        <div class="section-heading" style="margin-bottom:0">Tasks &amp; Deadlines</div>
         <button class="btn btn-sm btn-primary" onclick="showAssignmentModal(null, '${subj.name}')" style="font-size:0.75rem;padding:3px 9px">+ Add Task</button>
       </div>
       ${tasksHTML}
@@ -3779,8 +3802,8 @@ function renderSingleSubjectHub(el, subj, allSubjects) {
     <!-- 3. Resources & Links -->
     <div style="margin-bottom:20px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <div class="section-heading" style="margin-bottom:0">Subject Resources & Links</div>
-        <button class="btn btn-sm btn-primary" onclick="showAddLinkModal()" style="font-size:0.75rem;padding:3px 9px">+ Add Link</button>
+        <div class="section-heading" style="margin-bottom:0">Study Links &amp; Notes</div>
+        <button class="btn btn-sm btn-primary" onclick="addLinkSubject()" style="font-size:0.75rem;padding:3px 9px">+ Add Link</button>
       </div>
       ${linksHTML}
     </div>
@@ -3876,18 +3899,25 @@ function saveTimetableEntry(oldDay, idx) {
   const newDay   = parseInt(document.getElementById('tte-day').value);
   const time     = (document.getElementById('tte-time').value || '10:00').trim();
   const end      = (document.getElementById('tte-end').value || '11:00').trim();
-  let subject  = (document.getElementById('tte-subject').value || '').trim();
+  const subjectEl = document.getElementById('tte-subject');
+  let subject  = (subjectEl ? subjectEl.value : '').trim();
   let code     = (document.getElementById('tte-code').value || '').trim();
   let room     = (document.getElementById('tte-room').value || '').trim();
   let teacher  = (document.getElementById('tte-teacher').value || '').trim();
   const type     = document.getElementById('tte-type').value || 'lecture';
   const notes    = (document.getElementById('tte-notes').value || '').trim();
 
+  if (subjectEl) subjectEl.classList.remove('error', 'shake');
+
   if (type === 'off') {
     if (!subject) subject = 'Off';
   } else {
     if (!subject) {
-      alert("Please enter a subject name.");
+      if (subjectEl) {
+        subjectEl.classList.add('error', 'shake');
+        subjectEl.focus();
+      }
+      showToast('Please enter a subject name.', 'error');
       return;
     }
     if (!code) code = 'SUB';
@@ -3918,6 +3948,7 @@ function saveTimetableEntry(oldDay, idx) {
   saveTimetable(tt);
   document.getElementById('tt-entry-modal-backdrop')?.remove();
   state.ttDay = newDay;
+  showToast('Class schedule saved ✓', 'success');
   renderTimetable();
 }
 
@@ -3929,6 +3960,7 @@ function deleteTimetableEntry(day, idx) {
     saveTimetable(tt);
   }
   document.getElementById('tt-entry-modal-backdrop')?.remove();
+  showToast('Class entry removed', 'info');
   renderTimetable();
 }
 
@@ -3951,7 +3983,7 @@ function renderAssignments() {
     { key:'today',     label:'🔥 Due Today' },
     { key:'upcoming',  label:'📅 Upcoming' },
     { key:'overdue',   label:'⚠️ Overdue' },
-    { key:'exams',     label:'🎯 Exams & Quizzes' },
+    { key:'exams',     label:'🎯 Exams & Tests' },
     { key:'submitted', label:'✓ Completed' },
   ];
 
@@ -4034,14 +4066,24 @@ function renderAssignments() {
         </div>
       </div>`;
   }).join('') : (all.length === 0 
-    ? `<div class="card" style="text-align:center;padding:40px;color:var(--text-muted);border-style:dashed">✨ No academic tasks yet! Click <strong>+ Add Task</strong> above to add assignments, quizzes, labs, or exams.</div>`
-    : `<div class="card" style="text-align:center;padding:40px;color:var(--text-muted);border-style:dashed">🔍 No tasks found matching this filter.</div>`);
+    ? `<div class="empty-state-card" style="margin-top:14px">
+        <span class="empty-state-icon">📚</span>
+        <div class="empty-state-title">No Academic Tasks Yet</div>
+        <div class="empty-state-desc">Stay ahead of submissions, lab tests, and quiz deadlines. Tap Add Task to organize coursework with ease.</div>
+        <button class="btn-primary" onclick="showAddTaskModal()" style="font-size:0.82rem;padding:7px 16px">+ Add Your First Task</button>
+      </div>`
+    : `<div class="empty-state-card" style="margin-top:14px">
+        <span class="empty-state-icon">✨</span>
+        <div class="empty-state-title">No Matching Tasks</div>
+        <div class="empty-state-desc">No academic tasks found matching the selected filter. Try switching back to All Tasks or reset your filters.</div>
+        <button class="btn-secondary" onclick="state.assignFilter='all'; state.assignTypeFilter='all'; state.assignSubjectFilter='all'; renderAssignments();" style="font-size:0.82rem;padding:6px 14px">Reset Filters</button>
+      </div>`);
 
   el.innerHTML = `
     <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start">
       <div>
-        <div class="page-title">Workload & Assignments</div>
-        <div class="page-subtitle">${pendingCount()} pending · ${all.filter(a=>a.status==='submitted').length} completed · Academic task tracking</div>
+        <div class="page-title">Tasks &amp; Workload</div>
+        <div class="page-subtitle">${pendingCount()} pending · ${all.filter(a=>a.status==='submitted').length} completed · Academic task &amp; deadline tracking</div>
       </div>
       <button class="btn-primary" onclick="showAddTaskModal()" style="display:flex;align-items:center;gap:6px;flex-shrink:0">${icons.plus()} Add Task</button>
     </div>
@@ -4169,13 +4211,34 @@ function submitAddTask(editTaskId = null) {
   const typeEl     = document.getElementById('task-type');
   const priorityEl = document.querySelector('input[name="task-priority"]:checked');
 
-  [subjectEl, titleEl, dueEl].forEach(el => el.classList.remove('error'));
+  [subjectEl, titleEl, dueEl].forEach(el => {
+    if (el) {
+      el.classList.remove('error');
+      el.classList.remove('shake');
+    }
+  });
 
   let valid = true;
-  if (!subjectEl.value)       { subjectEl.classList.add('error'); valid = false; }
-  if (!titleEl.value.trim())  { titleEl.classList.add('error');   valid = false; }
-  if (!dueEl.value)           { dueEl.classList.add('error');     valid = false; }
-  if (!valid) return;
+  let firstInvalid = null;
+
+  if (!subjectEl || !subjectEl.value) {
+    if (subjectEl) { subjectEl.classList.add('error', 'shake'); if (!firstInvalid) firstInvalid = subjectEl; }
+    valid = false;
+  }
+  if (!titleEl || !titleEl.value.trim()) {
+    if (titleEl) { titleEl.classList.add('error', 'shake'); if (!firstInvalid) firstInvalid = titleEl; }
+    valid = false;
+  }
+  if (!dueEl || !dueEl.value) {
+    if (dueEl) { dueEl.classList.add('error', 'shake'); if (!firstInvalid) firstInvalid = dueEl; }
+    valid = false;
+  }
+
+  if (!valid) {
+    if (firstInvalid) firstInvalid.focus();
+    showToast('Please provide a subject, title, and due date.', 'error');
+    return;
+  }
 
   const [subject, code] = subjectEl.value.split('|||');
   const taskType = typeEl?.value || 'assignment';
@@ -4211,6 +4274,7 @@ function submitAddTask(editTaskId = null) {
 
   saveCustomTasks();
   document.getElementById('add-task-backdrop')?.remove();
+  showToast(editTaskId ? 'Task updated ✓' : 'Task added to desk ✓', 'success');
   renderPage(state.currentPage);
   updateNavBadges();
 }
@@ -4237,9 +4301,12 @@ function renderNotices() {
         ${svg('<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>', 12)}
         ${formatDate(n.date)} ${n.important ? '· <strong style="color:var(--red)">Important</strong>' : ''}
       </div>
-      <div class="notice-preview">${n.content}</div>
-    </div>
-  `).join('') : `<div class="card" style="text-align:center;padding:40px;color:var(--text-muted);border-style:dashed">🔍 No matching notices.</div>`;
+  `).join('') : `<div class="empty-state-card" style="margin-top:14px">
+    <span class="empty-state-icon">🔍</span>
+    <div class="empty-state-title">No Announcements Found</div>
+    <div class="empty-state-desc">No campus notices match "${state.noticeSearch}". Check your keywords or clear your search to view all notices.</div>
+    <button class="btn-secondary" onclick="filterNotices(''); const el=document.getElementById('notice-search'); if(el) el.value='';" style="font-size:0.82rem;padding:6px 14px">Clear Search</button>
+  </div>`;
 
   const searchInput = document.getElementById('notice-search');
   if (searchInput && el.classList.contains('active')) {
@@ -4253,13 +4320,13 @@ function renderNotices() {
   el.innerHTML = `
     <div class="page-header">
       <div>
-        <div class="page-title">Notices</div>
-        <div class="page-subtitle">${NOTICES.filter(n=>n.important).length} important</div>
+        <div class="page-title">Notice Board</div>
+        <div class="page-subtitle">${NOTICES.filter(n=>n.important).length} pinned / important announcements</div>
       </div>
     </div>
     <div class="search-input-wrapper" style="position:relative;display:flex;align-items:center">
       <span class="s-icon">${icons.search()}</span>
-      <input type="text" placeholder="Search notices…" value="${state.noticeSearch}"
+      <input type="text" placeholder="Search notices by title, category, or keyword…" value="${state.noticeSearch}"
         oninput="filterNotices(this.value)" id="notice-search" style="flex:1">
       <button id="notice-search-clear" onclick="filterNotices('');document.getElementById('notice-search').value='';"
         style="position:absolute;right:10px;background:none;border:none;cursor:pointer;color:var(--text-muted);padding:4px;line-height:0;font-size:1rem;display:${state.noticeSearch?'block':'none'}"
@@ -4289,8 +4356,8 @@ function renderResources() {
   el.innerHTML = `
     <div class="page-header" style="margin-bottom: 16px;">
       <div>
-        <div class="page-title">Resources &amp; Insights</div>
-        <div class="page-subtitle">Personal notes, subject links &amp; daily academic summary</div>
+        <div class="page-title">Study Resources &amp; Summary</div>
+        <div class="page-subtitle">Subject quick links, course materials &amp; daily academic briefing</div>
       </div>
       ${currentTab === 'links' ? `
         <button class="btn-primary" onclick="addLinkSubject()" style="font-size:0.85rem;padding:8px 14px">+ Add Subject</button>
@@ -4303,14 +4370,14 @@ function renderResources() {
           <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
           <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
         </svg>
-        Quick Links
+        Subject Links
       </button>
       <button role="tab" aria-selected="${currentTab === 'summary'}" class="res-tab-btn ${currentTab === 'summary' ? 'active' : ''}" onclick="switchResourcesTab('summary')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="10"/>
           <line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
         </svg>
-        Daily Summary
+        Daily Briefing
       </button>
     </div>
 
@@ -4344,8 +4411,8 @@ function renderLinksContent(container) {
     container.innerHTML = `
       <div class="card" style="text-align:center;padding:40px 20px;color:var(--text-muted)">
         <div style="font-size:2.2rem;margin-bottom:12px">📚</div>
-        <div style="font-weight:700;font-size:1.05rem;color:var(--text-primary);margin-bottom:6px">No Quick Links Saved Yet</div>
-        <div style="font-size:0.85rem;margin-bottom:20px;max-width:360px;margin-left:auto;margin-right:auto">Organize your course notes, slides, GitHub repos, and drive links by subject.</div>
+        <div style="font-weight:700;font-size:1.05rem;color:var(--text-primary);margin-bottom:6px">No Study Links Saved Yet</div>
+        <div style="font-size:0.85rem;margin-bottom:20px;max-width:360px;margin-left:auto;margin-right:auto">Keep your course notes, slides, GitHub repos, and drive links organized per subject for instant access.</div>
         <button class="btn-primary" onclick="addLinkSubject()" style="font-size:0.85rem">+ Add Your First Subject</button>
       </div>
     `;
@@ -4405,6 +4472,7 @@ window.deleteLinkSubject = function(si) {
   const links = loadCustomLinks();
   links.splice(si, 1);
   saveCustomLinks(links);
+  showToast('Subject removed', 'info');
   renderLinks();
 };
 
@@ -4422,6 +4490,7 @@ window.deleteLinkResource = function(si, ri) {
   const links = loadCustomLinks();
   links[si].resources.splice(ri, 1);
   saveCustomLinks(links);
+  showToast('Resource removed', 'info');
   renderLinks();
 };
 
@@ -4439,7 +4508,7 @@ function showLinkSubjectModal(si, existing) {
       </div>
       <div class="modal-body" style="display:flex;flex-direction:column;gap:14px">
         <div>
-          <label class="form-label">Subject Name</label>
+          <label class="form-label">Subject Name <span style="color:var(--red)">*</span></label>
           <input id="lsm-name" class="form-input" value="${existing?.subject || ''}" placeholder="e.g. Data Structures" />
         </div>
         <div>
@@ -4462,10 +4531,15 @@ function showLinkSubjectModal(si, existing) {
 }
 
 window.saveLinkSubject = function(si) {
-  const name  = document.getElementById('lsm-name')?.value?.trim();
+  const nameEl = document.getElementById('lsm-name');
+  const name  = nameEl?.value?.trim();
   const code  = document.getElementById('lsm-code')?.value?.trim();
   const color = document.getElementById('lsm-color')?.value || '#6366f1';
-  if (!name) { alert('Subject name is required.'); return; }
+  if (!name) {
+    if (nameEl) { nameEl.classList.add('error', 'shake'); nameEl.focus(); }
+    showToast('Subject name is required.', 'error');
+    return;
+  }
   const links = loadCustomLinks();
   if (si === null) {
     links.push({ subject: name, code: code || name.slice(0,4).toUpperCase(), color, resources: [] });
@@ -4474,6 +4548,7 @@ window.saveLinkSubject = function(si) {
   }
   saveCustomLinks(links);
   document.getElementById('link-subject-modal-backdrop')?.remove();
+  showToast('Subject saved ✓', 'success');
   renderLinks();
 };
 
@@ -4486,16 +4561,16 @@ function showLinkResourceModal(si, ri, existing) {
   backdrop.innerHTML = `
     <div class="modal" style="max-width:400px;width:92vw">
       <div class="modal-header">
-        <span class="modal-title">${isNew ? 'Add Resource' : 'Edit Resource'}</span>
+        <span class="modal-title">${isNew ? 'Add Study Resource' : 'Edit Study Resource'}</span>
         <button class="modal-close" onclick="document.getElementById('link-resource-modal-backdrop')?.remove()">✕</button>
       </div>
       <div class="modal-body" style="display:flex;flex-direction:column;gap:14px">
         <div>
-          <label class="form-label">Label</label>
+          <label class="form-label">Label <span style="color:var(--red)">*</span></label>
           <input id="lrm-label" class="form-input" value="${existing?.label || ''}" placeholder="e.g. GFG DSA Sheet" />
         </div>
         <div>
-          <label class="form-label">URL</label>
+          <label class="form-label">URL <span style="color:var(--red)">*</span></label>
           <input id="lrm-url" class="form-input" type="url" value="${existing?.url || ''}" placeholder="https://..." />
         </div>
         <div>
@@ -4515,13 +4590,23 @@ function showLinkResourceModal(si, ri, existing) {
   `;
   backdrop.addEventListener('click', e => { if (e.target === backdrop) backdrop.remove(); });
   document.body.appendChild(backdrop);
-};
+}
 
 window.saveLinkResource = function(si, ri) {
-  const label = document.getElementById('lrm-label')?.value?.trim();
-  const url   = document.getElementById('lrm-url')?.value?.trim();
+  const labelEl = document.getElementById('lrm-label');
+  const urlEl   = document.getElementById('lrm-url');
+  const label = labelEl?.value?.trim();
+  const url   = urlEl?.value?.trim();
   const icon  = document.getElementById('lrm-icon')?.value || 'link';
-  if (!label || !url) { alert('Label and URL are required.'); return; }
+
+  [labelEl, urlEl].forEach(el => el?.classList.remove('error', 'shake'));
+
+  if (!label || !url) {
+    if (!label && labelEl) { labelEl.classList.add('error', 'shake'); labelEl.focus(); }
+    else if (!url && urlEl) { urlEl.classList.add('error', 'shake'); urlEl.focus(); }
+    showToast('Resource label and URL are required.', 'error');
+    return;
+  }
   const links = loadCustomLinks();
   if (ri === null) {
     links[si].resources.push({ label, url, icon });
@@ -4530,6 +4615,7 @@ window.saveLinkResource = function(si, ri) {
   }
   saveCustomLinks(links);
   document.getElementById('link-resource-modal-backdrop')?.remove();
+  showToast('Study resource saved ✓', 'success');
   renderLinks();
 };
 
@@ -4550,7 +4636,7 @@ function renderSummaryContent(container) {
 
     <div class="section-heading">Today's Schedule</div>
     ${classes.length === 0
-      ? '<div class="card" style="text-align:center;padding:24px;color:var(--text-muted)">🏖️ No classes today.</div>'
+      ? '<div class="card" style="text-align:center;padding:24px;color:var(--text-muted)">🏖️ No classes scheduled for today.</div>'
       : classes.map(c => {
           const isPast = currentMin >= timeToMinutes(c.end);
           return `<div class="summary-item" style="${isPast?'opacity:0.5':''}">
@@ -4573,14 +4659,14 @@ function renderSummaryContent(container) {
             <div class="summary-icon" style="background:rgba(245,158,11,0.12);color:var(--yellow)">${icons.assignments()}</div>
             <div style="flex:1;min-width:0">
               <div class="summary-text-main">${a.title}</div>
-              <div class="summary-text-sub">${a.subject} · ${a.marks > 0 ? a.marks + ' marks' : 'Custom task'}</div>
+              <div class="summary-text-sub">${a.subject} · ${a.marks > 0 ? a.marks + ' marks' : 'Academic task'}</div>
             </div>
           </div>`).join('')
-      : '<div class="card" style="text-align:center;padding:20px;color:var(--text-muted)">✅ Nothing due today!</div>'
+      : '<div class="card" style="text-align:center;padding:20px;color:var(--text-muted)">🌿 No tasks due today — all clear!</div>'
     }
 
     ${overdueItems.length ? `
-      <div class="section-heading" style="margin-top:20px;color:var(--red)">⚠ Overdue</div>
+      <div class="section-heading" style="margin-top:20px;color:var(--red)">⚠ Overdue Tasks</div>
       ${overdueItems.map(a => `
         <div class="summary-item" style="border-left:3px solid var(--red)">
           <div class="summary-icon" style="background:rgba(239,68,68,0.12);color:var(--red)">${icons.alert()}</div>
@@ -4590,7 +4676,7 @@ function renderSummaryContent(container) {
           </div>
         </div>`).join('')}` : ''}
 
-    <div class="section-heading" style="margin-top:20px">Important Notices</div>
+    <div class="section-heading" style="margin-top:20px">Key Notices</div>
     ${importantNotices.length
       ? importantNotices.map(n => `
           <div class="summary-item" onclick="showNotice('${n.id}')" style="cursor:pointer">
@@ -4600,7 +4686,7 @@ function renderSummaryContent(container) {
               <div class="summary-text-sub">${formatDate(n.date)} · ${n.category}</div>
             </div>
           </div>`).join('')
-      : '<div class="card" style="text-align:center;padding:20px;color:var(--text-muted)">No important notices.</div>'
+      : '<div class="card" style="text-align:center;padding:20px;color:var(--text-muted)">No urgent notices today.</div>'
     }
 
     <div class="section-heading" style="margin-top:20px">Quick Stats</div>
@@ -4619,7 +4705,7 @@ function renderSummaryContent(container) {
       </div>
       <div class="stat-card">
         <div class="stat-value" style="color:var(--green)">${allTasks().filter(a => a.status === 'submitted').length}</div>
-        <div class="stat-label">Submitted</div>
+        <div class="stat-label">Completed</div>
       </div>
     </div>
   `;
@@ -4637,18 +4723,18 @@ function renderSettings() {
   el.innerHTML = `
     <div class="page-header">
       <div>
-        <div class="page-title">Settings</div>
-        <div class="page-subtitle">Your profile & app preferences — saved locally in your browser</div>
+        <div class="page-title">Desk Settings</div>
+        <div class="page-subtitle">Your student profile, notification preferences &amp; local workspace settings</div>
       </div>
     </div>
 
-    <div class="section-heading">${icons.user()} Account & Cloud Sync</div>
+    <div class="section-heading">${icons.user()} Account &amp; Cloud Sync</div>
     <div class="card" style="padding:20px;margin-bottom:16px">
-      <div style="display:flex;align-items:center;justify-space-between;gap:12px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
         <div>
-          <div style="font-weight:600;font-size:0.95rem">${currentUser ? (currentUser.displayName || currentUser.email || 'Cloud User') : 'Local Storage Mode'}</div>
+          <div style="font-weight:600;font-size:0.95rem">${currentUser ? (currentUser.displayName || currentUser.email || 'Cloud User') : 'Local Desk Mode'}</div>
           <div style="font-size:0.8rem;color:var(--text-muted);margin-top:2px">
-            ${currentUser ? `Cross-device sync active · UID: ${currentUser.uid.slice(0, 8)}…` : 'Sign in with Google to sync tasks & profile across phone and laptop.'}
+            ${currentUser ? `Cross-device sync active · Signed in via Google` : 'Your desk data stays in your browser storage. Sign in with Google to sync seamlessly across devices.'}
           </div>
         </div>
         <div>
@@ -4660,8 +4746,9 @@ function renderSettings() {
       </div>
     </div>
 
-    <div class="section-heading">${icons.user()} Profile</div>
+    <div class="section-heading">${icons.user()} Student Profile</div>
     <div class="card" style="padding:20px;margin-bottom:16px">
+      <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:14px">Used to personalize your dashboard greeting, timetable headers, and course schedule.</div>
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">Full Name</label>
@@ -4678,43 +4765,44 @@ function renderSettings() {
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">Branch</label>
-          <input type="text" class="form-input" id="s-branch" value="${(p.branch || '').replace(/"/g, '&quot;')}" placeholder="Branch (e.g. AI & Data Science)">
+          <label class="form-label">Branch / Department</label>
+          <input type="text" class="form-input" id="s-branch" value="${(p.branch || '').replace(/"/g, '&quot;')}" placeholder="Branch (e.g. AI &amp; Data Science)">
         </div>
         <div class="form-group">
-          <label class="form-label">Year & Semester</label>
-          <input type="text" class="form-input" id="s-year" value="${(p.year || '').replace(/"/g, '&quot;')}" placeholder="Year & semester (e.g. 2nd Year)">
+          <label class="form-label">Year &amp; Semester</label>
+          <input type="text" class="form-input" id="s-year" value="${(p.year || '').replace(/"/g, '&quot;')}" placeholder="Year &amp; semester (e.g. 2nd Year)">
         </div>
       </div>
     </div>
 
-    <div class="section-heading">${icons.clock()} Academic</div>
+    <div class="section-heading">${icons.clock()} Academic Countdown</div>
     <div class="card" style="padding:20px;margin-bottom:20px">
       <div class="form-group" style="margin-bottom:0">
         <label class="form-label">End-Semester Exam Date</label>
         <input type="date" class="form-input" id="s-exam-date" value="${p.examDate}" style="max-width:240px">
         <div style="font-size:0.78rem;color:var(--text-muted);margin-top:6px">
-          Shows a live countdown on your dashboard once set.
+          Shows a calm daily countdown on your dashboard once set.
         </div>
       </div>
     </div>
 
-    <div class="section-heading">${icons.layers()} Visual Theme</div>
+    <div class="section-heading">${icons.layers()} Appearance</div>
     <div class="card" style="padding:20px;margin-bottom:20px">
       <div class="form-group" style="margin-bottom:0">
-        <label class="form-label" style="margin-bottom:12px">Select Theme</label>
-        <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(150px, 1fr));gap:10px">
+        <label class="form-label" style="margin-bottom:6px">Choose a palette</label>
+        <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:12px">Five distinct themes. Each saves automatically and restores on your next visit.</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(148px, 1fr));gap:10px">
           <button class="filter-chip ${['paper','soft-neutral','light'].includes(document.documentElement?.getAttribute('data-theme') || 'paper')?'active':''}" onclick="setTheme('paper')" style="justify-content:flex-start">
             <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#147980;margin-right:6px"></span>
-            📄 Paper (Default)
+            📄 Paper
           </button>
           <button class="filter-chip ${['cloud','mist-blue','glass'].includes(document.documentElement?.getAttribute('data-theme'))?'active':''}" onclick="setTheme('cloud')" style="justify-content:flex-start">
             <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#1e3a8a;margin-right:6px"></span>
-            ☁️ Cloud (Navy)
+            ☁️ Cloud
           </button>
-          <button class="filter-chip ${['stone','sandstone','emerald'].includes(document.documentElement?.getAttribute('data-theme'))?'active':''}" onclick="setTheme('stone')" style="justify-content:flex-start">
+          <button class="filter-chip ${['stone','sandstone','emerald','warm-study','espresso-paper'].includes(document.documentElement?.getAttribute('data-theme'))?'active':''}" onclick="setTheme('stone')" style="justify-content:flex-start">
             <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#2c6e63;margin-right:6px"></span>
-            🪨 Stone (Mineral)
+            🪨 Stone
           </button>
           <button class="filter-chip ${['quiet-dark','dark','cocoa-night','sunset'].includes(document.documentElement?.getAttribute('data-theme'))?'active':''}" onclick="setTheme('quiet-dark')" style="justify-content:flex-start">
             <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#52719a;margin-right:6px"></span>
@@ -4724,15 +4812,11 @@ function renderSettings() {
             <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#d97706;margin-right:6px"></span>
             ☕️ Café Night
           </button>
-          <button class="filter-chip ${['warm-study','espresso-paper'].includes(document.documentElement?.getAttribute('data-theme'))?'active':''}" onclick="setTheme('warm-study')" style="justify-content:flex-start">
-            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#3b6b5e;margin-right:6px"></span>
-            ☕️ Warm Study
-          </button>
         </div>
       </div>
     </div>
 
-    <div class="section-heading">${icons.bell()} Notifications & Reminders</div>
+    <div class="section-heading">${icons.bell()} Notifications &amp; Study Alerts</div>
     <div class="card" style="padding:20px;margin-bottom:20px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;padding-bottom:14px;border-bottom:1px solid var(--border)">
         <div>
@@ -4826,8 +4910,8 @@ function renderSettings() {
 
         <div style="display:flex;align-items:center;justify-content:space-between;font-size:0.88rem;gap:12px;flex-wrap:wrap">
           <div>
-            <span style="font-weight:500;color:var(--text-primary)">Daily Overview Summary</span>
-            <div style="font-size:0.75rem;color:var(--text-muted)">Daily briefing time</div>
+            <span style="font-weight:500;color:var(--text-primary)">Daily Briefing Time</span>
+            <div style="font-size:0.75rem;color:var(--text-muted)">Preferred morning notification time</div>
           </div>
           <input type="time" class="form-input" id="np-summary-time" value="${nPrefs.dailySummaryTime || '08:00'}" style="width:130px;padding:4px 8px;font-size:0.85rem">
         </div>
@@ -4843,19 +4927,18 @@ function renderSettings() {
       </span>
     </div>
 
-    <div class="section-heading">${icons.trash()} Data Management</div>
+    <div class="section-heading">${icons.trash()} Data &amp; Backup</div>
     <div class="card" style="padding:18px">
       <div style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:14px;line-height:1.6">
-        All your data (profile, tasks, assignment statuses) is stored only in this browser.
-        Export a backup before clearing anything.
+        Your desk data (profile, custom schedule, tasks, attendance records) stays private and stored locally in this browser.
+        You can export a portable JSON backup anytime.
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn-secondary" onclick="exportData()" style="display:flex;align-items:center;gap:6px">
-          Export Backup (.json)
+          Export Desk Backup (.json)
         </button>
         <button class="btn-secondary" onclick="document.getElementById('import-file-input').click()" style="display:flex;align-items:center;gap:6px">
           Restore Backup (.json)
-        </button>
         <input type="file" id="import-file-input" accept=".json" style="display:none" onchange="importData(event)">
         <button class="btn-secondary" onclick="confirmClearTasks()"
           style="color:var(--red);border-color:rgba(239,68,68,0.35)">
@@ -4914,7 +4997,7 @@ function exportData() {
     customTasks:        state.customTasks,
     assignmentStatuses: safeGetStorage(KEY_ASSIGNMENTS, {}),
     notificationPrefs:  loadNotifPrefs(),
-    theme:              localStorage.getItem(KEY_THEME) || 'dark',
+    theme:              localStorage.getItem(KEY_THEME) || 'paper',
     exportedAt:         new Date().toISOString(),
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -4923,6 +5006,7 @@ function exportData() {
   a.href = url; a.download = `clarity-desk-backup-${todayStr()}.json`;
   a.click();
   URL.revokeObjectURL(url);
+  showToast('Backup file downloaded ✓', 'success');
 }
 
 function importData(event) {
@@ -4953,12 +5037,12 @@ function importData(event) {
       }
 
       updateTopbarProfile();
-  setupFABDrag();
+      setupFABDrag();
       updateNavBadges();
-      alert('Backup restored successfully!');
+      showToast('Desk data restored successfully! ✨', 'success');
       renderSettings();
     } catch (err) {
-      alert('Error parsing backup file: ' + err.message);
+      showToast('Error parsing backup: ' + err.message, 'error');
     }
   };
   reader.readAsText(file);
@@ -5000,7 +5084,507 @@ function showNotice(id) {
   document.addEventListener('keydown', escHandler);
 }
 
+
+// ── Desk Assistant ────────────────────────────────────────────
+// Rules-based student data assistant. No paid API. No fake LLM.
+// Every answer comes from live app state.
+
+const ClarityAssistant = (() => {
+
+  // ── Helpers ───────────────────────────────────────────────────
+  function todayISO() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+
+  function nDaysFromNow(n) {
+    const d = new Date();
+    d.setDate(d.getDate() + n);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+
+  function fmtDate(iso) {
+    if (!iso) return '—';
+    const [y, m, d] = iso.split('-').map(Number);
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return `${d} ${months[m-1]}`;
+  }
+
+  const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const DAY_ABBR  = ['sun','mon','tue','wed','thu','fri','sat'];
+
+  function formatTime(t) {
+    if (!t) return '—';
+    const [h, m] = t.split(':').map(Number);
+    const suffix = h >= 12 ? 'PM' : 'AM';
+    const hour = ((h - 1 + 12) % 12) + 1;
+    return `${hour}:${String(m).padStart(2,'0')} ${suffix}`;
+  }
+
+  // ── Intent Matching ───────────────────────────────────────────
+  const INTENTS = [
+    {
+      id: 'greeting',
+      test: /\b(hi|hello|hey|good\s*(morning|afternoon|evening)|what'?s up|sup)\b/i,
+    },
+    {
+      id: 'help',
+      test: /\b(help|what can you|commands|what do you know|how to use|capabilities)\b/i,
+    },
+    {
+      id: 'today_schedule',
+      test: /\b(today|what do i have|schedule today|classes today|my day|what'?s on|plan for today)\b/i,
+    },
+    {
+      id: 'next_class',
+      test: /\b(next class|next lecture|upcoming class|which class|next period|soon start|starting next)\b/i,
+    },
+    {
+      id: 'classes_left',
+      test: /\b(classes left|remaining (class|today)|how many more|left today)\b/i,
+    },
+    {
+      id: 'day_schedule',
+      test: /\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun)\b/i,
+    },
+    {
+      id: 'tasks_overdue',
+      test: /\b(overdue|late|missed deadline|past due|behind|not submitted)\b/i,
+    },
+    {
+      id: 'tasks_today',
+      test: /\b(due today|tasks? today|deadline today|submit today|assignment today)\b/i,
+    },
+    {
+      id: 'tasks_week',
+      test: /\b(due (this|next) week|upcoming (task|deadline|assignment)|this week|due soon|week'?s tasks?)\b/i,
+    },
+    {
+      id: 'tasks_all',
+      test: /\b(all (task|assignment)|pending tasks?|my tasks?|task list|what (task|assignment))\b/i,
+    },
+    {
+      id: 'attendance_skip',
+      test: /\b(can i (skip|bunk|miss)|safe to (skip|bunk|miss)|how many (can i|more) (skip|miss|bunk)|bunking)\b/i,
+    },
+    {
+      id: 'attendance',
+      test: /\b(attendance|percentage|pct|how many class(es)? (attended|missed)|my record|att(end)?)\b/i,
+    },
+    {
+      id: 'notices',
+      test: /\b(notice|announcement|important|update|bulletin|news|notification)\b/i,
+    },
+    {
+      id: 'profile',
+      test: /\b(who am i|my profile|my name|my branch|my year|my roll|my college)\b/i,
+    },
+  ];
+
+  function matchIntent(q) {
+    const lower = q.toLowerCase().trim();
+    // Priority order — more specific first
+    for (const intent of INTENTS) {
+      if (intent.test.test(lower)) return intent.id;
+    }
+    return 'unknown';
+  }
+
+  // ── Data Readers ──────────────────────────────────────────────
+
+  function getAttendanceSummary() {
+    const data = safeGetStorage(KEY_ATTENDANCE, {}) || {};
+    let attended = 0, skipped = 0;
+    Object.values(data).forEach(dayObj => {
+      if (dayObj && typeof dayObj === 'object') {
+        Object.values(dayObj).forEach(st => {
+          if (st === 'attended') attended++;
+          else if (st === 'skipped') skipped++;
+        });
+      }
+    });
+    return { attended, skipped, total: attended + skipped };
+  }
+
+  function getTodayClasses() {
+    const tt = loadTimetable();
+    const day = new Date().getDay();
+    return (tt[day] || []).filter(c => !isBreakEntry(c));
+  }
+
+  function getDayClasses(dayNum) {
+    const tt = loadTimetable();
+    return (tt[dayNum] || []).filter(c => !isBreakEntry(c));
+  }
+
+  function getNextClass() {
+    const tt = loadTimetable();
+    const now = currentTimeMinutes();
+    const day = new Date().getDay();
+    const classes = (tt[day] || []).filter(c => !isBreakEntry(c));
+    return classes.find(c => timeToMinutes(c.time) > now) || null;
+  }
+
+  function getRemainingTodayClasses() {
+    const tt = loadTimetable();
+    const now = currentTimeMinutes();
+    const day = new Date().getDay();
+    return (tt[day] || []).filter(c => !isBreakEntry(c) && timeToMinutes(c.end || c.time) > now);
+  }
+
+  // ── Response Builders ─────────────────────────────────────────
+
+  function buildGreeting() {
+    const profile = loadProfile();
+    const name = profile.name || '';
+    const hour = new Date().getHours();
+    const greet = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+    const nameStr = name ? `, ${name.split(' ')[0]}` : '';
+    const todayClasses = getTodayClasses();
+    const pending = allTasks().filter(t => t.status === 'pending').length;
+    const dayName = DAY_NAMES[new Date().getDay()];
+
+    let line2 = '';
+    if (todayClasses.length > 0) {
+      line2 = `You have <strong>${todayClasses.length} class${todayClasses.length !== 1 ? 'es' : ''}</strong> today (${dayName})`;
+    } else {
+      line2 = `No classes today (${dayName}).`;
+    }
+    if (pending > 0) {
+      line2 += ` and <strong>${pending} pending task${pending !== 1 ? 's' : ''}</strong>.`;
+    } else {
+      line2 += ` and no pending tasks.`;
+    }
+
+    return `${greet}${nameStr}! ${line2}`;
+  }
+
+  function buildHelp() {
+    return `I can answer questions about your real desk data. Try:<ul class="cd-list">
+      <li><span class="cd-item-label">Schedule</span><span class="cd-item-meta">"What do I have today?" · "Show Friday's timetable" · "What's my next class?"</span></li>
+      <li><span class="cd-item-label">Tasks</span><span class="cd-item-meta">"Which tasks are overdue?" · "What's due this week?" · "Show all pending tasks"</span></li>
+      <li><span class="cd-item-label">Attendance</span><span class="cd-item-meta">"What is my attendance?" · "Can I skip a class?"</span></li>
+      <li><span class="cd-item-label">Notices</span><span class="cd-item-meta">"Any important notices?"</span></li>
+    </ul>`;
+  }
+
+  function buildTodaySchedule() {
+    const classes = getTodayClasses();
+    const dayName = DAY_NAMES[new Date().getDay()];
+
+    if (new Date().getDay() === 0) {
+      return `Today is Sunday — no classes. A good day to catch up on pending tasks.`;
+    }
+    if (classes.length === 0) {
+      return `No classes scheduled for today (${dayName}). Enjoy the free time.`;
+    }
+
+    const items = classes.map(c => {
+      const timeStr = `${formatTime(c.time)} – ${formatTime(c.end)}`;
+      const meta = [c.room !== '—' ? c.room : null, c.teacher !== '—' ? c.teacher : null].filter(Boolean).join(' · ');
+      return `<li><span class="cd-item-label">${escHtml(c.subject)}</span><span class="cd-item-meta">${timeStr}${meta ? ' · ' + escHtml(meta) : ''}</span></li>`;
+    }).join('');
+
+    return `<strong>${dayName}</strong> — ${classes.length} class${classes.length !== 1 ? 'es' : ''}:<ul class="cd-list">${items}</ul>`;
+  }
+
+  function buildNextClass() {
+    const next = getNextClass();
+    if (!next) {
+      const remaining = getRemainingTodayClasses();
+      if (remaining.length === 0) return `No more classes today. You're done for the day.`;
+      return `No upcoming class found. Check your timetable.`;
+    }
+    const timeStr = `${formatTime(next.time)} – ${formatTime(next.end)}`;
+    const meta = [next.room !== '—' ? next.room : null, next.teacher !== '—' ? next.teacher : null].filter(Boolean).join(' · ');
+    return `Next up: <strong>${escHtml(next.subject)}</strong> at <strong>${timeStr}</strong>${meta ? ' · ' + escHtml(meta) : ''}.`;
+  }
+
+  function buildClassesLeft() {
+    const remaining = getRemainingTodayClasses();
+    if (remaining.length === 0) {
+      return `No more classes left today. You're done!`;
+    }
+    const items = remaining.map(c =>
+      `<li><span class="cd-item-label">${escHtml(c.subject)}</span><span class="cd-item-meta">${formatTime(c.time)} – ${formatTime(c.end)}</span></li>`
+    ).join('');
+    return `<strong>${remaining.length} class${remaining.length !== 1 ? 'es' : ''}</strong> remaining today:<ul class="cd-list">${items}</ul>`;
+  }
+
+  function buildDaySchedule(q) {
+    const lower = q.toLowerCase();
+    let dayNum = -1;
+    for (let i = 0; i < DAY_ABBR.length; i++) {
+      if (lower.includes(DAY_ABBR[i]) || lower.includes(DAY_NAMES[i].toLowerCase())) {
+        dayNum = i;
+        break;
+      }
+    }
+    if (dayNum < 0) return buildTodaySchedule();
+
+    const classes = getDayClasses(dayNum);
+    const dayName = DAY_NAMES[dayNum];
+
+    if (dayNum === 0) return `No classes on Sundays.`;
+    if (classes.length === 0) return `No classes scheduled on ${dayName}.`;
+
+    const items = classes.map(c => {
+      const timeStr = `${formatTime(c.time)} – ${formatTime(c.end)}`;
+      return `<li><span class="cd-item-label">${escHtml(c.subject)}</span><span class="cd-item-meta">${timeStr}</span></li>`;
+    }).join('');
+
+    return `<strong>${dayName}</strong> — ${classes.length} class${classes.length !== 1 ? 'es' : ''}:<ul class="cd-list">${items}</ul>`;
+  }
+
+  function buildTasksOverdue() {
+    const today = todayISO();
+    const overdue = allTasks().filter(t => t.status === 'pending' && t.dueDate < today);
+    if (overdue.length === 0) return `No overdue tasks. You're on top of things.`;
+
+    const items = overdue.map(t =>
+      `<li><span class="cd-tag cd-tag-overdue">Overdue</span><span class="cd-item-label">${escHtml(t.title)}</span><span class="cd-item-meta">${escHtml(t.subject)} · Due ${fmtDate(t.dueDate)}</span></li>`
+    ).join('');
+    return `<strong>${overdue.length} overdue task${overdue.length !== 1 ? 's' : ''}:</strong><ul class="cd-list">${items}</ul>`;
+  }
+
+  function buildTasksToday() {
+    const today = todayISO();
+    const due = allTasks().filter(t => t.status === 'pending' && t.dueDate === today);
+    if (due.length === 0) return `Nothing due today. Good.`;
+    const items = due.map(t =>
+      `<li><span class="cd-tag cd-tag-today">Due Today</span><span class="cd-item-label">${escHtml(t.title)}</span><span class="cd-item-meta">${escHtml(t.subject)}</span></li>`
+    ).join('');
+    return `<strong>${due.length} task${due.length !== 1 ? 's' : ''} due today:</strong><ul class="cd-list">${items}</ul>`;
+  }
+
+  function buildTasksWeek() {
+    const today = todayISO();
+    const weekEnd = nDaysFromNow(7);
+    const upcoming = allTasks().filter(t => t.status === 'pending' && t.dueDate >= today && t.dueDate <= weekEnd);
+    if (upcoming.length === 0) return `Nothing due in the next 7 days.`;
+    const items = upcoming.sort((a, b) => a.dueDate.localeCompare(b.dueDate)).map(t => {
+      const isToday = t.dueDate === today;
+      const tag = isToday ? '<span class="cd-tag cd-tag-today">Today</span>' : '';
+      return `<li>${tag}<span class="cd-item-label">${escHtml(t.title)}</span><span class="cd-item-meta">${escHtml(t.subject)} · Due ${fmtDate(t.dueDate)}</span></li>`;
+    }).join('');
+    return `<strong>${upcoming.length} task${upcoming.length !== 1 ? 's' : ''} in the next 7 days:</strong><ul class="cd-list">${items}</ul>`;
+  }
+
+  function buildTasksAll() {
+    const pending = allTasks().filter(t => t.status === 'pending');
+    if (pending.length === 0) return `No pending tasks. Your desk is clear.`;
+    const today = todayISO();
+    const sorted = [...pending].sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+    const items = sorted.map(t => {
+      const isOverdue = t.dueDate < today;
+      const tag = isOverdue ? '<span class="cd-tag cd-tag-overdue">Overdue</span>' : '';
+      return `<li>${tag}<span class="cd-item-label">${escHtml(t.title)}</span><span class="cd-item-meta">${escHtml(t.subject)} · ${fmtDate(t.dueDate)}</span></li>`;
+    }).join('');
+    return `<strong>${pending.length} pending task${pending.length !== 1 ? 's' : ''}:</strong><ul class="cd-list">${items}</ul>`;
+  }
+
+  function buildAttendance() {
+    const { attended, skipped, total } = getAttendanceSummary();
+    if (total === 0) {
+      return `No attendance recorded yet. Mark classes as Attended or Skipped in the Timetable to start tracking.`;
+    }
+    const pct = Math.round((attended / total) * 100);
+    const isSafe = pct >= 75;
+    const tag = isSafe
+      ? '<span class="cd-tag cd-tag-safe">Safe Zone</span>'
+      : '<span class="cd-tag cd-tag-risk">Risk Zone</span>';
+    return `${tag}<strong>${pct}% attendance</strong> — ${attended} attended, ${skipped} skipped (${total} total marked).<br><br>75% is the general target. ${isSafe ? 'You are currently above target.' : 'You are below target.'}`;
+  }
+
+  function buildAttendanceSkip() {
+    const { attended, skipped, total } = getAttendanceSummary();
+    const guidance = calculateSmartAttendanceGuidance(attended, skipped, 75);
+    if (total === 0) return `No attendance data yet. Start marking classes first.`;
+    // Strip HTML from guidance message for cleaner display
+    const cleanMsg = guidance.message.replace(/<\/?strong>/g, '');
+    const tag = guidance.isSafe
+      ? '<span class="cd-tag cd-tag-safe">Safe Zone</span>'
+      : '<span class="cd-tag cd-tag-risk">Risk Zone</span>';
+    return `${tag}${cleanMsg}`;
+  }
+
+  function buildNotices() {
+    const importantNotices = NOTICES.filter(n => n.important);
+    const allNotices = NOTICES;
+
+    if (allNotices.length === 0) return `No notices posted yet.`;
+
+    const items = allNotices.slice(0, 5).map(n => {
+      const tag = n.important ? '<span class="cd-tag cd-tag-notice">Important</span>' : '';
+      return `<li>${tag}<span class="cd-item-label">${escHtml(n.title)}</span><span class="cd-item-meta">${n.category} · ${fmtDate(n.date)}</span></li>`;
+    }).join('');
+
+    const header = importantNotices.length > 0
+      ? `${importantNotices.length} important notice${importantNotices.length !== 1 ? 's' : ''}:`
+      : `${allNotices.length} notice${allNotices.length !== 1 ? 's' : ''} posted:`;
+
+    return `<strong>${header}</strong><ul class="cd-list">${items}</ul>`;
+  }
+
+  function buildProfile() {
+    const p = loadProfile();
+    if (!p.name) return `Your profile isn't set up yet. Go to Settings to add your name, branch, and year.`;
+    const lines = [
+      p.name    ? `<li><span class="cd-item-label">Name</span><span class="cd-item-meta">${escHtml(p.name)}</span></li>` : '',
+      p.branch  ? `<li><span class="cd-item-label">Branch</span><span class="cd-item-meta">${escHtml(p.branch)}</span></li>` : '',
+      p.year    ? `<li><span class="cd-item-label">Year</span><span class="cd-item-meta">${escHtml(p.year)}</span></li>` : '',
+      p.college ? `<li><span class="cd-item-label">College</span><span class="cd-item-meta">${escHtml(p.college)}</span></li>` : '',
+      p.rollNo  ? `<li><span class="cd-item-label">Roll No.</span><span class="cd-item-meta">${escHtml(p.rollNo)}</span></li>` : '',
+    ].filter(Boolean).join('');
+    return `<ul class="cd-list">${lines}</ul>`;
+  }
+
+  function buildUnknown() {
+    return `I didn't quite get that. I can answer questions about your schedule, tasks, attendance, and notices. Type <strong>help</strong> to see what I understand.`;
+  }
+
+  function escHtml(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ── Main Respond ──────────────────────────────────────────────
+  function respond(query) {
+    // For 'day_schedule', check it's not actually a 'today' query first
+    let intent = matchIntent(query);
+
+    // Refinement: if 'today' in query, prefer today_schedule over day_schedule
+    if (intent === 'day_schedule' && /\btoday\b/i.test(query)) intent = 'today_schedule';
+
+    switch (intent) {
+      case 'greeting':      return buildGreeting();
+      case 'help':          return buildHelp();
+      case 'today_schedule': return buildTodaySchedule();
+      case 'next_class':    return buildNextClass();
+      case 'classes_left':  return buildClassesLeft();
+      case 'day_schedule':  return buildDaySchedule(query);
+      case 'tasks_overdue': return buildTasksOverdue();
+      case 'tasks_today':   return buildTasksToday();
+      case 'tasks_week':    return buildTasksWeek();
+      case 'tasks_all':     return buildTasksAll();
+      case 'attendance':    return buildAttendance();
+      case 'attendance_skip': return buildAttendanceSkip();
+      case 'notices':       return buildNotices();
+      case 'profile':       return buildProfile();
+      default:              return buildUnknown();
+    }
+  }
+
+  return { respond };
+})();
+
+// ── Assistant Panel UI ────────────────────────────────────────
+
+let _assistantOpen = false;
+
+function openAssistant() {
+  _assistantOpen = true;
+  const panel   = document.getElementById('cd-assistant-panel');
+  const overlay = document.getElementById('cd-assistant-overlay');
+  const btn     = document.getElementById('assistant-toggle-btn');
+  if (!panel) return;
+
+  panel.classList.add('open');
+  panel.setAttribute('aria-hidden', 'false');
+  overlay.classList.add('open');
+  btn?.setAttribute('aria-expanded', 'true');
+
+  // Show welcome if thread is empty
+  const thread = document.getElementById('cd-chat-thread');
+  if (thread && thread.children.length === 0) {
+    thread.innerHTML = `
+      <div class="cd-welcome">
+        <div class="cd-welcome-mark">
+          <svg width="20" height="20" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+            <circle cx="16" cy="12" r="3.6" fill="currentColor"/>
+            <line x1="16" y1="15.8" x2="16" y2="20.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity="0.7"/>
+            <line x1="6.5" y1="21.5" x2="25.5" y2="21.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <p><strong>Desk Assistant</strong>Ask about your schedule, tasks, or attendance. I read from your actual data — no guesses.</p>
+      </div>`;
+  }
+
+  // Focus input after animation
+  setTimeout(() => document.getElementById('cd-input')?.focus(), 300);
+}
+
+function closeAssistant() {
+  _assistantOpen = false;
+  const panel   = document.getElementById('cd-assistant-panel');
+  const overlay = document.getElementById('cd-assistant-overlay');
+  const btn     = document.getElementById('assistant-toggle-btn');
+  if (!panel) return;
+  panel.classList.remove('open');
+  panel.setAttribute('aria-hidden', 'true');
+  overlay.classList.remove('open');
+  btn?.setAttribute('aria-expanded', 'false');
+}
+
+function toggleAssistant() {
+  _assistantOpen ? closeAssistant() : openAssistant();
+}
+
+function sendAssistantMessage(presetText) {
+  const input = document.getElementById('cd-input');
+  const q = (presetText || (input ? input.value : '')).trim();
+  if (!q) return;
+  if (input) input.value = '';
+
+  const thread = document.getElementById('cd-chat-thread');
+  if (!thread) return;
+
+  // Clear welcome screen on first real message
+  const welcome = thread.querySelector('.cd-welcome');
+  if (welcome) welcome.remove();
+
+  // Render user bubble
+  const userMsg = document.createElement('div');
+  userMsg.className = 'cd-msg cd-msg-user';
+  userMsg.innerHTML = `<div class="cd-bubble">${escHtml_cd(q)}</div>`;
+  thread.appendChild(userMsg);
+
+  // Typing indicator
+  const typingEl = document.createElement('div');
+  typingEl.className = 'cd-msg cd-msg-bot';
+  typingEl.innerHTML = `<div class="cd-typing"><span></span><span></span><span></span></div>`;
+  thread.appendChild(typingEl);
+  thread.scrollTop = thread.scrollHeight;
+
+  // Respond after brief delay (feels natural, not instant)
+  setTimeout(() => {
+    typingEl.remove();
+    const response = ClarityAssistant.respond(q);
+
+    const botMsg = document.createElement('div');
+    botMsg.className = 'cd-msg cd-msg-bot';
+    botMsg.innerHTML = `<div class="cd-bubble">${response}</div>`;
+    thread.appendChild(botMsg);
+    thread.scrollTop = thread.scrollHeight;
+  }, 420);
+}
+
+function escHtml_cd(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// Keyboard shortcut: Ctrl+/ to toggle assistant
+document.addEventListener('keydown', (e) => {
+  if (e.ctrlKey && e.key === '/') {
+    e.preventDefault();
+    toggleAssistant();
+  }
+  if (e.key === 'Escape' && _assistantOpen) {
+    closeAssistant();
+  }
+});
+
 // ── Global Handlers ───────────────────────────────────────────
+
 window.navigateTo       = navigate;
 window.setTTDay         = (d) => { state.ttDay = d; renderTimetable(); };
 window.setAssignFilter  = (f) => { state.assignFilter = f; renderAssignments(); };
@@ -5027,12 +5611,25 @@ window.saveLinkResource        = saveLinkResource;
 window.switchResourcesTab     = switchResourcesTab;
 window.renderResources        = renderResources;
 
+// Desk Assistant
+window.toggleAssistant       = toggleAssistant;
+window.openAssistant         = openAssistant;
+window.closeAssistant        = closeAssistant;
+window.sendAssistantMessage  = sendAssistantMessage;
+
 window.toggleAssignment = (id) => {
   // Custom task
   const ct = state.customTasks.find(x => x.id === id);
   if (ct) {
-    ct.status = ct.status === 'submitted' ? 'pending' : 'submitted';
+    const isNowDone = ct.status !== 'submitted';
+    ct.status = isNowDone ? 'submitted' : 'pending';
     saveCustomTasks();
+    if (isNowDone) {
+      triggerConfetti();
+      showToast('Task marked as completed! 🎯', 'success');
+    } else {
+      showToast('Task moved back to pending', 'info');
+    }
     renderPage(state.currentPage);
     updateNavBadges();
     return;
@@ -5040,8 +5637,15 @@ window.toggleAssignment = (id) => {
   // Data.js assignment
   const a = state.assignments.find(x => x.id === id);
   if (!a) return;
-  a.status = a.status === 'submitted' ? 'pending' : 'submitted';
+  const isNowDone = a.status !== 'submitted';
+  a.status = isNowDone ? 'submitted' : 'pending';
   saveAssignments();
+  if (isNowDone) {
+    triggerConfetti();
+    showToast('Task marked as completed! 🎯', 'success');
+  } else {
+    showToast('Task moved back to pending', 'info');
+  }
   renderPage(state.currentPage);
   updateNavBadges();
 };
@@ -5050,6 +5654,7 @@ window.deleteCustomTask = (id) => {
   if (!confirm('Delete this task?')) return;
   state.customTasks = state.customTasks.filter(t => t.id !== id);
   saveCustomTasks();
+  showToast('Task removed from desk', 'info');
   renderPage(state.currentPage);
   updateNavBadges();
 };
@@ -5128,6 +5733,16 @@ function init() {
       console.warn('ServiceWorker registration skipped or failed:', err);
     });
   }
+
+  // Network connectivity status listeners
+  window.addEventListener('online', () => {
+    showToast('Back online — cloud sync active ✓', 'success');
+    updateSyncUI();
+  });
+  window.addEventListener('offline', () => {
+    showToast('Offline mode — changes saved locally to your device', 'info');
+    updateSyncUI('offline');
+  });
 }
 
 document.addEventListener('DOMContentLoaded', init);

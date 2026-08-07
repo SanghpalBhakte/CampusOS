@@ -1,31 +1,32 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none" role="img" aria-label="Clarity Desk">
   <title>Clarity Desk</title>
 
-  <!-- Teal rounded-square background -->
+  <!-- Background: teal rounded square -->
   <rect width="32" height="32" rx="7" fill="#147980"/>
 
   <!--
-    Mark layout at 32px:
-    strokeW ≈ 3.0px, arcR ≈ 5.0px
-    C center  ≈ (11, 16)
-    D bar     ≈ x 17.5..20.5
-    D arc cx  ≈ 20.5
+    Brand mark concept: "Point of Clarity"
+    A single focused dot above a calm desk horizon line.
+    Reads clearly at 16px, 32px, 192px, and 512px.
+    Simple enough to feel premium, geometric enough to feel purposeful.
+
+    At 32×32 grid:
+      Desk line: x1=7, y1=21, x2=25, y2=21  (lower third, full width)
+      Dot:       cx=16, cy=12, r=3.8         (centered, upper portion)
+      Stem:      x1=16, y1=15.8, x2=16, y2=21 (connecting dot to line)
   -->
 
-  <!-- C: open arc, gap on right ~62deg each side -->
-  <path
-    d="M 14.0,11.2 A 5,5 0 1,0 14.0,20.8"
-    stroke="white" stroke-width="3.0" stroke-linecap="round" fill="none"/>
+  <!-- Vertical stem connecting dot to desk line -->
+  <line
+    x1="16" y1="15.8" x2="16" y2="20.5"
+    stroke="white" stroke-width="1.8" stroke-linecap="round" opacity="0.75"/>
 
-  <!-- D: vertical bar -->
-  <rect x="18.0" y="11.0" width="3.0" height="10" rx="1.2" fill="white"/>
+  <!-- The clarity dot — primary focal mark -->
+  <circle cx="16" cy="12" r="3.6" fill="white"/>
 
-  <!-- D: right semicircle arc -->
-  <path
-    d="M 18.0,11.0 A 5,5 0 0,1 18.0,21.0"
-    stroke="white" stroke-width="3.0" stroke-linecap="round" fill="none"/>
+  <!-- Desk horizon line — clean, full-width, anchoring -->
+  <line
+    x1="6.5" y1="21.5" x2="25.5" y2="21.5"
+    stroke="white" stroke-width="2.2" stroke-linecap="round"/>
 
-  <!-- Desk rule: thin line at midpoint -->
-  <line x1="7.5" y1="16" x2="26" y2="16"
-        stroke="white" stroke-width="0.9" stroke-linecap="round" opacity="0.5"/>
 </svg>

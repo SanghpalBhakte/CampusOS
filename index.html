@@ -27,8 +27,8 @@
       }
     };
   </script>
-  <meta name="description" content="Clarity Desk — Student workflow layer that cuts app chaos and makes it clear what to do today instead of juggling five tools." />
-  <title>Clarity Desk — Clear Student Workflow</title>
+  <meta name="description" content="Clarity Desk — Less app chaos, more clarity. Student desk for timetables, attendance, coursework, and daily focus." />
+  <title>Clarity Desk — Less App Chaos, More Clarity</title>
 
   <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -65,8 +65,14 @@
           <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
         </svg>
       </button>
-      <div class="topbar-brand">
-        <div class="logo-icon">CD</div>
+      <div class="topbar-brand" onclick="navigateTo('dashboard')" style="cursor:pointer" title="Clarity Desk — Less app chaos, more clarity">
+        <div class="logo-icon">
+          <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" style="width:20px;height:20px">
+            <line x1="16" y1="15.8" x2="16" y2="20.5" stroke="white" stroke-width="1.8" stroke-linecap="round" opacity="0.75"/>
+            <circle cx="16" cy="12" r="3.6" fill="white"/>
+            <line x1="6.5" y1="21.5" x2="25.5" y2="21.5" stroke="white" stroke-width="2.2" stroke-linecap="round"/>
+          </svg>
+        </div>
         <span>Clarity Desk</span>
       </div>
     </div>
@@ -77,7 +83,7 @@
           <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
         </svg>
       </span>
-      <input type="text" id="global-search" placeholder="Search notices… (press Enter)" autocomplete="off" />
+      <input type="text" id="global-search" placeholder="Search notices, topics, courses… (Enter)" autocomplete="off" />
     </div>
 
   <div class="topbar-actions">
@@ -85,13 +91,17 @@
         <span id="sync-icon">☁️</span>
         <span id="sync-label" class="text-xs text-muted">Local</span>
       </button>
+      <button class="btn-icon" id="assistant-toggle-btn" onclick="toggleAssistant()" title="Ask Desk Assistant (Ctrl+/)" aria-label="Open Desk Assistant" aria-expanded="false" style="position:relative">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+      </button>
       <select id="theme-selector" class="theme-selector-topbar" aria-label="Select visual theme" title="Select visual theme" onchange="setTheme(this.value)">
         <option value="paper">📄 Paper</option>
         <option value="cloud">☁️ Cloud</option>
         <option value="stone">🪨 Stone</option>
         <option value="quiet-dark">🌒 Quiet Dark</option>
         <option value="cafe-night">☕️ Café Night</option>
-        <option value="warm-study">☕️ Warm Study</option>
       </select>
       <div class="avatar" id="topbar-avatar" onclick="navigateTo('settings')" title="Your Profile" style="cursor:pointer">?</div>
     </div>
@@ -102,14 +112,14 @@
 
     <!-- Sidebar (desktop) -->
     <nav class="sidebar" role="navigation" aria-label="Main navigation">
-      <span class="sidebar-section-label">Main</span>
+      <span class="sidebar-section-label">Desk</span>
 
       <div class="nav-item active" data-nav="dashboard" onclick="navigateTo('dashboard')" id="sidebar-dashboard">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
           <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
         </svg>
-        Dashboard
+        Today & Focus
       </div>
 
       <div class="nav-item" data-nav="timetable" onclick="navigateTo('timetable')" id="sidebar-timetable">
@@ -135,7 +145,7 @@
           <polyline points="14 2 14 8 20 8"/>
           <line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/>
         </svg>
-        Assignments
+        Tasks & Deadlines
         <span class="nav-badge" id="assign-badge-sidebar">0</span>
       </div>
 
@@ -144,17 +154,17 @@
           <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
           <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
         </svg>
-        Notices
+        Notice Board
       </div>
 
-      <span class="sidebar-section-label">Resources</span>
+      <span class="sidebar-section-label">Study</span>
 
       <div class="nav-item" data-nav="links" onclick="navigateTo('links')" id="sidebar-links">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
           <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
         </svg>
-        Quick Links
+        Study Links
       </div>
 
       <div class="nav-item" data-nav="summary" onclick="navigateTo('summary')" id="sidebar-summary">
@@ -162,17 +172,17 @@
           <circle cx="12" cy="12" r="10"/>
           <line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
         </svg>
-        Daily Summary
+        Daily Briefing
       </div>
 
-      <span class="sidebar-section-label">Account</span>
+      <span class="sidebar-section-label">Preferences</span>
 
       <div class="nav-item" data-nav="settings" onclick="navigateTo('settings')" id="sidebar-settings">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="3"/>
           <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
         </svg>
-        Settings
+        Desk Settings
       </div>
     </nav>
 
@@ -189,25 +199,25 @@
       <section id="page-timetable" class="section-page" data-page="timetable" aria-label="Timetable"></section>
 
       <!-- Subject Hubs -->
-      <section id="page-subjects" class="section-page" data-page="subjects" aria-label="Subjects Hub"></section>
+      <section id="page-subjects" class="section-page" data-page="subjects" aria-label="Subject Hubs"></section>
 
       <!-- Assignments -->
-      <section id="page-assignments" class="section-page" data-page="assignments" aria-label="Assignments"></section>
+      <section id="page-assignments" class="section-page" data-page="assignments" aria-label="Tasks & Workload"></section>
 
       <!-- Notices -->
-      <section id="page-notices" class="section-page" data-page="notices" aria-label="Notices"></section>
+      <section id="page-notices" class="section-page" data-page="notices" aria-label="Notice Board"></section>
 
       <!-- Resources -->
-      <section id="page-resources" class="section-page" data-page="resources" aria-label="Resources"></section>
+      <section id="page-resources" class="section-page" data-page="resources" aria-label="Study Resources"></section>
 
       <!-- Quick Links -->
-      <section id="page-links" class="section-page" data-page="links" aria-label="Quick Links"></section>
+      <section id="page-links" class="section-page" data-page="links" aria-label="Study Links"></section>
 
       <!-- Daily Summary -->
-      <section id="page-summary" class="section-page" data-page="summary" aria-label="Daily Summary"></section>
+      <section id="page-summary" class="section-page" data-page="summary" aria-label="Daily Briefing"></section>
 
       <!-- Settings -->
-      <section id="page-settings" class="section-page" data-page="settings" aria-label="Settings"></section>
+      <section id="page-settings" class="section-page" data-page="settings" aria-label="Desk Settings"></section>
 
     </main>
   </div><!-- /main-wrapper -->
@@ -222,7 +232,7 @@
       <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
       <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
     </svg>
-    Home
+    Today
   </button>
 
   <button class="bottom-nav-item" data-nav="timetable" onclick="navigateTo('timetable')">
@@ -230,7 +240,7 @@
       <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/>
       <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
     </svg>
-    Classes
+    Timetable
   </button>
 
   <button class="bottom-nav-item" data-nav="assignments" onclick="navigateTo('assignments')">
@@ -256,7 +266,7 @@
       <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
       <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
     </svg>
-    Resources
+    Links
   </button>
 
   <button class="bottom-nav-item" data-nav="settings" onclick="navigateTo('settings')">
@@ -276,6 +286,64 @@
   </svg>
   Add Task
 </button>
+
+<!-- ── Desk Assistant Panel ──────────────────────────────── -->
+<div id="cd-assistant-overlay" class="cd-assistant-overlay" onclick="closeAssistant()" aria-hidden="true"></div>
+
+<aside id="cd-assistant-panel" class="cd-assistant-panel" role="complementary" aria-label="Desk Assistant" aria-hidden="true">
+
+  <!-- Header -->
+  <div class="cd-assistant-header">
+    <div class="cd-assistant-title">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="3.6" fill="currentColor" stroke="none"/>
+        <line x1="12" y1="15.8" x2="12" y2="20.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity="0.7"/>
+        <line x1="6.5" y1="21.5" x2="17.5" y2="21.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <span>Desk Assistant</span>
+    </div>
+    <button class="btn-icon cd-assistant-close" onclick="closeAssistant()" aria-label="Close assistant" title="Close (Esc)">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- Chat thread -->
+  <div id="cd-chat-thread" class="cd-chat-thread" role="log" aria-live="polite" aria-label="Assistant conversation"></div>
+
+  <!-- Suggested prompts -->
+  <div class="cd-chip-row" id="cd-chip-row">
+    <button class="cd-chip" onclick="sendAssistantMessage('What do I have today?')">Today's schedule</button>
+    <button class="cd-chip" onclick="sendAssistantMessage('What is my next class?')">Next class</button>
+    <button class="cd-chip" onclick="sendAssistantMessage('Which tasks are overdue?')">Overdue tasks</button>
+    <button class="cd-chip" onclick="sendAssistantMessage('What is my attendance situation?')">Attendance</button>
+    <button class="cd-chip" onclick="sendAssistantMessage('Are there any important notices?')">Notices</button>
+    <button class="cd-chip" onclick="sendAssistantMessage('What tasks are due this week?')">Due this week</button>
+  </div>
+
+  <!-- Input -->
+  <div class="cd-input-row">
+    <input
+      type="text"
+      id="cd-input"
+      class="cd-input"
+      placeholder="Ask about your schedule, tasks, attendance…"
+      autocomplete="off"
+      autocorrect="off"
+      spellcheck="false"
+      maxlength="200"
+      aria-label="Ask the Desk Assistant"
+      onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAssistantMessage();}"
+    />
+    <button class="btn-icon cd-send-btn" onclick="sendAssistantMessage()" aria-label="Send message" title="Send">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+      </svg>
+    </button>
+  </div>
+
+</aside>
 
 <!-- Firebase Web SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
