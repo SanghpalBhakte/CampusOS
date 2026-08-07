@@ -753,8 +753,15 @@ img { display: block; max-width: 100%; }
 .tt-entry.current .tt-divider { background: var(--accent); }
 
 .tt-info { flex: 1; min-width: 0; }
-.tt-subject { font-weight: 600; font-size: 0.9rem; color: var(--text-primary); }
-.tt-meta    { font-size: 0.78rem; color: var(--text-muted); margin-top: 3px; }
+.tt-subject {
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tt-meta { font-size: 0.78rem; color: var(--text-muted); margin-top: 3px; }
 
 .type-badge {
   font-size: 0.68rem;
@@ -824,7 +831,7 @@ img { display: block; max-width: 100%; }
   border-radius: 999px;
   font-size: 0.78rem;
   font-weight: 500;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-btn, var(--border));
   background: var(--surface-2);
   color: var(--text-secondary);
   transition: all var(--ease);
@@ -832,10 +839,16 @@ img { display: block; max-width: 100%; }
   white-space: nowrap;
 }
 
+.filter-chip:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
 .filter-chip.active {
   background: var(--accent);
-  color: white;
+  color: white !important;
   border-color: var(--accent);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 }
 
 /* Opaque High-Contrast Task Cards for Text Readability */
@@ -863,7 +876,7 @@ img { display: block; max-width: 100%; }
 .assignment-checkbox {
   width: 20px; height: 20px;
   border-radius: 6px;
-  border: 2px solid var(--border);
+  border: 2px solid var(--border-btn, var(--border));
   display: grid;
   place-items: center;
   cursor: pointer;
@@ -884,7 +897,15 @@ img { display: block; max-width: 100%; }
 
 .assignment-body { flex: 1; min-width: 0; }
 .assignment-subject { font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
-.assignment-title   { font-size: 0.95rem; font-weight: 600; color: var(--text-primary); margin-top: 2px; }
+.assignment-title   {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .assignment-desc    { font-size: 0.83rem; color: var(--text-secondary); margin-top: 6px; line-height: 1.5; }
 
 .assignment-footer {

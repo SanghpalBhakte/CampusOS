@@ -4873,19 +4873,19 @@ function saveSettings() {
   Object.assign(liveProfile, profile);
 
   const nPrefs = {
-    enabled: (typeof Notification !== 'undefined') && Notification.permission === 'granted',
-    taskDueToday: document.getElementById('np-due-today')?.checked ?? true,
-    taskOverdue: document.getElementById('np-overdue')?.checked ?? true,
-    taskUpcoming: document.getElementById('np-upcoming')?.checked ?? true,
+    taskUpcoming: document.getElementById('np-task-upcoming')?.value || 'day_before',
+    taskOverdue: document.getElementById('np-task-overdue')?.value || 'same_day',
+    classReminders: document.getElementById('np-class-reminders')?.value || '15_min',
+    attendanceAlerts: document.getElementById('np-attendance-alerts')?.value || 'instant',
+    newNotices: document.getElementById('np-new-notices')?.value || 'instant',
     dailySummaryTime: document.getElementById('np-summary-time')?.value || '08:00',
-    noticeMode: document.getElementById('np-notice-mode')?.value || 'instant',
   };
   saveNotifPrefs(nPrefs);
 
   // Show "Saved" feedback
   const saved = document.getElementById('settings-saved');
   if (saved) {
-    saved.style.display = 'flex';
+    saved.style.display = 'inline-flex';
     setTimeout(() => { saved.style.display = 'none'; }, 2500);
   }
 
@@ -4893,6 +4893,7 @@ function saveSettings() {
   updateTopbarProfile();
   setupFABDrag();
   syncToCloud();
+  showToast('Settings saved successfully ✓', 'success');
 }
 
 function exportData() {
