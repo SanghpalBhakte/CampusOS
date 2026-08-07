@@ -5481,6 +5481,47 @@ const ClarityAssistant = (() => {
 
 let _assistantOpen = false;
 
+function renderAssistantWelcome() {
+  const thread = document.getElementById('cd-chat-thread');
+  if (!thread) return;
+  thread.innerHTML = `
+    <div class="cd-welcome-card">
+      <div class="cd-welcome-badge">
+        <span class="cd-dot-live"></span> Ready with live desk data
+      </div>
+      <div class="cd-welcome-title">How can I help you today?</div>
+      <div class="cd-welcome-sub">Grounded in your live timetable, task deadlines, attendance logs, and notices.</div>
+      <div class="cd-starter-grid">
+        <button class="cd-starter-btn" onclick="sendAssistantMessage('What do I have today?')">
+          <span class="cd-starter-icon">📅</span>
+          <strong>Today's Classes</strong>
+          <span>View today's lecture schedule</span>
+        </button>
+        <button class="cd-starter-btn" onclick="sendAssistantMessage('What is my next class?')">
+          <span class="cd-starter-icon">⏱️</span>
+          <strong>Next Class</strong>
+          <span>Upcoming lecture &amp; room</span>
+        </button>
+        <button class="cd-starter-btn" onclick="sendAssistantMessage('Which tasks are overdue?')">
+          <span class="cd-starter-icon">🎯</span>
+          <strong>Overdue Tasks</strong>
+          <span>Check pending deadlines</span>
+        </button>
+        <button class="cd-starter-btn" onclick="sendAssistantMessage('What is my attendance situation?')">
+          <span class="cd-starter-icon">🛡️</span>
+          <strong>Attendance %</strong>
+          <span>Safe skips &amp; target buffer</span>
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+function clearAssistantChat() {
+  renderAssistantWelcome();
+  showToast('Chat cleared', 'info');
+}
+
 function openAssistant() {
   _assistantOpen = true;
   const panel   = document.getElementById('cd-assistant-panel');
@@ -5490,27 +5531,15 @@ function openAssistant() {
 
   panel.classList.add('open');
   panel.setAttribute('aria-hidden', 'false');
-  overlay.classList.add('open');
+  overlay?.classList.add('open');
   btn?.setAttribute('aria-expanded', 'true');
 
-  // Show welcome if thread is empty
   const thread = document.getElementById('cd-chat-thread');
   if (thread && thread.children.length === 0) {
-    thread.innerHTML = `
-      <div class="cd-welcome">
-        <div class="cd-welcome-mark">
-          <svg width="20" height="20" viewBox="0 0 32 32" fill="none" aria-hidden="true">
-            <circle cx="16" cy="12" r="3.6" fill="currentColor"/>
-            <line x1="16" y1="15.8" x2="16" y2="20.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity="0.7"/>
-            <line x1="6.5" y1="21.5" x2="25.5" y2="21.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-          </svg>
-        </div>
-        <p><strong>Desk Assistant</strong>Ask about your schedule, tasks, or attendance. I read from your actual data — no guesses.</p>
-      </div>`;
+    renderAssistantWelcome();
   }
 
-  // Focus input after animation
-  setTimeout(() => document.getElementById('cd-input')?.focus(), 300);
+  setTimeout(() => document.getElementById('cd-input')?.focus(), 250);
 }
 
 function closeAssistant() {
@@ -5521,7 +5550,7 @@ function closeAssistant() {
   if (!panel) return;
   panel.classList.remove('open');
   panel.setAttribute('aria-hidden', 'true');
-  overlay.classList.remove('open');
+  overlay?.classList.remove('open');
   btn?.setAttribute('aria-expanded', 'false');
 }
 
@@ -5538,8 +5567,8 @@ function sendAssistantMessage(presetText) {
   const thread = document.getElementById('cd-chat-thread');
   if (!thread) return;
 
-  // Clear welcome screen on first real message
-  const welcome = thread.querySelector('.cd-welcome');
+  // Clear welcome card on first real message
+  const welcome = thread.querySelector('.cd-welcome-card, .cd-welcome');
   if (welcome) welcome.remove();
 
   // Render user bubble
@@ -5565,7 +5594,7 @@ function sendAssistantMessage(presetText) {
     botMsg.innerHTML = `<div class="cd-bubble">${response}</div>`;
     thread.appendChild(botMsg);
     thread.scrollTop = thread.scrollHeight;
-  }, 420);
+  }, 380);
 }
 
 function escHtml_cd(s) {
@@ -5616,6 +5645,7 @@ window.toggleAssistant       = toggleAssistant;
 window.openAssistant         = openAssistant;
 window.closeAssistant        = closeAssistant;
 window.sendAssistantMessage  = sendAssistantMessage;
+window.clearAssistantChat    = clearAssistantChat;
 
 window.toggleAssignment = (id) => {
   // Custom task
@@ -5701,6 +5731,11 @@ function init() {
 
   document.getElementById('global-search')?.addEventListener('keydown', e => {
     if (e.key === 'Enter') handleGlobalSearch(e.target.value);
+  });
+
+  document.getElementById('assistant-toggle-btn')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    toggleAssistant();
   });
 
   const pending = window._pendingNav;

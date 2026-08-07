@@ -86,15 +86,18 @@
       <input type="text" id="global-search" placeholder="Search notices, topics, courses… (Enter)" autocomplete="off" />
     </div>
 
-  <div class="topbar-actions">
+    <div class="topbar-actions">
       <button class="btn-icon" id="sync-status-btn" onclick="navigateTo('settings')" title="Cloud Sync Status" aria-label="Cloud sync status" style="font-size:0.75rem;width:auto;padding:0 8px;gap:4px">
         <span id="sync-icon">☁️</span>
         <span id="sync-label" class="text-xs text-muted">Local</span>
       </button>
-      <button class="btn-icon" id="assistant-toggle-btn" onclick="toggleAssistant()" title="Ask Desk Assistant (Ctrl+/)" aria-label="Open Desk Assistant" aria-expanded="false" style="position:relative">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      <button class="btn-assistant-toggle" id="assistant-toggle-btn" onclick="toggleAssistant()" title="Ask Desk Assistant (Ctrl+/)" aria-label="Open Desk Assistant" aria-expanded="false">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="3.6" fill="currentColor"/>
+          <line x1="12" y1="15.8" x2="12" y2="20.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity="0.75"/>
+          <line x1="6.5" y1="21.5" x2="17.5" y2="21.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
         </svg>
+        <span>Ask Desk</span>
       </button>
       <select id="theme-selector" class="theme-selector-topbar" aria-label="Select visual theme" title="Select visual theme" onchange="setTheme(this.value)">
         <option value="paper">📄 Paper</option>
@@ -287,6 +290,76 @@
   Add Task
 </button>
 
+<!-- ── Desk Assistant Panel ──────────────────────────────── -->
+<div id="cd-assistant-overlay" class="cd-assistant-overlay" onclick="closeAssistant()" aria-hidden="true"></div>
+
+<aside id="cd-assistant-panel" class="cd-assistant-panel" role="complementary" aria-label="Desk Assistant" aria-hidden="true">
+
+  <!-- Header -->
+  <div class="cd-assistant-header">
+    <div class="cd-assistant-title-group">
+      <div class="cd-assistant-badge-icon" aria-hidden="true">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3.6" fill="currentColor"/>
+          <line x1="12" y1="15.8" x2="12" y2="20.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity="0.75"/>
+          <line x1="6.5" y1="21.5" x2="17.5" y2="21.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div>
+        <div class="cd-assistant-title">Desk Assistant</div>
+        <div class="cd-assistant-subtitle">Answers from live schedule &amp; tasks</div>
+      </div>
+    </div>
+    <div class="cd-assistant-actions">
+      <button class="cd-assistant-clear" onclick="clearAssistantChat()" title="Reset chat" aria-label="Reset conversation">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+        </svg>
+      </button>
+      <button class="cd-assistant-close" onclick="closeAssistant()" aria-label="Close assistant" title="Close (Esc)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Chat thread -->
+  <div id="cd-chat-thread" class="cd-chat-thread" role="log" aria-live="polite" aria-label="Assistant conversation"></div>
+
+  <!-- Suggested quick prompt chips -->
+  <div class="cd-chip-row" id="cd-chip-row">
+    <button class="cd-chip" onclick="sendAssistantMessage('What do I have today?')">Today's classes</button>
+    <button class="cd-chip" onclick="sendAssistantMessage('What is my next class?')">Next class</button>
+    <button class="cd-chip" onclick="sendAssistantMessage('Which tasks are overdue?')">Overdue tasks</button>
+    <button class="cd-chip" onclick="sendAssistantMessage('What is my attendance situation?')">Attendance %</button>
+    <button class="cd-chip" onclick="sendAssistantMessage('Are there any important notices?')">Notices</button>
+    <button class="cd-chip" onclick="sendAssistantMessage('What tasks are due this week?')">Due this week</button>
+  </div>
+
+  <!-- Input -->
+  <div class="cd-input-row">
+    <input
+      type="text"
+      id="cd-input"
+      class="cd-input"
+      placeholder="Ask about your classes, tasks, attendance…"
+      autocomplete="off"
+      autocorrect="off"
+      spellcheck="false"
+      maxlength="200"
+      aria-label="Ask the Desk Assistant"
+      onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAssistantMessage();}"
+    />
+    <button class="cd-send-btn" onclick="sendAssistantMessage()" aria-label="Send message" title="Send (Enter)">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+      </svg>
+    </button>
+  </div>
+
+</aside>
+
 <!-- Firebase Web SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
@@ -296,8 +369,8 @@
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
 <!-- Firebase Config & App Script -->
-<script src="firebase-config.js?v=42"></script>
-<script type="module" src="app.js?v=42"></script>
+<script src="firebase-config.js?v=52"></script>
+<script type="module" src="app.js?v=52"></script>
 
 </body>
 </html>
