@@ -2432,6 +2432,61 @@ function renderReview() {
 }
 
 // ── Weekly Attendance Helper Functions ───────────────────────
+function calculateSmartAttendanceGuidance(totalAttended, totalSkipped, targetPct = 75) {
+  const totalMarked = totalAttended + totalSkipped;
+  if (totalMarked === 0) {
+    return {
+      totalAttended: 0,
+      totalSkipped: 0,
+      totalMarked: 0,
+      pct: null,
+      isSafe: true,
+      statusZone: 'Neutral',
+      classesToAttend: 0,
+      safeSkips: 0,
+      message: 'No classes marked yet. Tap Attended or Skipped on today\'s classes to start tracking.',
+      badgeLabel: 'Getting Started',
+      badgeColor: 'var(--accent)'
+    };
+  }
+
+  const pct = Math.round((totalAttended / totalMarked) * 100);
+  const targetFraction = targetPct / 100;
+  const isSafe = pct >= targetPct;
+
+  let classesToAttend = 0;
+  let safeSkips = 0;
+  let message = '';
+
+  if (!isSafe) {
+    // Formula: ceil((targetFraction * T - A) / (1 - targetFraction))
+    classesToAttend = Math.max(1, Math.ceil((targetFraction * totalMarked - totalAttended) / (1 - targetFraction)));
+    message = `You are in the <strong>Risk Zone</strong> (${pct}%). Attend the next <strong>${classesToAttend} class${classesToAttend !== 1 ? 'es' : ''}</strong> continuously to reach the ${targetPct}% target.`;
+  } else {
+    // Formula: floor((A - targetFraction * T) / targetFraction)
+    safeSkips = Math.max(0, Math.floor((totalAttended - targetFraction * totalMarked) / targetFraction));
+    if (safeSkips > 0) {
+      message = `You are in the <strong>Safe Zone</strong> (${pct}%). You can safely skip up to <strong>${safeSkips} class${safeSkips !== 1 ? 'es' : ''}</strong> without dropping below ${targetPct}%.`;
+    } else {
+      message = `You are on target at <strong>${pct}%</strong>. Attend your next class to build a safe skip buffer!`;
+    }
+  }
+
+  return {
+    totalAttended,
+    totalSkipped,
+    totalMarked,
+    pct,
+    isSafe,
+    statusZone: isSafe ? 'Safe Zone' : 'Risk Zone',
+    classesToAttend,
+    safeSkips,
+    message,
+    badgeLabel: isSafe ? 'Safe Zone ✅' : 'Risk Zone ⚠️',
+    badgeColor: isSafe ? 'var(--green)' : 'var(--red)'
+  };
+}
+
 function getWeekDays(offset = 0) {
   const now = new Date();
   now.setDate(now.getDate() + (offset * 7));
@@ -2575,8 +2630,7 @@ function renderWeeklyAttendanceTracker() {
     `;
   }
 
-  const totalMarked = totalAttended + totalSkipped;
-  const attendancePct = totalMarked > 0 ? Math.round((totalAttended / totalMarked) * 100) : 0;
+  const guidance = calculateSmartAttendanceGuidance(totalAttended, totalSkipped, 75);
 
   const subjectBreakdownHTML = Object.keys(subjectStats).map(subj => {
     const st = subjectStats[subj];
@@ -2594,29 +2648,43 @@ function renderWeeklyAttendanceTracker() {
       ${weekSelectorHTML}
       ${attendanceDaysHTML}
 
-      <!-- Weekly Summary Card -->
-      <div class="card" style="padding:16px;background:var(--surface-2);border-left:3px solid var(--accent)">
-        <div style="font-weight:700;font-size:0.95rem;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
-          <span>Weekly Attendance Summary</span>
-          <span style="font-size:0.85rem;color:var(--accent);font-weight:700">${totalMarked > 0 ? `Attendance: ${attendancePct}%` : 'No classes marked yet'}</span>
+      <!-- Smart Attendance Guidance Card -->
+      <div class="card" style="padding:16px;margin-bottom:16px;background:var(--surface-2);border-left:4px solid ${guidance.isSafe ? 'var(--green)' : 'var(--red)'}">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap">
+          <div>
+            <div style="font-weight:700;font-size:0.98rem;color:var(--text-primary)">Smart Attendance Guidance</div>
+            <div style="font-size:0.78rem;color:var(--text-muted);margin-top:2px">Target threshold: <strong>75%</strong> minimum attendance</div>
+          </div>
+          <span class="type-badge" style="font-size:0.75rem;padding:3px 9px;background:${guidance.isSafe ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)'};color:${guidance.isSafe ? 'var(--green)' : 'var(--red)'}">
+            ${guidance.badgeLabel}
+          </span>
         </div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(110px, 1fr));gap:10px;margin-bottom:14px">
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(110px, 1fr));gap:10px;margin-bottom:12px">
           <div style="background:var(--background);padding:10px;border-radius:6px;text-align:center">
             <div style="font-size:1.1rem;font-weight:700;color:var(--green)">${totalAttended}</div>
-            <div style="font-size:0.72rem;color:var(--text-muted)">Classes Attended</div>
-          </div>
-          <div style="background:var(--background);padding:10px;border-radius:6px;text-align:center">
-            <div style="font-size:1.1rem;font-weight:700;color:var(--accent)">${totalLabsAttended}</div>
-            <div style="font-size:0.72rem;color:var(--text-muted)">Labs Attended</div>
+            <div style="font-size:0.72rem;color:var(--text-muted)">Attended</div>
           </div>
           <div style="background:var(--background);padding:10px;border-radius:6px;text-align:center">
             <div style="font-size:1.1rem;font-weight:700;color:var(--red)">${totalSkipped}</div>
-            <div style="font-size:0.72rem;color:var(--text-muted)">Classes Skipped</div>
+            <div style="font-size:0.72rem;color:var(--text-muted)">Missed / Skipped</div>
+          </div>
+          <div style="background:var(--background);padding:10px;border-radius:6px;text-align:center">
+            <div style="font-size:1.1rem;font-weight:700;color:${guidance.isSafe ? 'var(--green)' : 'var(--red)'}">${guidance.pct !== null ? guidance.pct + '%' : '0%'}</div>
+            <div style="font-size:0.72rem;color:var(--text-muted)">Current Rate</div>
+          </div>
+          <div style="background:var(--background);padding:10px;border-radius:6px;text-align:center">
+            <div style="font-size:1.1rem;font-weight:700;color:${guidance.isSafe ? 'var(--green)' : 'var(--red)'}">${guidance.isSafe ? guidance.safeSkips : guidance.classesToAttend}</div>
+            <div style="font-size:0.72rem;color:var(--text-muted)">${guidance.isSafe ? 'Safe Skips' : 'Classes Needed'}</div>
           </div>
         </div>
 
+        <div style="font-size:0.83rem;color:var(--text-primary);background:var(--background);padding:10px 12px;border-radius:6px;line-height:1.45;border:1px solid var(--border)">
+          💡 ${guidance.message}
+        </div>
+
         ${subjectBreakdownHTML ? `
-          <div style="margin-top:10px">
+          <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
             <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);margin-bottom:6px">Per-Subject Breakdown</div>
             ${subjectBreakdownHTML}
           </div>
@@ -3045,24 +3113,29 @@ function renderDashboard() {
     ${countdownHTML}
 
     <!-- 1. ATTENDANCE RISK WARNING BLOCK -->
-    <div class="card card-sm" style="margin-bottom:16px;padding:12px 16px;border-left:3px solid ${isAttendanceAtRisk ? 'var(--red)' : attendancePct !== null ? 'var(--green)' : 'var(--accent)'};background:${isAttendanceAtRisk ? 'rgba(239,68,68,0.06)' : 'var(--surface-2)'}">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
-        <div style="display:flex;align-items:center;gap:10px">
-          <div style="font-size:1.15rem;display:grid;place-items:center">${isAttendanceAtRisk ? '⚠️' : attendancePct !== null ? '✅' : '📊'}</div>
-          <div>
-            <div style="font-weight:700;font-size:0.88rem;color:${isAttendanceAtRisk ? 'var(--red)' : 'var(--text-primary)'}">
-              ${isAttendanceAtRisk ? `Attendance at Risk (${attendancePct}%)` : attendancePct !== null ? `Attendance on Track (${attendancePct}%)` : 'Attendance Tracker'}
+    ${(() => {
+      const dashGuidance = calculateSmartAttendanceGuidance(totalAttended, totalSkipped, 75);
+      return `
+        <div class="card card-sm" style="margin-bottom:16px;padding:12px 16px;border-left:3px solid ${isAttendanceAtRisk ? 'var(--red)' : attendancePct !== null ? 'var(--green)' : 'var(--accent)'};background:${isAttendanceAtRisk ? 'rgba(239,68,68,0.06)' : 'var(--surface-2)'}">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+            <div style="display:flex;align-items:center;gap:10px">
+              <div style="font-size:1.15rem;display:grid;place-items:center">${isAttendanceAtRisk ? '⚠️' : attendancePct !== null ? '✅' : '📊'}</div>
+              <div>
+                <div style="font-weight:700;font-size:0.88rem;color:${isAttendanceAtRisk ? 'var(--red)' : 'var(--text-primary)'}">
+                  ${isAttendanceAtRisk ? `Attendance at Risk (${attendancePct}%)` : attendancePct !== null ? `Attendance on Track (${attendancePct}%)` : 'Attendance Tracker'}
+                </div>
+                <div style="font-size:0.76rem;color:var(--text-muted);margin-top:1px">
+                  ${attendancePct !== null ? `${totalAttended} of ${totalMarked} attended (${attendancePct}%) · ${dashGuidance.isSafe ? (dashGuidance.safeSkips > 0 ? `Can skip ${dashGuidance.safeSkips} class${dashGuidance.safeSkips!==1?'es':''} safely` : 'On track for 75% target') : `Attend next ${dashGuidance.classesToAttend} class${dashGuidance.classesToAttend!==1?'es':''} to reach 75%`}` : 'No classes marked yet — tap today\'s classes below to track'}
+                </div>
+              </div>
             </div>
-            <div style="font-size:0.76rem;color:var(--text-muted);margin-top:1px">
-              ${attendancePct !== null ? `${totalAttended} of ${totalMarked} classes attended (Target: 75%)` : 'No classes marked yet — tap today\'s classes below to track'}
-            </div>
+            <button class="btn btn-sm btn-action" onclick="navigateTo('review')">
+              Open Attendance →
+            </button>
           </div>
         </div>
-        <button class="btn btn-sm btn-action" onclick="navigateTo('review')">
-          Open Attendance →
-        </button>
-      </div>
-    </div>
+      `;
+    })()}
 
     <!-- 2. QUICK STATS GRID -->
     <div class="stat-grid" style="margin-bottom:16px">
@@ -3596,6 +3669,16 @@ function renderSingleSubjectHub(el, subj, allSubjects) {
             <div style="font-size:1.1rem;font-weight:700;margin-top:2px">${links.length} link${links.length!==1?'s':''}</div>
           </div>
         </div>
+
+        ${(() => {
+          const subjSkipped = att.total - att.attended;
+          const subjGuidance = calculateSmartAttendanceGuidance(att.attended, subjSkipped, 75);
+          return att.pct !== null ? `
+            <div style="font-size:0.8rem;color:var(--text-primary);margin-top:12px;padding:8px 12px;background:var(--surface-2);border-radius:6px;border-left:3px solid ${subjGuidance.isSafe ? 'var(--green)' : 'var(--red)'}">
+              💡 ${subjGuidance.message}
+            </div>
+          ` : '';
+        })()}
       </div>
     </div>
 
