@@ -493,7 +493,7 @@ img { display: block; max-width: 100%; }
 
 .content-area {
   flex: 1;
-  padding: 24px 18px calc(var(--nav-h) + 28px);
+  padding: 20px 16px calc(var(--nav-h) + 28px);
   max-width: 860px;
   margin: 0 auto;
   width: 100%;
@@ -611,7 +611,7 @@ a.card:hover,
 
 /* ── Dashboard Hierarchy & Layout System ──────────────────────── */
 .dashboard-hero-header {
-  margin-bottom: 18px;
+  margin-bottom: 20px;
 }
 
 .today-hero-surface {
@@ -629,7 +629,7 @@ a.card:hover,
   content: '';
   position: absolute;
   top: -40px; right: -40px;
-  width: 180px; height: 180px;
+  width: 200px; height: 200px;
   border-radius: 50%;
   background: radial-gradient(circle, rgba(255, 255, 255, 0.12) 0%, transparent 70%);
   pointer-events: none;
@@ -639,14 +639,14 @@ a.card:hover,
   content: '';
   position: absolute;
   bottom: -30px; left: -20px;
-  width: 120px; height: 120px;
+  width: 140px; height: 140px;
   border-radius: 50%;
   background: radial-gradient(circle, rgba(255, 255, 255, 0.06) 0%, transparent 70%);
   pointer-events: none;
 }
 
 .greeting-text {
-  font-size: 1.35rem;
+  font-size: 1.4rem;
   font-weight: 800;
   letter-spacing: -0.4px;
   line-height: 1.25;
@@ -657,19 +657,19 @@ a.card:hover,
   align-items: center;
   gap: 6px;
   background: rgba(255, 255, 255, 0.16);
-  padding: 4px 10px;
+  padding: 5px 12px;
   border-radius: 999px;
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   font-weight: 500;
-  margin-top: 8px;
+  margin-top: 10px;
   backdrop-filter: blur(4px);
   border: 1px solid rgba(255, 255, 255, 0.22);
 }
 
 .greeting-date {
-  font-size: 0.78rem;
-  opacity: 0.78;
-  margin-top: 8px;
+  font-size: 0.8rem;
+  opacity: 0.82;
+  margin-top: 6px;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -679,8 +679,8 @@ a.card:hover,
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px;
-  font-size: 0.78rem;
+  padding: 7px 14px;
+  font-size: 0.8rem;
   font-weight: 600;
   border-radius: var(--radius-xs, 6px);
   background: rgba(255, 255, 255, 0.16);
@@ -701,15 +701,15 @@ a.card:hover,
 .vitals-strip {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
-  margin-bottom: 20px;
+  gap: 10px;
+  margin-bottom: 22px;
 }
 
 .vital-item {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 12px 14px;
+  border-radius: var(--radius-sm, 8px);
+  padding: 14px 16px;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -735,14 +735,14 @@ a.card:hover,
 
 .vital-label {
   font-size: 0.72rem;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
 }
 
 .vital-num {
-  font-size: 1.45rem;
+  font-size: 1.55rem;
   font-weight: 800;
   line-height: 1.1;
   color: var(--text-primary);
@@ -750,7 +750,7 @@ a.card:hover,
 }
 
 .vital-hint {
-  font-size: 0.72rem;
+  font-size: 0.74rem;
   color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
@@ -761,8 +761,8 @@ a.card:hover,
 .dashboard-grid-2col {
   display: grid;
   grid-template-columns: 1.15fr 0.85fr;
-  gap: 16px;
-  margin-bottom: 20px;
+  gap: 18px;
+  margin-bottom: 22px;
 }
 
 .dashboard-panel {
@@ -779,7 +779,7 @@ a.card:hover,
 }
 
 .panel-title {
-  font-size: 0.72rem;
+  font-size: 0.74rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -808,9 +808,9 @@ a.card:hover,
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: var(--radius-sm);
+  gap: 12px;
+  padding: 11px 14px;
+  border-radius: var(--radius-sm, 8px);
   background: var(--surface);
   border: 1px solid var(--border);
   margin-bottom: 6px;
@@ -884,9 +884,9 @@ a.card:hover,
 }
 
 @media (max-width: 600px) {
-  .content-area { padding: 18px 14px calc(var(--nav-h) + 24px); }
+  .content-area { padding: 16px 12px calc(var(--nav-h) + 24px); }
   .today-hero-surface { padding: 18px 16px; }
-  .greeting-text { font-size: 1.2rem; }
+  .greeting-text { font-size: 1.25rem; }
 }
 
 /* ── Section Heading ────────────────────────────────────────── */
@@ -1907,7 +1907,8 @@ button:disabled {
   .fab { bottom: 24px; right: 24px; }
 
   .content-area {
-    padding: 24px 32px 32px;
+    padding: 24px 32px 36px;
+    max-width: 980px;
   }
 
   .stat-grid { grid-template-columns: repeat(4, 1fr); }
@@ -1916,7 +1917,25 @@ button:disabled {
 }
 
 @media (min-width: 1024px) {
+  .content-area {
+    padding: 28px 40px 44px;
+    max-width: 1160px;
+  }
+  .dashboard-grid-2col {
+    grid-template-columns: 1.15fr 0.85fr;
+    gap: 22px;
+  }
   .links-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (min-width: 1280px) {
+  .content-area {
+    padding: 32px 48px 52px;
+    max-width: 1240px;
+  }
+  .dashboard-grid-2col {
+    gap: 24px;
+  }
 }
 
 /* ── Utility Classes ──────────────────────────────────────────*/
