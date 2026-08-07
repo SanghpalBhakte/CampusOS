@@ -73,35 +73,35 @@
   --ease: 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* ── 2) Cloud — Cool Gray-Blue Surfaces with Restrained Navy Accent ── */
+/* ── 2) Cloud — Clean Academic (Slate Gray, Pure White, Restrained Deep Navy) ── */
 [data-theme="cloud"],
 [data-theme="mist-blue"],
 [data-theme="glass"] {
-  --bg:            #eef2f6;
+  --bg:            #f1f5f9;
   --surface:       #ffffff;
   --surface-2:     #e2e8f0;
   --surface-3:     #cbd5e1;
   --border:        #cbd5e1;
   --border-light:  #e2e8f0;
-  --border-btn:    #b0c4de;
+  --border-btn:    #94a3b8;
 
   --text-primary:  #0f172a;
   --text-secondary:#334155;
   --text-muted:    #64748b;
 
-  --accent:        #1e3a8a;
-  --accent-light:  #2563eb;
-  --accent-dim:    rgba(30, 58, 138, 0.08);
-  --accent-hover:  #172554;
+  --accent:        #2563eb;
+  --accent-light:  #3b82f6;
+  --accent-dim:    rgba(37, 99, 235, 0.08);
+  --accent-hover:  #1d4ed8;
 
   --banner-bg: linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%);
   --banner-text: #ffffff;
 
-  --shadow:    0 1px 3px rgba(15, 23, 42, 0.06), 0 4px 12px rgba(15, 23, 42, 0.04);
-  --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.09), 0 12px 24px -4px rgba(15, 23, 42, 0.07);
+  --shadow:    0 1px 3px rgba(15, 23, 42, 0.05), 0 4px 12px rgba(15, 23, 42, 0.03);
+  --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.08), 0 12px 24px -4px rgba(15, 23, 42, 0.06);
 }
 
-/* ── 3) Stone — Sand/Mineral Neutrals with Dark Taupe Text & Desaturated Green-Blue Accent ── */
+/* ── 3) Stone — Sand & Mineral Neutrals with Desaturated Teal Accent ── */
 [data-theme="stone"],
 [data-theme="sandstone"],
 [data-theme="emerald"] {
@@ -129,26 +129,26 @@
   --shadow-md: 0 4px 6px -1px rgba(42, 39, 35, 0.08), 0 12px 24px -4px rgba(42, 39, 35, 0.06);
 }
 
-/* ── 4) Quiet Dark — Soft Charcoal & Slate Surfaces with High-Contrast Secondary Controls ── */
+/* ── 4) Quiet Dark — Low-Glare Operational Night (Dark Obsidian Slate & Desaturated Indigo) ── */
 [data-theme="quiet-dark"],
 [data-theme="dark"],
 [data-theme="cocoa-night"],
 [data-theme="sunset"] {
-  --bg:            #121417;
-  --surface:       #1a1d22;
-  --surface-2:     #242a34;
-  --surface-3:     #2e3644;
+  --bg:            #0f172a;
+  --surface:       #1e293b;
+  --surface-2:     #334155;
+  --surface-3:     #475569;
   --border:        rgba(255, 255, 255, 0.12);
   --border-light:  rgba(255, 255, 255, 0.07);
-  --border-btn:    rgba(255, 255, 255, 0.22);
+  --border-btn:    rgba(255, 255, 255, 0.24);
 
   --text-primary:  #f8fafc;
   --text-secondary:#cbd5e1;
-  --text-muted:    #8a96a8;
+  --text-muted:    #94a3b8;
 
   --accent:        #6366f1;
   --accent-light:  #818cf8;
-  --accent-dim:    rgba(99, 102, 241, 0.20);
+  --accent-dim:    rgba(99, 102, 241, 0.18);
   --accent-hover:  #4f46e5;
 
   --green:  #34d399;
@@ -158,38 +158,34 @@
   --purple: #a78bfa;
   --pink:   #f472b6;
 
-  --banner-bg: linear-gradient(135deg, #1f2836 0%, #121417 100%);
-  --banner-text: #f0f2f5;
+  --banner-bg: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  --banner-text: #f8fafc;
 
-  --shadow:    0 2px 8px rgba(0, 0, 0, 0.28);
-  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --shadow:    0 2px 8px rgba(0, 0, 0, 0.32);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.50);
 }
 
-/* ── 5) Café Night — Warm Espresso Charcoal with Amber/Caramel Accents & Soft Sand Text ── */
+/* ── 5) Café Night — Cozy Espresso Evening (Warm Charcoal Espresso & Amber Caramel) ── */
 [data-theme="cafe-night"] {
   --font: 'Inter', system-ui, -apple-system, sans-serif;
 
-  /* Surfaces — Roasted Dark Espresso */
-  --bg:            #181512;
-  --surface:       #221d18;
-  --surface-2:     #2c2620;
-  --surface-3:     #383028;
+  --bg:            #161412;
+  --surface:       #201c18;
+  --surface-2:     #2a241e;
+  --surface-3:     #362e26;
   --border:        rgba(245, 237, 226, 0.12);
   --border-light:  rgba(245, 237, 226, 0.07);
-  --border-btn:    rgba(245, 237, 226, 0.22);
+  --border-btn:    rgba(245, 237, 226, 0.24);
 
-  /* Text — Warm Oat Milk & Sand */
   --text-primary:  #f5ede2;
   --text-secondary:#d4c6b5;
   --text-muted:    #9e8e7c;
 
-  /* Accent — Warm Amber Caramel */
   --accent:        #d97706;
   --accent-light:  #f59e0b;
   --accent-dim:    rgba(217, 119, 6, 0.16);
   --accent-hover:  #b45309;
 
-  /* Status Colors */
   --green:  #34d399;
   --yellow: #fbbf24;
   --red:    #f87171;
@@ -197,35 +193,19 @@
   --purple: #c084fc;
   --pink:   #f472b6;
 
-  /* Banner & Surfaces */
-  --banner-bg: linear-gradient(135deg, #2e2017 0%, #181512 100%);
+  --banner-bg: linear-gradient(135deg, #2a1e16 0%, #161412 100%);
   --banner-text: #f5ede2;
 
-  --topbar-bg:      var(--surface);
-  --topbar-blur:    none;
-  --sidebar-bg:     var(--surface);
-  --sidebar-blur:   none;
-  --bottomnav-bg:   var(--surface);
-  --bottomnav-blur:  none;
-  --statcard-bg:    var(--surface);
-  --statcard-blur:  none;
-  --modal-bg:       var(--surface);
-  --modal-blur:     none;
-  --fab-bg:         var(--accent);
-  --fab-blur:       none;
-
-  /* Shadows */
-  --shadow:    0 2px 8px rgba(0, 0, 0, 0.35);
-  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.52);
+  --shadow:    0 2px 8px rgba(0, 0, 0, 0.38);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.55);
   --ease: 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* ── 6) Warm Study — Soft Parchment Cream with Dark Espresso Text & Muted Sage/Olive Accent ── */
+/* ── 6) Warm Study — Soft Café Afternoon (Warm Parchment Cream & Restrained Sage Olive) ── */
 [data-theme="warm-study"] {
   --font: 'Inter', system-ui, -apple-system, sans-serif;
 
-  /* Surfaces — Cozy Parchment & Oat Cream */
-  --bg:            #f4efe4;
+  --bg:            #f5f0e6;
   --surface:       #fcf9f2;
   --surface-2:     #e8e0d0;
   --surface-3:     #dcd2c0;
@@ -233,18 +213,15 @@
   --border-light:  #e4dac8;
   --border-btn:    #c2b49d;
 
-  /* Text — Deep Espresso & Soft Coffee */
   --text-primary:  #2b251f;
   --text-secondary:#5c5246;
   --text-muted:    #857867;
 
-  /* Accent — Restrained Sage / Mineral Olive */
   --accent:        #3b6b5e;
   --accent-light:  #4c8575;
   --accent-dim:    rgba(59, 107, 94, 0.10);
   --accent-hover:  #294d43;
 
-  /* Status Colors */
   --green:  #10b981;
   --yellow: #d97706;
   --red:    #dc2626;
@@ -252,26 +229,11 @@
   --purple: #7c3aed;
   --pink:   #db2777;
 
-  /* Banner & Surfaces */
   --banner-bg: linear-gradient(135deg, #294d43 0%, #2b251f 100%);
   --banner-text: #fcf9f2;
 
-  --topbar-bg:      var(--surface);
-  --topbar-blur:    none;
-  --sidebar-bg:     var(--surface);
-  --sidebar-blur:   none;
-  --bottomnav-bg:   var(--surface);
-  --bottomnav-blur:  none;
-  --statcard-bg:    var(--surface);
-  --statcard-blur:  none;
-  --modal-bg:       var(--surface);
-  --modal-blur:     none;
-  --fab-bg:         var(--accent);
-  --fab-blur:       none;
-
-  /* Shadows */
-  --shadow:    0 1px 3px rgba(43, 37, 31, 0.06), 0 4px 12px rgba(43, 37, 31, 0.04);
-  --shadow-md: 0 4px 6px -1px rgba(43, 37, 31, 0.09), 0 12px 24px -4px rgba(43, 37, 31, 0.07);
+  --shadow:    0 1px 3px rgba(43, 37, 31, 0.05), 0 4px 12px rgba(43, 37, 31, 0.03);
+  --shadow-md: 0 4px 6px -1px rgba(43, 37, 31, 0.08), 0 12px 24px -4px rgba(43, 37, 31, 0.06);
   --ease: 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -1645,6 +1607,40 @@ img { display: block; max-width: 100%; }
 .btn-secondary:active,
 .btn-action:active {
   transform: scale(0.98);
+}
+
+.btn-subtle {
+  background: var(--accent-dim);
+  color: var(--accent);
+  border: 1px solid transparent;
+  font-weight: 600;
+}
+
+.btn-subtle:hover {
+  background: var(--accent-dim);
+  color: var(--accent-light, var(--accent));
+  filter: brightness(1.08);
+}
+
+.btn-icon {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: var(--radius-xs, 6px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-btn, var(--border));
+  cursor: pointer;
+  transition: all var(--ease);
+}
+
+.btn-icon:hover {
+  background: var(--surface-3);
+  color: var(--text-primary);
+  border-color: var(--accent);
 }
 
 /* ── Responsive — Desktop ≥768px ──────────────────────────── */

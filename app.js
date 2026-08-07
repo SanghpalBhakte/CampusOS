@@ -3136,41 +3136,44 @@ function renderDashboard() {
   const quickLinksPreview = loadCustomLinks().slice(0, 4);
 
   el.innerHTML = `
-    <div class="dashboard-hero-header">
+    <div class="dashboard-hero-header" style="margin-bottom:20px">
       <div class="greeting-banner">
-        <div class="greeting-text">${greetingHeading}</div>
-        <div class="greeting-date">
-          ${icons.calendar()}
-          <span>${DAY_NAMES[now.getDay()]}, ${now.getDate()} ${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}</span>
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap">
+          <div>
+            <div class="greeting-text">${greetingHeading}</div>
+            <div class="greeting-date">
+              ${icons.calendar()}
+              <span>${DAY_NAMES[now.getDay()]}, ${now.getDate()} ${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}</span>
+            </div>
+          </div>
+          <button class="btn btn-sm btn-review" onclick="navigateTo('review')" title="Open Weekly Review & Reflection">
+            ${icons.calendar()} Weekly Review
+          </button>
         </div>
+        ${countdownHTML ? `<div style="margin-top:14px;padding-top:12px;border-top:1px dashed rgba(255,255,255,0.2);font-size:0.82rem">${countdownHTML}</div>` : ''}
       </div>
-      <button class="btn btn-sm btn-review" onclick="navigateTo('review')" title="Open Attendance & Weekly Review">
-        ${icons.calendar()} Attendance
-      </button>
     </div>
 
-    <div id="quick-add-container" style="margin-bottom:12px">
-      <div class="card" style="display:flex;align-items:center;gap:10px;padding:8px 12px">
+    <!-- ACTION STRIP (Quick Add & Assistant) -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:10px;margin-bottom:20px">
+      <div class="card card-sm" style="display:flex;align-items:center;gap:8px;padding:8px 12px">
         <div style="color:var(--accent);opacity:0.8">${icons.plus()}</div>
-        <input type="text" id="quick-add-input" placeholder="Quick add: 'DS assignment due Friday'" style="flex:1;border:none;background:transparent;outline:none;font-size:0.9rem;color:var(--text-primary)" onkeypress="if(event.key==='Enter') handleQuickAdd()">
-        <button class="btn btn-sm btn-primary" onclick="handleQuickAdd()" style="padding:4px 12px">Add</button>
+        <input type="text" id="quick-add-input" placeholder="Quick add: 'DS assignment due Friday'" style="flex:1;border:none;background:transparent;outline:none;font-size:0.88rem;color:var(--text-primary)" onkeypress="if(event.key==='Enter') handleQuickAdd()">
+        <button class="btn btn-xs btn-primary" onclick="handleQuickAdd()">Add</button>
       </div>
-    </div>
-    
-    <div style="margin-bottom:16px">
-      <div class="card" style="display:flex;align-items:center;gap:10px;padding:8px 12px">
+
+      <div class="card card-sm" style="display:flex;align-items:center;gap:8px;padding:8px 12px">
         <div style="color:var(--accent);opacity:0.8">✨</div>
-        <input type="text" id="assistant-input" placeholder="Ask Clarity Desk (e.g. 'What do I need to do today?')" style="flex:1;border:none;background:transparent;outline:none;font-size:0.9rem;color:var(--text-primary)" onkeypress="if(event.key==='Enter') handleAssistantQuestion()">
+        <input type="text" id="assistant-input" placeholder="Ask Clarity Desk (e.g. 'What do I need to do today?')" style="flex:1;border:none;background:transparent;outline:none;font-size:0.88rem;color:var(--text-primary)" onkeypress="if(event.key==='Enter') handleAssistantQuestion()">
       </div>
     </div>
     <div id="assistant-answer-container"></div>
 
     ${setupBanner}
-    ${countdownHTML}
 
     <!-- WEEKLY REVIEW & PREP BANNER -->
     ${!isWeeklyReviewDismissed() ? `
-      <div class="card card-sm" style="margin-bottom:16px;padding:12px 16px;background:var(--accent-dim);border:1px solid var(--accent);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+      <div class="card card-sm" style="margin-bottom:20px;padding:12px 16px;background:var(--accent-dim);border:1px solid var(--accent);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
         <div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1">
           <span style="font-size:1.2rem;flex-shrink:0">🗓️</span>
           <div style="min-width:0">
@@ -3189,7 +3192,7 @@ function renderDashboard() {
     ${(() => {
       const dashGuidance = calculateSmartAttendanceGuidance(totalAttended, totalSkipped, 75);
       return `
-        <div class="card card-sm" style="margin-bottom:16px;padding:12px 16px;border-left:3px solid ${isAttendanceAtRisk ? 'var(--red)' : attendancePct !== null ? 'var(--green)' : 'var(--accent)'};background:${isAttendanceAtRisk ? 'rgba(239,68,68,0.06)' : 'var(--surface-2)'}">
+        <div class="card card-sm" style="margin-bottom:20px;padding:12px 16px;border-left:3px solid ${isAttendanceAtRisk ? 'var(--red)' : attendancePct !== null ? 'var(--green)' : 'var(--accent)'};background:${isAttendanceAtRisk ? 'rgba(239,68,68,0.06)' : 'var(--surface-2)'}">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
             <div style="display:flex;align-items:center;gap:10px">
               <div style="font-size:1.15rem;display:grid;place-items:center">${isAttendanceAtRisk ? '⚠️' : attendancePct !== null ? '✅' : '📊'}</div>
@@ -3211,9 +3214,9 @@ function renderDashboard() {
     })()}
 
     <!-- 2. QUICK STATS GRID -->
-    <div class="stat-grid" style="margin-bottom:16px">
+    <div class="stat-grid" style="margin-bottom:24px">
       <div class="stat-card" onclick="navigateTo('timetable')" style="cursor:pointer">
-        <div class="stat-icon" style="background:rgba(99,102,241,0.12);color:var(--accent)">${icons.timetable()}</div>
+        <div class="stat-icon" style="background:var(--accent-dim);color:var(--accent)">${icons.timetable()}</div>
         <div class="stat-value">${classesLeftCount}</div>
         <div class="stat-label">Classes Left</div>
       </div>
@@ -3235,8 +3238,8 @@ function renderDashboard() {
     </div>
 
     <!-- 3. CLASS NOW / NEXT HIGHLIGHT CARD -->
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-      <div class="section-heading" style="margin-bottom:0">Class Schedule</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div class="section-heading" style="margin-bottom:0;margin-top:0">Class Schedule</div>
       <button class="btn btn-sm btn-action" onclick="navigateTo('timetable')">Open Timetable →</button>
     </div>
 
@@ -3246,7 +3249,7 @@ function renderDashboard() {
           NOW
         </div>
         <div style="flex:1;min-width:0">
-          <div style="font-weight:700;font-size:0.95rem">${activeClass.subject}</div>
+          <div style="font-weight:700;font-size:0.95rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${activeClass.subject}">${activeClass.subject}</div>
           <div class="text-xs text-muted" style="margin-top:2px">${activeClass.time} ${activeClass.end ? '- ' + activeClass.end : ''} ${activeClass.room ? '· ' + activeClass.room : ''} ${activeClass.teacher ? '· ' + activeClass.teacher : ''}</div>
         </div>
         <span class="type-badge type-${activeClass.type || 'lecture'}">${activeClass.type || 'lecture'}</span>
@@ -3257,7 +3260,7 @@ function renderDashboard() {
           NEXT
         </div>
         <div style="flex:1;min-width:0">
-          <div style="font-weight:700;font-size:0.95rem">${nextClass.subject}</div>
+          <div style="font-weight:700;font-size:0.95rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${nextClass.subject}">${nextClass.subject}</div>
           <div class="text-xs text-muted" style="margin-top:2px">${nextClass.time} ${nextClass.end ? '- ' + nextClass.end : ''} ${nextClass.room ? '· ' + nextClass.room : ''} ${nextClass.teacher ? '· ' + nextClass.teacher : ''}</div>
         </div>
         <span class="type-badge type-${nextClass.type || 'lecture'}">${nextClass.type || 'lecture'}</span>
