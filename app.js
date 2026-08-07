@@ -2855,19 +2855,56 @@ function answerUnknown() {
 // ── Dashboard ─────────────────────────────────────────────────
 function renderDashboard() {
   const el       = document.getElementById('page-dashboard');
+  if (!el) return;
   const now      = new Date();
+  const dateStr  = todayStr();
+  const currentMin = currentTimeMinutes();
+  const dayIdx   = now.getDay();
+
   const pending  = pendingCount();
   const overdue  = overdueCount();
-  const classes  = todayClasses();
+  const classesLeftCount = todayClasses();
 
   const total          = allTasks().length;
   const submittedCount = allTasks().filter(a => a.status === 'submitted').length;
   const progress       = total === 0 ? 0 : Math.round((submittedCount / total) * 100);
 
   const liveTT     = loadTimetable();
-  const dayClasses = (liveTT[now.getDay()] || []).filter(isTeachingClass);
-  const currentMin = currentTimeMinutes();
-  const nextClass  = dayClasses.find(c => timeToMinutes(c.end || '23:59') > currentMin);
+  const dayClasses = (liveTT[dayIdx] || []).filter(isTeachingClass);
+
+  // Attendance calculation & risk assessment
+  const attendanceData = safeGetStorage(KEY_ATTENDANCE, {}) || {};
+  let totalAttended = 0;
+  let totalSkipped = 0;
+  Object.values(attendanceData).forEach(dayObj => {
+    if (dayObj && typeof dayObj === 'object') {
+      Object.values(dayObj).forEach(st => {
+        if (st === 'attended') totalAttended++;
+        else if (st === 'skipped') totalSkipped++;
+      });
+    }
+  });
+  const totalMarked = totalAttended + totalSkipped;
+  const attendancePct = totalMarked > 0 ? Math.round((totalAttended / totalMarked) * 100) : null;
+  const isAttendanceAtRisk = attendancePct !== null && attendancePct < 75;
+
+  // Active class (now) or next class
+  let activeClass = null;
+  let nextClass = null;
+
+  for (const c of dayClasses) {
+    const startMin = timeToMinutes(c.time || '00:00');
+    const endMin   = timeToMinutes(c.end || '23:59');
+    if (currentMin >= startMin && currentMin < endMin) {
+      activeClass = c;
+      break;
+    }
+  }
+
+  if (!activeClass) {
+    nextClass = dayClasses.find(c => timeToMinutes(c.time || '00:00') > currentMin);
+  }
+
   // Exam countdown
   let countdownHTML = '';
   if (liveProfile.examDate) {
@@ -2876,18 +2913,18 @@ function renderDashboard() {
     const daysLeft = Math.ceil((examDay - today) / 86400000);
     if (daysLeft > 0) {
       countdownHTML = `
-        <div class="card" style="margin-bottom:20px;display:flex;align-items:center;gap:14px;border-left:3px solid var(--yellow)">
-          <div style="width:40px;height:40px;border-radius:8px;background:rgba(245,158,11,0.12);color:var(--yellow);display:grid;place-items:center;flex-shrink:0">
+        <div class="card" style="margin-bottom:16px;display:flex;align-items:center;gap:14px;border-left:3px solid var(--yellow)">
+          <div style="width:36px;height:36px;border-radius:8px;background:rgba(245,158,11,0.12);color:var(--yellow);display:grid;place-items:center;flex-shrink:0">
             ${icons.clock()}
           </div>
           <div>
-            <div style="font-weight:700;font-size:1.05rem">${daysLeft} days to End-Sem Exams</div>
-            <div style="font-size:0.8rem;color:var(--text-muted)">${formatDate(liveProfile.examDate)} · Keep going! 📚</div>
+            <div style="font-weight:700;font-size:0.95rem">${daysLeft} days to End-Sem Exams</div>
+            <div style="font-size:0.78rem;color:var(--text-muted)">${formatDate(liveProfile.examDate)} · Keep going! 📚</div>
           </div>
         </div>`;
     } else if (daysLeft === 0) {
       countdownHTML = `
-        <div class="card" style="margin-bottom:20px;border-left:3px solid var(--accent);padding:16px;font-weight:600">
+        <div class="card" style="margin-bottom:16px;border-left:3px solid var(--accent);padding:14px;font-weight:600">
           🎯 Exam is today — all the best!
         </div>`;
     }
@@ -2898,22 +2935,29 @@ function renderDashboard() {
   const greetingHeading = displayName ? `${greetingWord()}, ${displayName.split(' ')[0]}! 👋` : `${greetingWord()}! 👋`;
 
   const setupBanner = needsSetup ? `
-    <div class="card" style="margin-bottom:20px;display:flex;align-items:center;gap:12px;background:var(--accent-dim);border-color:var(--accent)">
+    <div class="card" style="margin-bottom:16px;display:flex;align-items:center;gap:12px;background:var(--accent-dim);border-color:var(--accent)">
       <div style="color:var(--accent);flex-shrink:0">${icons.user()}</div>
       <div style="flex:1;font-size:0.87rem">
-        <strong>Personalize Clarity Desk</strong> — set up your name, college, and roll number in Settings.
+        <strong>Personalize Clarity Desk</strong> — set up your profile in Settings.
       </div>
       <button class="btn-primary" onclick="navigateTo('settings')" style="flex-shrink:0;padding:6px 14px;font-size:0.8rem">Set Up Profile</button>
     </div>` : '';
 
-  const importantNotices = NOTICES.filter(n => n.important).slice(0, 2);
-  const dueSoonList = allTasks()
-        .filter(a => a.status === 'pending')
-        .sort((a,b) => a.dueDate.localeCompare(b.dueDate))
-        .slice(0, 3);
-  const quickLinksPreview = loadCustomLinks().slice(0, 4);
+  // Urgent tasks: Overdue or Due Today first, then due soon
+  const urgentTasks = allTasks()
+    .filter(a => a.status === 'pending')
+    .sort((a,b) => {
+      const daysA = dueDaysLeft(a.dueDate);
+      const daysB = dueDaysLeft(b.dueDate);
+      if (daysA < 0 && daysB >= 0) return -1;
+      if (daysB < 0 && daysA >= 0) return 1;
+      return a.dueDate.localeCompare(b.dueDate);
+    })
+    .slice(0, 4);
 
-  const tasksDueToday = allTasks().filter(a => a.status === 'pending' && a.dueDate === todayStr()).length;
+  // Latest notice
+  const latestNotice = NOTICES.find(n => n.important) || NOTICES[0];
+  const quickLinksPreview = loadCustomLinks().slice(0, 4);
 
   el.innerHTML = `
     <div class="dashboard-hero-header">
@@ -2924,8 +2968,8 @@ function renderDashboard() {
           <span>${DAY_NAMES[now.getDay()]}, ${now.getDate()} ${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}</span>
         </div>
       </div>
-      <button class="btn btn-sm btn-review" onclick="navigateTo('review')" title="Open Weekly Review">
-        ${icons.calendar()} Review
+      <button class="btn btn-sm btn-review" onclick="navigateTo('review')" title="Open Attendance & Weekly Review">
+        ${icons.calendar()} Attendance
       </button>
     </div>
 
@@ -2937,29 +2981,42 @@ function renderDashboard() {
       </div>
     </div>
     
-    <div style="margin-bottom:12px">
+    <div style="margin-bottom:16px">
       <div class="card" style="display:flex;align-items:center;gap:10px;padding:8px 12px">
         <div style="color:var(--accent);opacity:0.8">✨</div>
         <input type="text" id="assistant-input" placeholder="Ask Clarity Desk (e.g. 'What do I need to do today?')" style="flex:1;border:none;background:transparent;outline:none;font-size:0.9rem;color:var(--text-primary)" onkeypress="if(event.key==='Enter') handleAssistantQuestion()">
       </div>
     </div>
     <div id="assistant-answer-container"></div>
-    
-    <div class="card card-sm" style="margin-bottom:20px;display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surface-2)">
-      <div style="color:var(--text-secondary)">📅</div>
-      <div style="font-size:0.85rem;color:var(--text-secondary)">
-        <strong>Today:</strong> ${classes} classes left, ${tasksDueToday} pending ${tasksDueToday === 1 ? 'task' : 'tasks'} due.
-      </div>
-    </div>
 
     ${setupBanner}
     ${countdownHTML}
 
-    <!-- 1. TODAY INFORMATION -->
-    <div class="stat-grid">
+    <!-- 1. ATTENDANCE RISK WARNING BLOCK -->
+    <div class="card card-sm" style="margin-bottom:16px;padding:12px 16px;border-left:3px solid ${isAttendanceAtRisk ? 'var(--red)' : attendancePct !== null ? 'var(--green)' : 'var(--accent)'};background:${isAttendanceAtRisk ? 'rgba(239,68,68,0.06)' : 'var(--surface-2)'}">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="font-size:1.15rem;display:grid;place-items:center">${isAttendanceAtRisk ? '⚠️' : attendancePct !== null ? '✅' : '📊'}</div>
+          <div>
+            <div style="font-weight:700;font-size:0.88rem;color:${isAttendanceAtRisk ? 'var(--red)' : 'var(--text-primary)'}">
+              ${isAttendanceAtRisk ? `Attendance at Risk (${attendancePct}%)` : attendancePct !== null ? `Attendance on Track (${attendancePct}%)` : 'Attendance Tracker'}
+            </div>
+            <div style="font-size:0.76rem;color:var(--text-muted);margin-top:1px">
+              ${attendancePct !== null ? `${totalAttended} of ${totalMarked} classes attended (Target: 75%)` : 'No classes marked yet — tap today\'s classes below to track'}
+            </div>
+          </div>
+        </div>
+        <button class="btn btn-sm" onclick="navigateTo('review')" style="font-size:0.75rem;padding:4px 10px;white-space:nowrap;background:transparent;border:1px solid var(--border)">
+          Open Attendance →
+        </button>
+      </div>
+    </div>
+
+    <!-- 2. QUICK STATS GRID -->
+    <div class="stat-grid" style="margin-bottom:16px">
       <div class="stat-card" onclick="navigateTo('timetable')" style="cursor:pointer">
         <div class="stat-icon" style="background:rgba(99,102,241,0.12);color:var(--accent)">${icons.timetable()}</div>
-        <div class="stat-value">${classes}</div>
+        <div class="stat-value">${classesLeftCount}</div>
         <div class="stat-label">Classes Left</div>
       </div>
       <div class="stat-card" onclick="navigateTo('assignments')" style="cursor:pointer">
@@ -2972,89 +3029,152 @@ function renderDashboard() {
         <div class="stat-value" style="color:${overdue>0?'var(--red)':'inherit'}">${overdue}</div>
         <div class="stat-label">Overdue</div>
       </div>
-      <div class="stat-card">
+      <div class="stat-card" onclick="navigateTo('assignments')" style="cursor:pointer">
         <div class="stat-icon" style="background:rgba(16,185,129,0.12);color:var(--green)">${icons.check()}</div>
         <div class="stat-value" style="color:var(--green)">${submittedCount}</div>
         <div class="stat-label">Submitted</div>
       </div>
     </div>
 
-    <div class="section-heading">Next Class</div>
-    ${nextClass ? `
-    <div class="card" style="display:flex;gap:14px;align-items:center;margin-bottom:20px;cursor:pointer" onclick="navigateTo('timetable')">
-      <div style="width:44px;height:44px;border-radius:10px;background:var(--accent-dim);color:var(--accent);display:grid;place-items:center;flex-shrink:0">
-        ${icons.clock()}
-      </div>
-      <div style="flex:1;min-width:0">
-        <div style="font-weight:700">${nextClass.subject}</div>
-        <div class="text-sm text-muted">${nextClass.time} · ${nextClass.room} · ${nextClass.teacher}</div>
-      </div>
-      <span class="type-badge type-${nextClass.type || 'lecture'}">${nextClass.type || 'lecture'}</span>
-    </div>` : `
-    <div class="card card-sm" style="margin-bottom:20px;padding:24px;text-align:center;color:var(--text-muted)">
-      ${dayClasses.length > 0 
-          ? "🎉 All classes finished for today!" 
-          : "🎉 No classes today — enjoy the break!"}
-    </div>`}
+    <!-- 3. CLASS NOW / NEXT HIGHLIGHT CARD -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <div class="section-heading" style="margin-bottom:0">Class Schedule</div>
+      <button class="btn btn-sm" onclick="navigateTo('timetable')" style="font-size:0.75rem;padding:2px 8px">Open Timetable →</button>
+    </div>
 
-    ${dueSoonList.length > 0 ? `
-    <div class="section-heading">Due Soon</div>
-    <div style="margin-bottom:20px">
-      ${dueSoonList.map(a => {
-        const days  = dueDaysLeft(a.dueDate);
-        const label = days < 0 ? 'Overdue' : days === 0 ? 'Due Today' : `${days}d left`;
-        const cls   = days < 0 ? 'overdue' : days === 0 ? 'today' : days <= 3 ? 'soon' : '';
-        const done  = a.status === 'submitted';
-        return `
-          <div class="card card-sm assignment-card" style="margin-bottom:8px;display:flex;align-items:center;gap:12px;cursor:pointer;padding:12px 14px"
-               onclick="toggleAssignment('${a.id}')" title="Click to mark ${done ? 'pending' : 'done'}">
-            <div style="width:18px;height:18px;border-radius:5px;border:2px solid ${done?'var(--green)':a.priority==='high'?'var(--red)':a.priority==='medium'?'var(--yellow)':'var(--border)'};background:${done?'var(--green)':'transparent'};display:grid;place-items:center;flex-shrink:0;color:white;transition:all 0.15s">
-              ${done ? icons.check() : ''}
-            </div>
-            <div style="flex:1;min-width:0">
-              <div class="font-semibold" style="font-size:0.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${done?'text-decoration:line-through;opacity:0.5':''}">${a.title}</div>
-              <div class="text-xs text-muted">${a.subject}</div>
-            </div>
-            <span class="due-badge ${cls}">${label}</span>
-          </div>`;
-      }).join('')}
-    </div>` : ''}
-
-    ${importantNotices.length > 0 ? `
-    <div class="section-heading">Important Notices</div>
-    <div style="margin-bottom:20px">
-      ${importantNotices.map(n => `
-        <div class="card card-sm notice-card important" onclick="navigateTo('notices')" style="margin-bottom:8px;padding:12px 14px">
-          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
-            <div style="font-weight:600;font-size:0.9rem">${n.title}</div>
-            <span class="cat-badge cat-${n.category}">${n.category}</span>
-          </div>
-          <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px">${formatDate(n.date)}</div>
+    ${activeClass ? `
+      <div class="card" style="display:flex;gap:14px;align-items:center;margin-bottom:12px;border-left:4px solid var(--accent);background:var(--accent-dim)">
+        <div style="width:40px;height:40px;border-radius:10px;background:var(--accent);color:white;display:grid;place-items:center;flex-shrink:0;font-size:0.7rem;font-weight:700">
+          NOW
         </div>
-      `).join('')}
-    </div>` : ''}
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;font-size:0.95rem">${activeClass.subject}</div>
+          <div class="text-xs text-muted" style="margin-top:2px">${activeClass.time} ${activeClass.end ? '- ' + activeClass.end : ''} ${activeClass.room ? '· ' + activeClass.room : ''} ${activeClass.teacher ? '· ' + activeClass.teacher : ''}</div>
+        </div>
+        <span class="type-badge type-${activeClass.type || 'lecture'}">${activeClass.type || 'lecture'}</span>
+      </div>
+    ` : nextClass ? `
+      <div class="card" style="display:flex;gap:14px;align-items:center;margin-bottom:12px">
+        <div style="width:40px;height:40px;border-radius:10px;background:var(--surface-2);color:var(--accent);display:grid;place-items:center;flex-shrink:0;font-size:0.68rem;font-weight:700;border:1px solid var(--border)">
+          NEXT
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;font-size:0.95rem">${nextClass.subject}</div>
+          <div class="text-xs text-muted" style="margin-top:2px">${nextClass.time} ${nextClass.end ? '- ' + nextClass.end : ''} ${nextClass.room ? '· ' + nextClass.room : ''} ${nextClass.teacher ? '· ' + nextClass.teacher : ''}</div>
+        </div>
+        <span class="type-badge type-${nextClass.type || 'lecture'}">${nextClass.type || 'lecture'}</span>
+      </div>
+    ` : `
+      <div class="card card-sm" style="margin-bottom:12px;padding:16px;text-align:center;color:var(--text-muted);font-size:0.85rem">
+        ${dayClasses.length > 0 ? '🎉 All classes finished for today!' : '🎉 No classes scheduled today — enjoy your day!'}
+      </div>
+    `}
 
-    <!-- 2. UPCOMING ITEMS -->
-    <div class="section-heading">Assignment Progress</div>
-    <div class="card" style="margin-bottom:20px;cursor:pointer" onclick="navigateTo('assignments')">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <span class="text-sm font-semibold">Submitted ${submittedCount} / ${total}</span>
-        <span class="text-sm text-muted">${progress}%</span>
+    <!-- TODAY'S CLASSES SEQUENCE WITH QUICK ATTEND / SKIP -->
+    ${dayClasses.length > 0 ? `
+      <div style="margin-bottom:16px">
+        ${dayClasses.map(c => {
+          const classKey = `${c.code || c.subject}_${c.time}`.replace(/[^a-zA-Z0-9_]/g, '');
+          const status = attendanceData[dateStr]?.[classKey] || 'unset';
+          const isNow = (currentMin >= timeToMinutes(c.time || '00:00') && currentMin < timeToMinutes(c.end || '23:59'));
+          return `
+            <div class="card card-sm" style="margin-bottom:6px;padding:8px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;${isNow ? 'border-left:3px solid var(--accent)' : ''}">
+              <div style="flex:1;min-width:140px">
+                <div style="font-weight:600;font-size:0.85rem;display:flex;align-items:center;gap:6px">
+                  ${c.subject}
+                  ${isNow ? '<span class="type-badge" style="background:var(--accent);color:white;font-size:0.6rem;padding:1px 5px">NOW</span>' : ''}
+                </div>
+                <div style="font-size:0.72rem;color:var(--text-muted);margin-top:1px">
+                  ${c.time}${c.end ? ' - ' + c.end : ''} ${c.room ? '· ' + c.room : ''}
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:4px">
+                <button class="btn btn-sm" onclick="setAttendance('${dateStr}', '${classKey}', 'attended')" aria-label="Mark ${c.subject} as attended" style="padding:3px 8px;font-size:0.72rem;font-weight:600;background:${status==='attended'?'var(--green)':'var(--surface-2)'};color:${status==='attended'?'white':'var(--text-primary)'};border:1px solid ${status==='attended'?'var(--green)':'var(--border)'}">
+                  ${status==='attended'?'✓ Attended':'Attended'}
+                </button>
+                <button class="btn btn-sm" onclick="setAttendance('${dateStr}', '${classKey}', 'skipped')" aria-label="Mark ${c.subject} as skipped" style="padding:3px 8px;font-size:0.72rem;font-weight:600;background:${status==='skipped'?'var(--red)':'var(--surface-2)'};color:${status==='skipped'?'white':'var(--text-primary)'};border:1px solid ${status==='skipped'?'var(--red)':'var(--border)'}">
+                  ${status==='skipped'?'✕ Skipped':'Skipped'}
+                </button>
+              </div>
+            </div>`;
+        }).join('')}
+      </div>
+    ` : ''}
+
+    <!-- 4. URGENT TASKS -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;margin-top:16px">
+      <div class="section-heading" style="margin-bottom:0">Urgent Tasks</div>
+      <button class="btn btn-sm" onclick="navigateTo('assignments')" style="font-size:0.75rem;padding:2px 8px">Open Tasks (${pending}) →</button>
+    </div>
+
+    ${urgentTasks.length > 0 ? `
+      <div style="margin-bottom:16px">
+        ${urgentTasks.map(a => {
+          const days  = dueDaysLeft(a.dueDate);
+          const label = days < 0 ? 'Overdue' : days === 0 ? 'Due Today' : `${days}d left`;
+          const cls   = days < 0 ? 'overdue' : days === 0 ? 'today' : days <= 3 ? 'soon' : '';
+          const done  = a.status === 'submitted';
+          return `
+            <div class="card card-sm assignment-card" style="margin-bottom:6px;display:flex;align-items:center;gap:10px;padding:10px 12px">
+              <div onclick="toggleAssignment('${a.id}')" title="Click to mark done" style="width:18px;height:18px;border-radius:4px;border:2px solid ${done ? 'var(--green)' : a.priority==='high' ? 'var(--red)' : a.priority==='medium' ? 'var(--yellow)' : 'var(--border)'};background:${done ? 'var(--green)' : 'transparent'};display:grid;place-items:center;flex-shrink:0;color:white;cursor:pointer;transition:all 0.15s">
+                ${done ? icons.check() : ''}
+              </div>
+              <div style="flex:1;min-width:0;cursor:pointer" onclick="navigateTo('assignments')">
+                <div class="font-semibold" style="font-size:0.88rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${done?'text-decoration:line-through;opacity:0.5':''}">${a.title}</div>
+                <div class="text-xs text-muted">${a.subject || 'Task'}</div>
+              </div>
+              <span class="due-badge ${cls}">${label}</span>
+            </div>`;
+        }).join('')}
+      </div>
+    ` : `
+      <div class="card card-sm" style="margin-bottom:16px;padding:12px 14px;text-align:center;color:var(--text-muted);font-size:0.85rem">
+        ✨ All caught up! No urgent tasks due today.
+      </div>
+    `}
+
+    <!-- 5. LATEST NOTICE -->
+    ${latestNotice ? `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;margin-top:16px">
+        <div class="section-heading" style="margin-bottom:0">Latest Notice</div>
+        <button class="btn btn-sm" onclick="navigateTo('notices')" style="font-size:0.75rem;padding:2px 8px">Open Notices →</button>
+      </div>
+      <div class="card card-sm notice-card ${latestNotice.important ? 'important' : ''}" onclick="navigateTo('notices')" style="margin-bottom:16px;padding:12px 14px;cursor:pointer">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+          <div style="font-weight:600;font-size:0.88rem;color:var(--text-primary)">${latestNotice.title}</div>
+          <span class="cat-badge cat-${latestNotice.category}">${latestNotice.category}</span>
+        </div>
+        <div style="font-size:0.78rem;color:var(--text-secondary);margin-top:4px;line-height:1.4">
+          ${latestNotice.content.length > 110 ? latestNotice.content.slice(0, 107) + '…' : latestNotice.content}
+        </div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;display:flex;align-items:center;justify-content:space-between">
+          <span>${formatDate(latestNotice.date)}</span>
+          <span style="color:var(--accent);font-weight:600">Read Notice →</span>
+        </div>
+      </div>
+    ` : ''}
+
+    <!-- 6. ASSIGNMENT PROGRESS & QUICK LINKS -->
+    <div class="section-heading" style="margin-top:16px">Assignment Progress</div>
+    <div class="card" style="margin-bottom:16px;cursor:pointer" onclick="navigateTo('assignments')">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <span class="text-xs font-semibold">Submitted ${submittedCount} of ${total}</span>
+        <span class="text-xs text-muted">${progress}%</span>
       </div>
       <div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:${progress}%"></div></div>
     </div>
 
-    <!-- 3. RESOURCES -->
     ${quickLinksPreview.length > 0 ? `
-    <div class="section-heading">Quick Links <button class="icon-btn-xs" style="float:right" onclick="navigateTo('resources')">→</button></div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(180px, 1fr));gap:8px;margin-bottom:20px">
-      ${quickLinksPreview.map(s => `
-        <div class="card card-sm" style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:12px 14px" onclick="navigateTo('resources')">
-          <span style="width:8px;height:8px;border-radius:50%;background:${s.color || 'var(--accent)'};flex-shrink:0"></span>
-          <span style="font-weight:600;font-size:0.85rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${s.subject}</span>
-        </div>
-      `).join('')}
-    </div>` : ''}
+      <div class="section-heading">Quick Links <button class="icon-btn-xs" style="float:right" onclick="navigateTo('resources')">→</button></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(160px, 1fr));gap:8px;margin-bottom:16px">
+        ${quickLinksPreview.map(s => `
+          <div class="card card-sm" style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px 12px" onclick="navigateTo('resources')">
+            <span style="width:8px;height:8px;border-radius:50%;background:${s.color || 'var(--accent)'};flex-shrink:0"></span>
+            <span style="font-weight:600;font-size:0.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${s.subject}</span>
+          </div>
+        `).join('')}
+      </div>
+    ` : ''}
   `;
 }
 
