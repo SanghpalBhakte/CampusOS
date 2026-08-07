@@ -3006,7 +3006,7 @@ function renderDashboard() {
             </div>
           </div>
         </div>
-        <button class="btn btn-sm" onclick="navigateTo('review')" style="font-size:0.75rem;padding:4px 10px;white-space:nowrap;background:transparent;border:1px solid var(--border)">
+        <button class="btn btn-sm btn-action" onclick="navigateTo('review')">
           Open Attendance →
         </button>
       </div>
@@ -3039,7 +3039,7 @@ function renderDashboard() {
     <!-- 3. CLASS NOW / NEXT HIGHLIGHT CARD -->
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
       <div class="section-heading" style="margin-bottom:0">Class Schedule</div>
-      <button class="btn btn-sm" onclick="navigateTo('timetable')" style="font-size:0.75rem;padding:2px 8px">Open Timetable →</button>
+      <button class="btn btn-sm btn-action" onclick="navigateTo('timetable')">Open Timetable →</button>
     </div>
 
     ${activeClass ? `
@@ -3089,10 +3089,10 @@ function renderDashboard() {
                 </div>
               </div>
               <div style="display:flex;align-items:center;gap:4px">
-                <button class="btn btn-sm" onclick="setAttendance('${dateStr}', '${classKey}', 'attended')" aria-label="Mark ${c.subject} as attended" style="padding:3px 8px;font-size:0.72rem;font-weight:600;background:${status==='attended'?'var(--green)':'var(--surface-2)'};color:${status==='attended'?'white':'var(--text-primary)'};border:1px solid ${status==='attended'?'var(--green)':'var(--border)'}">
+                <button class="btn btn-sm ${status==='attended'?'btn-primary':'btn-secondary'}" onclick="setAttendance('${dateStr}', '${classKey}', 'attended')" aria-label="Mark ${c.subject} as attended" style="padding:3px 8px;font-size:0.72rem;font-weight:600;${status==='attended'?'background:var(--green);border-color:var(--green);':''}">
                   ${status==='attended'?'✓ Attended':'Attended'}
                 </button>
-                <button class="btn btn-sm" onclick="setAttendance('${dateStr}', '${classKey}', 'skipped')" aria-label="Mark ${c.subject} as skipped" style="padding:3px 8px;font-size:0.72rem;font-weight:600;background:${status==='skipped'?'var(--red)':'var(--surface-2)'};color:${status==='skipped'?'white':'var(--text-primary)'};border:1px solid ${status==='skipped'?'var(--red)':'var(--border)'}">
+                <button class="btn btn-sm ${status==='skipped'?'btn-primary':'btn-secondary'}" onclick="setAttendance('${dateStr}', '${classKey}', 'skipped')" aria-label="Mark ${c.subject} as skipped" style="padding:3px 8px;font-size:0.72rem;font-weight:600;${status==='skipped'?'background:var(--red);border-color:var(--red);':''}">
                   ${status==='skipped'?'✕ Skipped':'Skipped'}
                 </button>
               </div>
@@ -3104,7 +3104,7 @@ function renderDashboard() {
     <!-- 4. URGENT TASKS -->
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;margin-top:16px">
       <div class="section-heading" style="margin-bottom:0">Urgent Tasks</div>
-      <button class="btn btn-sm" onclick="navigateTo('assignments')" style="font-size:0.75rem;padding:2px 8px">Open Tasks (${pending}) →</button>
+      <button class="btn btn-sm btn-action" onclick="navigateTo('assignments')">Open Tasks (${pending}) →</button>
     </div>
 
     ${urgentTasks.length > 0 ? `
@@ -3137,7 +3137,7 @@ function renderDashboard() {
     ${latestNotice ? `
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;margin-top:16px">
         <div class="section-heading" style="margin-bottom:0">Latest Notice</div>
-        <button class="btn btn-sm" onclick="navigateTo('notices')" style="font-size:0.75rem;padding:2px 8px">Open Notices →</button>
+        <button class="btn btn-sm btn-action" onclick="navigateTo('notices')">Open Notices →</button>
       </div>
       <div class="card card-sm notice-card ${latestNotice.important ? 'important' : ''}" onclick="navigateTo('notices')" style="margin-bottom:16px;padding:12px 14px;cursor:pointer">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
@@ -3149,7 +3149,7 @@ function renderDashboard() {
         </div>
         <div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;display:flex;align-items:center;justify-content:space-between">
           <span>${formatDate(latestNotice.date)}</span>
-          <span style="color:var(--accent);font-weight:600">Read Notice →</span>
+          <span style="color:var(--accent-light, var(--accent));font-weight:600">Read Notice →</span>
         </div>
       </div>
     ` : ''}

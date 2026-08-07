@@ -16,13 +16,15 @@
   --bg:            #f8f6f0;
   --surface:       #ffffff;
   --surface-2:     #f0ece3;
+  --surface-3:     #e6e2d8;
   --border:        #e3ded3;
   --border-light:  #ebe7dc;
+  --border-btn:    #d5cfc2;
 
   /* Text — Muted Graphite */
   --text-primary:  #232628;
   --text-secondary:#52575c;
-  --text-muted:    #888e94;
+  --text-muted:    #767c82;
 
   /* Accent — Muted Teal */
   --accent:        #147980;
@@ -78,8 +80,10 @@
   --bg:            #eef2f6;
   --surface:       #ffffff;
   --surface-2:     #e2e8f0;
+  --surface-3:     #cbd5e1;
   --border:        #cbd5e1;
   --border-light:  #e2e8f0;
+  --border-btn:    #b0c4de;
 
   --text-primary:  #0f172a;
   --text-secondary:#334155;
@@ -104,12 +108,14 @@
   --bg:            #f3f0e8;
   --surface:       #faf8f3;
   --surface-2:     #e6e2d6;
+  --surface-3:     #d8d3c5;
   --border:        #d5d0c3;
   --border-light:  #e3ded2;
+  --border-btn:    #c5bfae;
 
   --text-primary:  #2a2723;
   --text-secondary:#5a554c;
-  --text-muted:    #8e887d;
+  --text-muted:    #7e786e;
 
   --accent:        #2c6e63;
   --accent-light:  #3b8a7d;
@@ -123,25 +129,27 @@
   --shadow-md: 0 4px 6px -1px rgba(42, 39, 35, 0.08), 0 12px 24px -4px rgba(42, 39, 35, 0.06);
 }
 
-/* ── 4) Quiet Dark — Soft Charcoal & Slate Surfaces with Muted Steel-Blue Accents ── */
+/* ── 4) Quiet Dark — Soft Charcoal & Slate Surfaces with High-Contrast Secondary Controls ── */
 [data-theme="quiet-dark"],
 [data-theme="dark"],
 [data-theme="cocoa-night"],
 [data-theme="sunset"] {
   --bg:            #121417;
   --surface:       #1a1d22;
-  --surface-2:     #242830;
-  --border:        rgba(255, 255, 255, 0.09);
-  --border-light:  rgba(255, 255, 255, 0.04);
+  --surface-2:     #242a34;
+  --surface-3:     #2e3644;
+  --border:        rgba(255, 255, 255, 0.12);
+  --border-light:  rgba(255, 255, 255, 0.07);
+  --border-btn:    rgba(255, 255, 255, 0.22);
 
-  --text-primary:  #f0f2f5;
-  --text-secondary:#9ba4b0;
-  --text-muted:    #656e7b;
+  --text-primary:  #f8fafc;
+  --text-secondary:#cbd5e1;
+  --text-muted:    #8a96a8;
 
-  --accent:        #52719a;
-  --accent-light:  #6b8bb8;
-  --accent-dim:    rgba(82, 113, 154, 0.16);
-  --accent-hover:  #3f5a7e;
+  --accent:        #6366f1;
+  --accent-light:  #818cf8;
+  --accent-dim:    rgba(99, 102, 241, 0.20);
+  --accent-hover:  #4f46e5;
 
   --green:  #34d399;
   --yellow: #fbbf24;
@@ -1428,37 +1436,82 @@ img { display: block; max-width: 100%; }
   border-top: 1px solid var(--border);
 }
 
-.btn-primary {
-  padding: 9px 20px;
-  background: var(--accent);
-  color: white;
+/* ── Universal Button System ─────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 14px;
   border-radius: var(--radius-sm);
-  font-size: 0.875rem;
+  font-size: 0.85rem;
   font-weight: 600;
   font-family: var(--font);
-  transition: background var(--ease), transform var(--ease);
-  border: none;
   cursor: pointer;
-  box-shadow: 0 2px 6px rgba(99, 102, 241, 0.25);
+  transition: all var(--ease);
+  white-space: nowrap;
+  user-select: none;
+  text-decoration: none;
+  border: 1px solid transparent;
 }
 
-.btn-primary:hover { background: var(--accent-hover); }
+.btn-sm {
+  padding: 5px 12px;
+  font-size: 0.78rem;
+  border-radius: var(--radius-xs, 6px);
+}
+
+.btn-xs {
+  padding: 3px 8px;
+  font-size: 0.72rem;
+  border-radius: var(--radius-xs, 6px);
+}
+
+.btn-primary {
+  padding: 8px 18px;
+  background: var(--accent);
+  color: #ffffff !important;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-family: var(--font);
+  transition: background var(--ease), transform var(--ease), box-shadow var(--ease);
+  border: 1px solid transparent;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.btn-primary:hover {
+  background: var(--accent-hover);
+  color: #ffffff !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.22);
+}
+
 .btn-primary:active { transform: scale(0.98); }
 
-.btn-secondary {
-  padding: 9px 16px;
+.btn-secondary,
+.btn-outline,
+.btn-action {
   background: var(--surface-2);
-  color: var(--text-secondary);
-  border-radius: var(--radius-sm);
-  font-size: 0.875rem;
+  color: var(--text-primary);
+  border: 1px solid var(--border-btn, var(--border));
   font-weight: 600;
-  font-family: var(--font);
-  border: 1px solid var(--border);
-  transition: background var(--ease);
-  cursor: pointer;
 }
 
-.btn-secondary:hover { background: var(--border); }
+.btn-secondary:hover,
+.btn-outline:hover,
+.btn-action:hover {
+  background: var(--surface-3, var(--surface-2));
+  color: var(--accent-light, var(--accent));
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.btn-secondary:active,
+.btn-action:active {
+  transform: scale(0.98);
+}
 
 /* ── Responsive — Desktop ≥768px ──────────────────────────── */
 @media (min-width: 768px) {
