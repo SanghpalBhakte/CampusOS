@@ -803,10 +803,13 @@ img { display: block; max-width: 100%; }
   color: var(--text-muted);
 }
 
-.type-lecture { background: var(--accent-dim); color: var(--accent); }
-.type-lab     { background: rgba(14, 165, 233, 0.08); color: var(--blue); }
-.type-project { background: rgba(245, 158, 11, 0.08); color: var(--yellow); }
-.type-off     { background: rgba(107, 114, 128, 0.08); color: var(--text-muted); }
+.type-lecture    { background: var(--accent-dim); color: var(--accent); }
+.type-lab        { background: rgba(16, 185, 129, 0.12); color: var(--green); }
+.type-project    { background: rgba(14, 165, 233, 0.12); color: #0ea5e9; }
+.type-off        { background: rgba(107, 114, 128, 0.08); color: var(--text-muted); }
+.type-assignment { background: var(--accent-dim); color: var(--accent); }
+.type-quiz       { background: rgba(245, 158, 11, 0.12); color: var(--yellow); }
+.type-exam       { background: rgba(239, 68, 68, 0.12); color: var(--red); }
 
 /* ── Assignments ────────────────────────────────────────────── */
 .filter-bar {

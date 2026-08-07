@@ -3773,39 +3773,80 @@ function deleteTimetableEntry(day, idx) {
   renderTimetable();
 }
 
-// ── Assignments ───────────────────────────────────────────────
+// ── Assignments & Workload Manager ────────────────────────────
+window.setAssignTypeFilter = function(type) {
+  state.assignTypeFilter = type;
+  renderAssignments();
+};
+
 function renderAssignments() {
   const el  = document.getElementById('page-assignments');
   const all = allTasks();
 
-  const subjects = ['all', ...new Set(all.map(a => a.code))];
+  if (!state.assignTypeFilter) state.assignTypeFilter = 'all';
+  const today = todayStr();
+  const subjects = ['all', ...new Set(all.map(a => a.code || a.subject))];
+
   const statusFilters = [
-    { key:'all',       label:'All'       },
-    { key:'pending',   label:'Pending'   },
-    { key:'submitted', label:'Submitted' },
-    { key:'overdue',   label:'Overdue'   },
+    { key:'all',       label:'All Tasks' },
+    { key:'today',     label:'🔥 Due Today' },
+    { key:'upcoming',  label:'📅 Upcoming' },
+    { key:'overdue',   label:'⚠️ Overdue' },
+    { key:'exams',     label:'🎯 Exams & Quizzes' },
+    { key:'submitted', label:'✓ Completed' },
+  ];
+
+  const typeFilters = [
+    { key:'all',        label:'All Types' },
+    { key:'assignment', label:'📝 Assignments' },
+    { key:'quiz',       label:'⚡ Quizzes' },
+    { key:'lab',        label:'🧪 Labs' },
+    { key:'project',    label:'💻 Projects' },
+    { key:'exam',       label:'🎯 Exams' },
   ];
 
   let filtered = all;
-  if (state.assignFilter === 'pending')   filtered = filtered.filter(a => a.status === 'pending');
-  if (state.assignFilter === 'submitted') filtered = filtered.filter(a => a.status === 'submitted');
-  if (state.assignFilter === 'overdue')   filtered = filtered.filter(a => a.status === 'pending' && a.dueDate < todayStr());
-  if (state.assignSubjectFilter !== 'all') filtered = filtered.filter(a => a.code === state.assignSubjectFilter);
 
+  // Filter by status/deadline
+  if (state.assignFilter === 'today') {
+    filtered = filtered.filter(a => a.status === 'pending' && a.dueDate === today);
+  } else if (state.assignFilter === 'upcoming') {
+    filtered = filtered.filter(a => a.status === 'pending' && a.dueDate >= today);
+  } else if (state.assignFilter === 'overdue') {
+    filtered = filtered.filter(a => a.status === 'pending' && a.dueDate < today);
+  } else if (state.assignFilter === 'exams') {
+    filtered = filtered.filter(a => (a.taskType === 'exam' || a.taskType === 'quiz') && a.status === 'pending');
+  } else if (state.assignFilter === 'submitted') {
+    filtered = filtered.filter(a => a.status === 'submitted');
+  }
+
+  // Filter by subject
+  if (state.assignSubjectFilter !== 'all') {
+    filtered = filtered.filter(a => a.code === state.assignSubjectFilter || a.subject === state.assignSubjectFilter);
+  }
+
+  // Filter by task type
+  if (state.assignTypeFilter !== 'all') {
+    filtered = filtered.filter(a => (a.taskType || 'assignment') === state.assignTypeFilter);
+  }
+
+  // Sorting: Pending first, then due date ascending
   filtered.sort((a,b) => {
     if (a.status !== b.status) return a.status === 'pending' ? -1 : 1;
     return a.dueDate.localeCompare(b.dueDate);
   });
 
   const statusBar  = statusFilters.map(f => `<button class="filter-chip ${f.key===state.assignFilter?'active':''}" onclick="setAssignFilter('${f.key}')">${f.label}</button>`).join('');
+  const typeBar    = typeFilters.map(f => `<button class="filter-chip ${f.key===state.assignTypeFilter?'active':''}" onclick="setAssignTypeFilter('${f.key}')">${f.label}</button>`).join('');
   const subjectBar = subjects.map(s => `<button class="filter-chip ${s===state.assignSubjectFilter?'active':''}" onclick="setAssignSubject('${s}')">${s==='all'?'All Subjects':s}</button>`).join('');
 
   const cards = filtered.length ? filtered.map(a => {
     const days = dueDaysLeft(a.dueDate);
     const done = a.status === 'submitted';
-    const label = done ? 'Submitted' : days < 0 ? `${Math.abs(days)}d overdue` : days === 0 ? 'Due Today' : `${days}d left`;
+    const label = done ? 'Completed ✓' : days < 0 ? `${Math.abs(days)}d overdue` : days === 0 ? 'Due Today' : days === 1 ? 'Due Tomorrow' : `${days}d left`;
     const cls   = done ? '' : days < 0 ? 'overdue' : days === 0 ? 'today' : days <= 3 ? 'soon' : '';
     const isCustom = !!a.isCustom;
+    const taskType = a.taskType || 'assignment';
 
     return `
       <div class="assignment-card priority-${a.priority} ${done?'done':''}" id="ac-${a.id}">
@@ -3814,11 +3855,12 @@ function renderAssignments() {
         </div>
         <div class="assignment-body">
           <div class="assignment-subject" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-            ${a.subject} · ${a.code}
+            <span onclick="openSubjectHub('${a.subject}')" style="cursor:pointer;font-weight:700" title="Open ${a.subject} Hub">${a.subject} ${a.code ? '· ' + a.code : ''}</span>
+            <span class="type-badge type-${taskType}">${taskType}</span>
             ${isCustom ? '<span class="session-badge">My task</span>' : ''}
           </div>
           <div class="assignment-title">${a.title}</div>
-          <div class="assignment-desc">${a.description}</div>
+          ${a.description ? `<div class="assignment-desc">${a.description}</div>` : ''}
           <div class="assignment-footer">
             <span class="due-badge ${cls}">
               ${svg('<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>', 12)}
@@ -3833,21 +3875,185 @@ function renderAssignments() {
         </div>
       </div>`;
   }).join('') : (all.length === 0 
-    ? `<div class="card" style="text-align:center;padding:40px;color:var(--text-muted);border-style:dashed">✨ No tasks yet! Click <strong>+ Add Task</strong> above to create your first task.</div>`
-    : `<div class="card" style="text-align:center;padding:40px;color:var(--text-muted);border-style:dashed">🔍 No tasks found for this filter.</div>`);
+    ? `<div class="card" style="text-align:center;padding:40px;color:var(--text-muted);border-style:dashed">✨ No academic tasks yet! Click <strong>+ Add Task</strong> above to add assignments, quizzes, labs, or exams.</div>`
+    : `<div class="card" style="text-align:center;padding:40px;color:var(--text-muted);border-style:dashed">🔍 No tasks found matching this filter.</div>`);
 
   el.innerHTML = `
     <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start">
       <div>
-        <div class="page-title">Assignments</div>
-        <div class="page-subtitle">${pendingCount()} pending · ${all.filter(a=>a.status==='submitted').length} submitted · ${state.customTasks.length} custom</div>
+        <div class="page-title">Workload & Assignments</div>
+        <div class="page-subtitle">${pendingCount()} pending · ${all.filter(a=>a.status==='submitted').length} completed · Academic task tracking</div>
       </div>
       <button class="btn-primary" onclick="showAddTaskModal()" style="display:flex;align-items:center;gap:6px;flex-shrink:0">${icons.plus()} Add Task</button>
     </div>
     <div class="filter-bar">${statusBar}</div>
+    <div class="filter-bar">${typeBar}</div>
     <div class="filter-bar">${subjectBar}</div>
     ${cards}
   `;
+}
+
+// ── Add / Edit Task Modal ──────────────────────────────────────
+window.showAssignmentModal = function(id = null, prefilledSubject = null) {
+  showAddTaskModal(id, prefilledSubject);
+};
+
+function showAddTaskModal(editTaskId = null, prefilledSubject = null) {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const defaultDate = tomorrow.toISOString().split('T')[0];
+
+  const editTask = editTaskId ? state.customTasks.find(t => t.id === editTaskId) : null;
+  const subjectsList = getSubjectList();
+
+  const subjectOptions = subjectsList.map(s => {
+    const val = `${s.name}|||${s.code}`;
+    const isSel = (editTask && (editTask.code === s.code || editTask.subject === s.name)) || (prefilledSubject && (prefilledSubject.toLowerCase() === s.name.toLowerCase() || prefilledSubject.toLowerCase() === s.code.toLowerCase()));
+    return `<option value="${val}" ${isSel ? 'selected' : ''}>${s.name} (${s.code})</option>`;
+  }).join('');
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  backdrop.id = 'add-task-backdrop';
+  backdrop.innerHTML = `
+    <div class="modal add-task-modal" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h2 class="modal-title">${editTask ? 'Edit Academic Task' : 'Add Academic Task'}</h2>
+        <button class="modal-close" onclick="document.getElementById('add-task-backdrop').remove()">${icons.x()}</button>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Subject <span class="req">*</span></label>
+        <select class="form-select" id="task-subject">
+          <option value="">Select subject…</option>
+          ${subjectOptions}
+          <option value="General|||GEN">General / Other</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Title <span class="req">*</span></label>
+        <input type="text" class="form-input" id="task-title"
+          placeholder="e.g. Lab Report 3 or End-Sem Revision" maxlength="120"
+          value="${editTask ? editTask.title.replace(/"/g, '&quot;') : ''}">
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Task Type</label>
+          <select class="form-select" id="task-type">
+            <option value="assignment" ${editTask && editTask.taskType === 'assignment' ? 'selected' : ''}>📝 Assignment</option>
+            <option value="quiz" ${editTask && editTask.taskType === 'quiz' ? 'selected' : ''}>⚡ Quiz / Test</option>
+            <option value="lab" ${editTask && editTask.taskType === 'lab' ? 'selected' : ''}>🧪 Lab Report / Viva</option>
+            <option value="project" ${editTask && editTask.taskType === 'project' ? 'selected' : ''}>💻 Project</option>
+            <option value="exam" ${editTask && editTask.taskType === 'exam' ? 'selected' : ''}>🎯 Exam</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Due Date <span class="req">*</span></label>
+          <input type="date" class="form-input" id="task-due" value="${editTask ? editTask.dueDate : defaultDate}">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Marks / Weightage</label>
+          <input type="number" class="form-input" id="task-marks" placeholder="10" min="0" max="100"
+            value="${editTask && editTask.marks ? editTask.marks : ''}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Priority</label>
+          <div class="priority-pills">
+            <label class="priority-pill priority-high">
+              <input type="radio" name="task-priority" value="high" ${editTask && editTask.priority === 'high' ? 'checked' : ''}> High
+            </label>
+            <label class="priority-pill priority-medium">
+              <input type="radio" name="task-priority" value="medium" ${!editTask || editTask.priority === 'medium' ? 'checked' : ''}> Med
+            </label>
+            <label class="priority-pill priority-low">
+              <input type="radio" name="task-priority" value="low" ${editTask && editTask.priority === 'low' ? 'checked' : ''}> Low
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Description / Instructions</label>
+        <textarea class="form-input form-textarea" id="task-desc"
+          placeholder="Submission link, syllabus topics, or notes...">${editTask ? editTask.description : ''}</textarea>
+      </div>
+
+      <div class="form-actions">
+        <button class="btn-secondary" onclick="document.getElementById('add-task-backdrop').remove()">Cancel</button>
+        <button class="btn-primary" onclick="submitAddTask(${editTask ? `'${editTask.id}'` : ''})">${editTask ? 'Save Changes' : 'Add Task'}</button>
+      </div>
+    </div>
+  `;
+  backdrop.addEventListener('click', () => backdrop.remove());
+  document.body.appendChild(backdrop);
+  setTimeout(() => document.getElementById('task-subject')?.focus(), 50);
+
+  // Close on Esc
+  const escHandler = (e) => {
+    if (e.key === 'Escape') { backdrop.remove(); document.removeEventListener('keydown', escHandler); }
+  };
+  document.addEventListener('keydown', escHandler);
+  backdrop.addEventListener('remove', () => document.removeEventListener('keydown', escHandler));
+}
+
+function submitAddTask(editTaskId = null) {
+  const subjectEl  = document.getElementById('task-subject');
+  const titleEl    = document.getElementById('task-title');
+  const dueEl      = document.getElementById('task-due');
+  const marksEl    = document.getElementById('task-marks');
+  const descEl     = document.getElementById('task-desc');
+  const typeEl     = document.getElementById('task-type');
+  const priorityEl = document.querySelector('input[name="task-priority"]:checked');
+
+  [subjectEl, titleEl, dueEl].forEach(el => el.classList.remove('error'));
+
+  let valid = true;
+  if (!subjectEl.value)       { subjectEl.classList.add('error'); valid = false; }
+  if (!titleEl.value.trim())  { titleEl.classList.add('error');   valid = false; }
+  if (!dueEl.value)           { dueEl.classList.add('error');     valid = false; }
+  if (!valid) return;
+
+  const [subject, code] = subjectEl.value.split('|||');
+  const taskType = typeEl?.value || 'assignment';
+
+  if (editTaskId) {
+    const task = state.customTasks.find(t => t.id === editTaskId);
+    if (task) {
+      task.subject     = subject;
+      task.code        = code;
+      task.title       = titleEl.value.trim();
+      task.taskType    = taskType;
+      task.description = descEl.value.trim() || '—';
+      task.dueDate     = dueEl.value;
+      task.priority    = priorityEl?.value || 'medium';
+      task.marks       = parseInt(marksEl.value) || 0;
+    }
+  } else {
+    const task = {
+      id:          `c-${Date.now()}`,
+      subject,
+      code,
+      title:       titleEl.value.trim(),
+      taskType,
+      description: descEl.value.trim() || '—',
+      dueDate:     dueEl.value,
+      priority:    priorityEl?.value || 'medium',
+      status:      'pending',
+      marks:       parseInt(marksEl.value) || 0,
+      isCustom:    true,
+    };
+    state.customTasks.push(task);
+  }
+
+  saveCustomTasks();
+  document.getElementById('add-task-backdrop')?.remove();
+  renderPage(state.currentPage);
+  updateNavBadges();
 }
 
 // ── Notices ───────────────────────────────────────────────────
