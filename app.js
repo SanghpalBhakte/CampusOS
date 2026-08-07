@@ -3219,21 +3219,19 @@ function renderTimetable() {
 
       const attendanceControlsHTML = isTeaching ? `
         <div style="display:flex;align-items:center;gap:4px;margin-right:2px">
-          <button class="btn btn-sm" onclick="event.stopPropagation(); setAttendance('${dateStr}', '${classKey}', 'attended')"
+          <button class="btn btn-sm ${isAttended ? 'btn-primary' : 'btn-secondary'}"
+                  onclick="event.stopPropagation(); setAttendance('${dateStr}', '${classKey}', 'attended')"
                   title="Mark ${c.subject} Attended" aria-label="Mark ${c.subject} as attended" aria-pressed="${isAttended}"
-                  style="padding:4px 9px;font-size:0.78rem;font-weight:700;border-radius:6px;min-width:32px;height:28px;
-                         background:${isAttended ? 'var(--green)' : 'var(--surface-2)'};
-                         color:${isAttended ? '#ffffff' : 'var(--text-primary)'};
-                         border:1px solid ${isAttended ? 'var(--green)' : 'var(--border)'}">
-            ${isAttended ? '✓' : '✓'}
+                  style="padding:4px 9px;font-size:0.78rem;font-weight:700;border-radius:6px;min-width:32px;height:30px;
+                         ${isAttended ? 'background:var(--green);border-color:var(--green);color:#ffffff;' : ''}">
+            ✓
           </button>
-          <button class="btn btn-sm" onclick="event.stopPropagation(); setAttendance('${dateStr}', '${classKey}', 'skipped')"
+          <button class="btn btn-sm ${isSkipped ? 'btn-primary' : 'btn-secondary'}"
+                  onclick="event.stopPropagation(); setAttendance('${dateStr}', '${classKey}', 'skipped')"
                   title="Mark ${c.subject} Skipped" aria-label="Mark ${c.subject} as skipped" aria-pressed="${isSkipped}"
-                  style="padding:4px 9px;font-size:0.78rem;font-weight:700;border-radius:6px;min-width:32px;height:28px;
-                         background:${isSkipped ? 'var(--red)' : 'var(--surface-2)'};
-                         color:${isSkipped ? '#ffffff' : 'var(--text-primary)'};
-                         border:1px solid ${isSkipped ? 'var(--red)' : 'var(--border)'}">
-            ${isSkipped ? '✕' : '✕'}
+                  style="padding:4px 9px;font-size:0.78rem;font-weight:700;border-radius:6px;min-width:32px;height:30px;
+                         ${isSkipped ? 'background:var(--red);border-color:var(--red);color:#ffffff;' : ''}">
+            ✕
           </button>
         </div>
       ` : '';
