@@ -165,6 +165,116 @@
   --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.45);
 }
 
+/* ── 5) Café Night — Warm Espresso Charcoal with Amber/Caramel Accents & Soft Sand Text ── */
+[data-theme="cafe-night"] {
+  --font: 'Inter', system-ui, -apple-system, sans-serif;
+
+  /* Surfaces — Roasted Dark Espresso */
+  --bg:            #181512;
+  --surface:       #221d18;
+  --surface-2:     #2c2620;
+  --surface-3:     #383028;
+  --border:        rgba(245, 237, 226, 0.12);
+  --border-light:  rgba(245, 237, 226, 0.07);
+  --border-btn:    rgba(245, 237, 226, 0.22);
+
+  /* Text — Warm Oat Milk & Sand */
+  --text-primary:  #f5ede2;
+  --text-secondary:#d4c6b5;
+  --text-muted:    #9e8e7c;
+
+  /* Accent — Warm Amber Caramel */
+  --accent:        #d97706;
+  --accent-light:  #f59e0b;
+  --accent-dim:    rgba(217, 119, 6, 0.16);
+  --accent-hover:  #b45309;
+
+  /* Status Colors */
+  --green:  #34d399;
+  --yellow: #fbbf24;
+  --red:    #f87171;
+  --blue:   #38bdf8;
+  --purple: #c084fc;
+  --pink:   #f472b6;
+
+  /* Banner & Surfaces */
+  --banner-bg: linear-gradient(135deg, #2e2017 0%, #181512 100%);
+  --banner-text: #f5ede2;
+
+  --topbar-bg:      var(--surface);
+  --topbar-blur:    none;
+  --sidebar-bg:     var(--surface);
+  --sidebar-blur:   none;
+  --bottomnav-bg:   var(--surface);
+  --bottomnav-blur:  none;
+  --statcard-bg:    var(--surface);
+  --statcard-blur:  none;
+  --modal-bg:       var(--surface);
+  --modal-blur:     none;
+  --fab-bg:         var(--accent);
+  --fab-blur:       none;
+
+  /* Shadows */
+  --shadow:    0 2px 8px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.52);
+  --ease: 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ── 6) Warm Study — Soft Parchment Cream with Dark Espresso Text & Muted Sage/Olive Accent ── */
+[data-theme="warm-study"] {
+  --font: 'Inter', system-ui, -apple-system, sans-serif;
+
+  /* Surfaces — Cozy Parchment & Oat Cream */
+  --bg:            #f4efe4;
+  --surface:       #fcf9f2;
+  --surface-2:     #e8e0d0;
+  --surface-3:     #dcd2c0;
+  --border:        #d4c8b4;
+  --border-light:  #e4dac8;
+  --border-btn:    #c2b49d;
+
+  /* Text — Deep Espresso & Soft Coffee */
+  --text-primary:  #2b251f;
+  --text-secondary:#5c5246;
+  --text-muted:    #857867;
+
+  /* Accent — Restrained Sage / Mineral Olive */
+  --accent:        #3b6b5e;
+  --accent-light:  #4c8575;
+  --accent-dim:    rgba(59, 107, 94, 0.10);
+  --accent-hover:  #294d43;
+
+  /* Status Colors */
+  --green:  #10b981;
+  --yellow: #d97706;
+  --red:    #dc2626;
+  --blue:   #0284c7;
+  --purple: #7c3aed;
+  --pink:   #db2777;
+
+  /* Banner & Surfaces */
+  --banner-bg: linear-gradient(135deg, #294d43 0%, #2b251f 100%);
+  --banner-text: #fcf9f2;
+
+  --topbar-bg:      var(--surface);
+  --topbar-blur:    none;
+  --sidebar-bg:     var(--surface);
+  --sidebar-blur:   none;
+  --bottomnav-bg:   var(--surface);
+  --bottomnav-blur:  none;
+  --statcard-bg:    var(--surface);
+  --statcard-blur:  none;
+  --modal-bg:       var(--surface);
+  --modal-blur:     none;
+  --fab-bg:         var(--accent);
+  --fab-blur:       none;
+
+  /* Shadows */
+  --shadow:    0 1px 3px rgba(43, 37, 31, 0.06), 0 4px 12px rgba(43, 37, 31, 0.04);
+  --shadow-md: 0 4px 6px -1px rgba(43, 37, 31, 0.09), 0 12px 24px -4px rgba(43, 37, 31, 0.07);
+  --ease: 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 /* ── Reset & Base ───────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 

@@ -1830,12 +1830,13 @@ const state = {
 };
 
 // ── Theme ─────────────────────────────────────────────────────
-const ALL_THEMES = ['paper', 'cloud', 'stone', 'quiet-dark'];
+const ALL_THEMES = ['paper', 'cloud', 'stone', 'quiet-dark', 'cafe-night', 'warm-study'];
 const LEGACY_THEME_MAP = {
   'soft-neutral': 'paper', light: 'paper',
   'mist-blue': 'cloud', glass: 'cloud',
   sandstone: 'stone', emerald: 'stone',
   dark: 'quiet-dark', 'cocoa-night': 'quiet-dark', sunset: 'quiet-dark',
+  'espresso-paper': 'warm-study', 'cafe': 'cafe-night',
 };
 
 function initTheme() {
@@ -4715,6 +4716,14 @@ function renderSettings() {
           <button class="filter-chip ${['quiet-dark','dark','cocoa-night','sunset'].includes(document.documentElement?.getAttribute('data-theme'))?'active':''}" onclick="setTheme('quiet-dark')" style="justify-content:flex-start">
             <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#52719a;margin-right:6px"></span>
             🌒 Quiet Dark
+          </button>
+          <button class="filter-chip ${['cafe-night','cafe'].includes(document.documentElement?.getAttribute('data-theme'))?'active':''}" onclick="setTheme('cafe-night')" style="justify-content:flex-start">
+            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#d97706;margin-right:6px"></span>
+            ☕️ Café Night
+          </button>
+          <button class="filter-chip ${['warm-study','espresso-paper'].includes(document.documentElement?.getAttribute('data-theme'))?'active':''}" onclick="setTheme('warm-study')" style="justify-content:flex-start">
+            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#3b6b5e;margin-right:6px"></span>
+            ☕️ Warm Study
           </button>
         </div>
       </div>
