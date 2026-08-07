@@ -1460,9 +1460,13 @@ function applyCloudDataToLocalState(data) {
   if (data.attendance && typeof data.attendance === 'object') {
     safeSetStorage(KEY_ATTENDANCE, data.attendance);
   }
-  if (data.theme && ['quiet-dark', 'cocoa-night', 'paper', 'cloud', 'stone', 'soft-neutral', 'mist-blue', 'sandstone', 'dark', 'light', 'glass', 'emerald', 'sunset'].includes(data.theme)) {
-    localStorage.setItem(KEY_THEME, data.theme);
-    initTheme();
+  if (data.theme && typeof data.theme === 'string') {
+    let t = data.theme;
+    if (LEGACY_THEME_MAP[t]) t = LEGACY_THEME_MAP[t];
+    if (ALL_THEMES.includes(t)) {
+      localStorage.setItem(KEY_THEME, t);
+      initTheme();
+    }
   }
   if (data.notificationPrefs && typeof data.notificationPrefs === 'object') {
     safeSetStorage(KEY_NOTIF_PREFS, data.notificationPrefs);
@@ -1877,6 +1881,7 @@ function setTheme(theme) {
   localStorage.setItem(KEY_THEME, theme);
   updateThemeSelector(theme);
   renderPage(state.currentPage);
+  syncToCloud();
 }
 
 function updateThemeSelector(theme) {
@@ -5733,11 +5738,6 @@ function init() {
 
   document.getElementById('global-search')?.addEventListener('keydown', e => {
     if (e.key === 'Enter') handleGlobalSearch(e.target.value);
-  });
-
-  document.getElementById('assistant-toggle-btn')?.addEventListener('click', (e) => {
-    e.preventDefault();
-    toggleAssistant();
   });
 
   const pending = window._pendingNav;

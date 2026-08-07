@@ -11,9 +11,13 @@
           'soft-neutral': 'paper', light: 'paper',
           'mist-blue': 'cloud', glass: 'cloud',
           sandstone: 'stone', emerald: 'stone',
-          dark: 'quiet-dark', 'cocoa-night': 'quiet-dark', sunset: 'quiet-dark'
+          'warm-study': 'stone', 'espresso-paper': 'stone',
+          dark: 'quiet-dark', 'cocoa-night': 'quiet-dark', sunset: 'quiet-dark',
+          cafe: 'cafe-night'
         };
         if (m[t]) t = m[t];
+        var valid = ['paper', 'cloud', 'stone', 'quiet-dark', 'cafe-night'];
+        if (!valid.includes(t)) t = 'paper';
         document.documentElement.setAttribute('data-theme', t);
       } catch(e) {}
     })();
@@ -369,8 +373,8 @@
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
 <!-- Firebase Config & App Script -->
-<script src="firebase-config.js?v=54"></script>
-<script type="module" src="app.js?v=54"></script>
+<script src="firebase-config.js?v=55"></script>
+<script type="module" src="app.js?v=55"></script>
 
 </body>
 </html>
