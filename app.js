@@ -1524,18 +1524,27 @@ document.addEventListener('visibilitychange', () => {
 });
 
 // ── Notification Preferences & Service ───────────────────────
+// ── Notification Preferences & Service ───────────────────────
 function loadNotifPrefs() {
   const saved = safeGetStorage(KEY_NOTIF_PREFS, null);
   const defaults = {
     enabled: typeof Notification !== 'undefined' && Notification.permission === 'granted',
-    taskDueToday: true,
-    taskOverdue: true,
-    taskUpcoming: true,
-    dailySummaryTime: "08:00",
-    noticeMode: "instant", // "instant" | "digest" | "off"
+    taskUpcoming: "day_before",  // "day_before" | "same_day" | "off"
+    taskOverdue: "same_day",     // "same_day" | "instant" | "off"
+    classReminders: "15_min",    // "15_min" | "30_min" | "1_hour" | "off"
+    attendanceAlerts: "instant", // "instant" | "weekly" | "off"
+    newNotices: "instant",       // "instant" | "same_day" | "off"
+    dailySummaryTime: "08:00"
   };
   if (saved && typeof saved === 'object') {
-    return { ...defaults, ...saved };
+    const mapped = { ...defaults, ...saved };
+    if (saved.taskUpcoming === true) mapped.taskUpcoming = "day_before";
+    if (saved.taskUpcoming === false) mapped.taskUpcoming = "off";
+    if (saved.taskOverdue === true) mapped.taskOverdue = "same_day";
+    if (saved.taskOverdue === false) mapped.taskOverdue = "off";
+    if (saved.noticeMode === 'off') mapped.newNotices = "off";
+    if (saved.noticeMode === 'instant') mapped.newNotices = "instant";
+    return mapped;
   }
   return defaults;
 }
@@ -1569,7 +1578,7 @@ async function requestNotificationPermission() {
     if (permission === 'granted') {
       showToast('Notifications enabled!', 'success');
       dispatchNotification('Clarity Desk Notifications', {
-        body: 'You will now receive alerts for task deadlines and notices.',
+        body: 'You will now receive alerts for class reminders, task deadlines, attendance warnings, and notices.',
         tag: 'welcome-notif'
       });
     } else if (permission === 'denied') {
@@ -1606,7 +1615,6 @@ function dispatchNotification(title, options = {}) {
     badge: NOTIF_DEFAULT_BADGE,
     vibrate: [100, 50, 100],
     ...merged,
-    // Always derive renotify from the final tag so it cannot be overridden by caller accidentally
     renotify: !!(merged.tag)
   };
 
@@ -1634,17 +1642,32 @@ function checkScheduledNotifications() {
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   const tomorrowStr = tomorrow.toISOString().split('T')[0];
+  const now = new Date();
+  const currentMin = currentTimeMinutes();
+  const currentHHMM = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
 
   const tasks = allTasks().filter(t => t.status === 'pending');
   const notifiedMap = safeGetStorage('cos_notified_history', {}) || {};
 
-  // 1. Task Due Today
-  if (prefs.taskDueToday) {
+  // 1. Upcoming Tasks
+  if (prefs.taskUpcoming === 'day_before') {
+    tasks.filter(t => t.dueDate === tomorrowStr).forEach(t => {
+      const key = `upcoming_daybefore_${t.id}_${today}`;
+      if (!notifiedMap[key]) {
+        dispatchNotification(`Upcoming Task: ${t.title}`, {
+          body: `${t.subject || 'Task'} · Due tomorrow! Keep going.`,
+          tag: key,
+          data: { url: './#assignments' }
+        });
+        notifiedMap[key] = true;
+      }
+    });
+  } else if (prefs.taskUpcoming === 'same_day') {
     tasks.filter(t => t.dueDate === today).forEach(t => {
-      const key = `due_today_${t.id}_${today}`;
+      const key = `upcoming_sameday_${t.id}_${today}`;
       if (!notifiedMap[key]) {
         dispatchNotification(`Task Due Today: ${t.title}`, {
-          body: `${t.subject || 'Task'} · Due today! Keep going!`,
+          body: `${t.subject || 'Task'} · Due today!`,
           tag: key,
           data: { url: './#assignments' }
         });
@@ -1653,8 +1676,8 @@ function checkScheduledNotifications() {
     });
   }
 
-  // 2. Task Overdue
-  if (prefs.taskOverdue) {
+  // 2. Overdue Tasks
+  if (prefs.taskOverdue !== 'off') {
     tasks.filter(t => t.dueDate < today).forEach(t => {
       const key = `overdue_${t.id}_${today}`;
       if (!notifiedMap[key]) {
@@ -1669,27 +1692,61 @@ function checkScheduledNotifications() {
     });
   }
 
-  // 3. Task Upcoming (Due Tomorrow)
-  if (prefs.taskUpcoming) {
-    tasks.filter(t => t.dueDate === tomorrowStr).forEach(t => {
-      const key = `upcoming_${t.id}_${today}`;
-      if (!notifiedMap[key]) {
-        dispatchNotification(`Upcoming Task: ${t.title}`, {
-          body: `${t.subject || 'Task'} · Due tomorrow!`,
-          tag: key,
-          data: { url: './#assignments' }
-        });
-        notifiedMap[key] = true;
+  // 3. Class Reminders
+  if (prefs.classReminders !== 'off') {
+    const liveTT = loadTimetable();
+    const dayClasses = (liveTT[now.getDay()] || []).filter(isTeachingClass);
+    const leadWindow = prefs.classReminders === '1_hour' ? 60 : prefs.classReminders === '30_min' ? 30 : 15;
+
+    dayClasses.forEach(c => {
+      const startMin = timeToMinutes(c.time || '10:00');
+      const diff = startMin - currentMin;
+      if (diff > 0 && diff <= leadWindow) {
+        const classKey = `class_rem_${c.code || c.subject}_${c.time}_${today}`;
+        if (!notifiedMap[classKey]) {
+          dispatchNotification(`Class Starting Soon: ${c.subject}`, {
+            body: `Starts at ${c.time} in ${c.room || 'class'} with ${c.teacher || 'faculty'}`,
+            tag: classKey,
+            data: { url: './#timetable' }
+          });
+          notifiedMap[classKey] = true;
+        }
       }
     });
   }
 
-  // 4. Daily Summary Notification Check
-  if (prefs.dailySummaryTime) {
-    const now = new Date();
-    const currentHHMM = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-    const summaryKey = `daily_summary_${today}`;
+  // 4. Low-Attendance Warning Alert
+  if (prefs.attendanceAlerts !== 'off') {
+    const attendanceData = safeGetStorage(KEY_ATTENDANCE, {}) || {};
+    let totalAttended = 0;
+    let totalSkipped = 0;
+    Object.values(attendanceData).forEach(dayObj => {
+      if (dayObj && typeof dayObj === 'object') {
+        Object.values(dayObj).forEach(st => {
+          if (st === 'attended') totalAttended++;
+          else if (st === 'skipped') totalSkipped++;
+        });
+      }
+    });
+    const totalMarked = totalAttended + totalSkipped;
+    const pct = totalMarked > 0 ? Math.round((totalAttended / totalMarked) * 100) : null;
 
+    if (pct !== null && pct < 75) {
+      const attKey = `att_warning_${today}`;
+      if (!notifiedMap[attKey]) {
+        dispatchNotification(`Attendance Alert: ${pct}%`, {
+          body: `Your attendance is currently ${pct}% (below 75% target). Tap to review.`,
+          tag: attKey,
+          data: { url: './#review' }
+        });
+        notifiedMap[attKey] = true;
+      }
+    }
+  }
+
+  // 5. Daily Summary Notification Check
+  if (prefs.dailySummaryTime && prefs.dailySummaryTime !== 'off') {
+    const summaryKey = `daily_summary_${today}`;
     if (currentHHMM >= prefs.dailySummaryTime && !notifiedMap[summaryKey]) {
       const pendingCountVal = tasks.length;
       const dueTodayCount = tasks.filter(t => t.dueDate === today).length;
@@ -1715,27 +1772,21 @@ function checkScheduledNotifications() {
 function triggerNoticeNotification(notice) {
   if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
   const prefs = loadNotifPrefs();
-  if (prefs.noticeMode === 'off') return;
+  if (prefs.newNotices === 'off') return;
 
-  if (prefs.noticeMode === 'instant') {
+  if (prefs.newNotices === 'instant' || prefs.newNotices === 'same_day') {
     dispatchNotification(`New Notice: ${notice.title}`, {
       body: (notice.content || '').slice(0, 120),
       tag: `notice_${notice.id}`,
       data: { url: './#notices' }
     });
-  } else if (prefs.noticeMode === 'digest') {
-    const digestList = safeGetStorage('cos_notice_digest', []) || [];
-    if (!digestList.some(n => n.id === notice.id)) {
-      digestList.push(notice);
-      safeSetStorage('cos_notice_digest', digestList);
-    }
   }
 }
 
 function checkNoticeNotifications() {
   if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
   const prefs = loadNotifPrefs();
-  if (prefs.noticeMode === 'off') return;
+  if (prefs.newNotices === 'off') return;
 
   const notifiedNotices = safeGetStorage('cos_notified_notices', {}) || {};
   NOTICES.forEach(n => {
@@ -4015,18 +4066,18 @@ function renderSettings() {
       </div>
     </div>
 
-    <div class="section-heading">${icons.bell()} Notifications</div>
+    <div class="section-heading">${icons.bell()} Notifications & Reminders</div>
     <div class="card" style="padding:20px;margin-bottom:20px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:10px;padding-bottom:14px;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;padding-bottom:14px;border-bottom:1px solid var(--border)">
         <div>
-          <div style="font-weight:600;font-size:0.9rem">Browser Notification Permission</div>
+          <div style="font-weight:600;font-size:0.9rem;color:var(--text-primary)">Browser Notification Permission</div>
           <div style="font-size:0.78rem;color:var(--text-muted);margin-top:2px">
             Status: <strong style="color:${isGranted ? 'var(--green)' : isDenied ? 'var(--red)' : 'var(--yellow)'}">
               ${isGranted ? 'Granted ✓' : isDenied ? 'Blocked ✕' : 'Not Requested'}
             </strong>
           </div>
         </div>
-        <button class="btn btn-sm ${isGranted ? 'btn-secondary' : 'btn-primary'}" onclick="requestNotificationPermission()" style="font-size:0.8rem;padding:6px 14px">
+        <button class="btn btn-sm ${isGranted ? 'btn-secondary' : 'btn-primary'}" onclick="requestNotificationPermission()">
           ${isGranted ? 'Test Notification' : isDenied ? 'Re-check Permission' : 'Enable Notifications'}
         </button>
       </div>
@@ -4035,48 +4086,84 @@ function renderSettings() {
       <div style="margin-bottom:16px;font-size:0.78rem;color:var(--red);background:rgba(239,68,68,0.08);padding:10px 12px;border-radius:6px;border:1px solid rgba(239,68,68,0.25);line-height:1.5;display:flex;align-items:flex-start;gap:8px">
         <span style="font-size:0.9rem">🔒</span>
         <div>
-          <strong>Notifications are blocked by your browser.</strong> To receive alerts, click the lock or tune icon (🔒) near your browser address bar, set <strong>Notifications</strong> to <strong>Allow</strong>, and then click <strong>Re-check Permission</strong>.
+          <strong>Notifications are blocked by your browser.</strong> To receive alerts, click the lock or tune icon (🔒) near your browser address bar, set <strong>Notifications</strong> to <strong>Allow</strong>, and click <strong>Re-check Permission</strong>.
         </div>
       </div>` : ''}
 
       <div style="display:flex;flex-direction:column;gap:14px">
-        <div style="font-weight:700;font-size:0.8rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted)">Task Deadlines</div>
+        <div style="font-weight:700;font-size:0.78rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted)">Task Deadlines</div>
         
-        <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;font-size:0.88rem">
-          <span>Alert when a task is due today</span>
-          <input type="checkbox" id="np-due-today" ${nPrefs.taskDueToday ? 'checked' : ''} style="width:16px;height:16px">
-        </label>
-
-        <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;font-size:0.88rem">
-          <span>Alert when a task is overdue</span>
-          <input type="checkbox" id="np-overdue" ${nPrefs.taskOverdue ? 'checked' : ''} style="width:16px;height:16px">
-        </label>
-
-        <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;font-size:0.88rem">
-          <span>Alert day before task is due</span>
-          <input type="checkbox" id="np-upcoming" ${nPrefs.taskUpcoming ? 'checked' : ''} style="width:16px;height:16px">
-        </label>
-
-        <div style="display:flex;align-items:center;justify-content:space-between;font-size:0.88rem;margin-top:4px">
+        <div style="display:flex;align-items:center;justify-content:space-between;font-size:0.88rem;gap:12px;flex-wrap:wrap">
           <div>
-            <span>Daily Tasks Summary Time</span>
-            <div style="font-size:0.75rem;color:var(--text-muted)">Daily overview of pending tasks</div>
+            <span style="font-weight:500;color:var(--text-primary)">Upcoming Tasks</span>
+            <div style="font-size:0.75rem;color:var(--text-muted)">Remind about pending assignments</div>
           </div>
-          <input type="time" class="form-input" id="np-summary-time" value="${nPrefs.dailySummaryTime || '08:00'}" style="width:120px;padding:4px 8px;font-size:0.85rem">
+          <select class="form-select" id="np-task-upcoming" style="width:170px;padding:5px 8px;font-size:0.82rem">
+            <option value="day_before" ${nPrefs.taskUpcoming === 'day_before' ? 'selected' : ''}>Day Before (09:00)</option>
+            <option value="same_day" ${nPrefs.taskUpcoming === 'same_day' ? 'selected' : ''}>Same Day (Morning)</option>
+            <option value="off" ${nPrefs.taskUpcoming === 'off' ? 'selected' : ''}>Off</option>
+          </select>
         </div>
 
-        <div style="font-weight:700;font-size:0.8rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);margin-top:8px">Notices & Announcements</div>
-        
-        <div style="display:flex;align-items:center;justify-content:space-between;font-size:0.88rem">
+        <div style="display:flex;align-items:center;justify-content:space-between;font-size:0.88rem;gap:12px;flex-wrap:wrap">
           <div>
-            <span>Notice Alert Frequency</span>
-            <div style="font-size:0.75rem;color:var(--text-muted)">Choose how to receive admin notice updates</div>
+            <span style="font-weight:500;color:var(--text-primary)">Overdue Tasks</span>
+            <div style="font-size:0.75rem;color:var(--text-muted)">Alert when tasks pass due date</div>
           </div>
-          <select class="form-select" id="np-notice-mode" style="width:140px;padding:4px 8px;font-size:0.85rem">
-            <option value="instant" ${nPrefs.noticeMode === 'instant' ? 'selected' : ''}>Instant Alert</option>
-            <option value="digest" ${nPrefs.noticeMode === 'digest' ? 'selected' : ''}>Daily Digest</option>
-            <option value="off" ${nPrefs.noticeMode === 'off' ? 'selected' : ''}>Muted (Off)</option>
+          <select class="form-select" id="np-task-overdue" style="width:170px;padding:5px 8px;font-size:0.82rem">
+            <option value="same_day" ${nPrefs.taskOverdue === 'same_day' ? 'selected' : ''}>Daily Reminder</option>
+            <option value="instant" ${nPrefs.taskOverdue === 'instant' ? 'selected' : ''}>Instant Alert</option>
+            <option value="off" ${nPrefs.taskOverdue === 'off' ? 'selected' : ''}>Off</option>
           </select>
+        </div>
+
+        <div style="font-weight:700;font-size:0.78rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);margin-top:6px">Classes & Attendance</div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;font-size:0.88rem;gap:12px;flex-wrap:wrap">
+          <div>
+            <span style="font-weight:500;color:var(--text-primary)">Class Reminders</span>
+            <div style="font-size:0.75rem;color:var(--text-muted)">Notify before upcoming classes</div>
+          </div>
+          <select class="form-select" id="np-class-reminders" style="width:170px;padding:5px 8px;font-size:0.82rem">
+            <option value="15_min" ${nPrefs.classReminders === '15_min' ? 'selected' : ''}>15 Minutes Before</option>
+            <option value="30_min" ${nPrefs.classReminders === '30_min' ? 'selected' : ''}>30 Minutes Before</option>
+            <option value="1_hour" ${nPrefs.classReminders === '1_hour' ? 'selected' : ''}>1 Hour Before</option>
+            <option value="off" ${nPrefs.classReminders === 'off' ? 'selected' : ''}>Off</option>
+          </select>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;font-size:0.88rem;gap:12px;flex-wrap:wrap">
+          <div>
+            <span style="font-weight:500;color:var(--text-primary)">Low-Attendance Alerts</span>
+            <div style="font-size:0.75rem;color:var(--text-muted)">Alert if attendance drops below 75% target</div>
+          </div>
+          <select class="form-select" id="np-attendance-alerts" style="width:170px;padding:5px 8px;font-size:0.82rem">
+            <option value="instant" ${nPrefs.attendanceAlerts === 'instant' ? 'selected' : ''}>Instant Alert (&lt; 75%)</option>
+            <option value="weekly" ${nPrefs.attendanceAlerts === 'weekly' ? 'selected' : ''}>Weekly Summary Only</option>
+            <option value="off" ${nPrefs.attendanceAlerts === 'off' ? 'selected' : ''}>Off</option>
+          </select>
+        </div>
+
+        <div style="font-weight:700;font-size:0.78rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);margin-top:6px">Notices & Summaries</div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;font-size:0.88rem;gap:12px;flex-wrap:wrap">
+          <div>
+            <span style="font-weight:500;color:var(--text-primary)">New Notices</span>
+            <div style="font-size:0.75rem;color:var(--text-muted)">Alerts for admin announcements</div>
+          </div>
+          <select class="form-select" id="np-new-notices" style="width:170px;padding:5px 8px;font-size:0.82rem">
+            <option value="instant" ${nPrefs.newNotices === 'instant' ? 'selected' : ''}>Instant Alert</option>
+            <option value="same_day" ${nPrefs.newNotices === 'same_day' ? 'selected' : ''}>Daily Overview</option>
+            <option value="off" ${nPrefs.newNotices === 'off' ? 'selected' : ''}>Off</option>
+          </select>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;font-size:0.88rem;gap:12px;flex-wrap:wrap">
+          <div>
+            <span style="font-weight:500;color:var(--text-primary)">Daily Overview Summary</span>
+            <div style="font-size:0.75rem;color:var(--text-muted)">Daily briefing time</div>
+          </div>
+          <input type="time" class="form-input" id="np-summary-time" value="${nPrefs.dailySummaryTime || '08:00'}" style="width:130px;padding:4px 8px;font-size:0.85rem">
         </div>
       </div>
     </div>
@@ -4114,8 +4201,7 @@ function renderSettings() {
 }
 
 function saveSettings() {
-  const rawName = (document.getElementById('s-name').value || '').trim();
-  const nameToSave = (rawName.toLowerCase() === 'your name') ? '' : rawName;
+  const nameToSave = (document.getElementById('s-name').value || '').trim();
   const rawCollege = (document.getElementById('s-college').value || '').trim();
   const rawBranch = (document.getElementById('s-branch').value || '').trim();
   const rawYear = (document.getElementById('s-year').value || '').trim();
