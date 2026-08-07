@@ -217,6 +217,8 @@ function initFirebase() {
     console.warn(firebaseInitError);
     updateSyncUI();
   }
+}
+
 function triggerConfetti() {
   try {
     if (typeof confetti === 'function') {
