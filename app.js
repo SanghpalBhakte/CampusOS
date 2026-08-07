@@ -2301,6 +2301,31 @@ window._rsSave = function(taskId) {
   renderPage('review');
 };
 
+function getWeekId(d = new Date()) {
+  const year = d.getFullYear();
+  const firstJan = new Date(year, 0, 1);
+  const dayNum = Math.floor((d - firstJan) / 86400000);
+  const weekNum = Math.ceil((dayNum + firstJan.getDay() + 1) / 7);
+  return `${year}-W${String(weekNum).padStart(2, '0')}`;
+}
+
+function isWeeklyReviewDismissed() {
+  const currentWeek = getWeekId();
+  return localStorage.getItem(`cos_weekly_review_dismissed_${currentWeek}`) === 'true';
+}
+
+window.dismissWeeklyReview = function() {
+  const currentWeek = getWeekId();
+  localStorage.setItem(`cos_weekly_review_dismissed_${currentWeek}`, 'true');
+  renderPage(state.currentPage);
+};
+
+window.completeWeeklyReset = function() {
+  dismissWeeklyReview();
+  showToast('Weekly reset complete! Ready for a clear, focused week. ✨', 'success');
+  navigateTo('dashboard');
+};
+
 function renderReview() {
   const el = document.getElementById('page-review');
   const now = new Date();
@@ -2317,6 +2342,7 @@ function renderReview() {
   
   const upcomingTasks = allTasks().filter(t => t.dueDate >= todayS && t.dueDate <= lookaheadStr);
   const upcomingNotices = NOTICES.filter(n => n.date >= todayS && n.date <= lookaheadStr);
+  const recentNotices = NOTICES.filter(n => n.date >= lookbackStr && n.date <= todayS);
   
   const next7Days = {};
   for(let i=0; i<=7; i++) {
@@ -2351,14 +2377,18 @@ function renderReview() {
       if (it.type === 'task') {
         const a = it.data;
         const done = a.status === 'submitted';
+        const taskType = a.taskType || 'assignment';
         return `
           <div class="card card-sm assignment-card" style="margin-bottom:8px;display:flex;align-items:center;gap:12px;padding:12px 14px">
-            <div style="width:18px;height:18px;border-radius:5px;border:2px solid ${done?'var(--green)':a.priority==='high'?'var(--red)':'var(--border)'};background:${done?'var(--green)':'transparent'};display:grid;place-items:center;flex-shrink:0;color:white">
+            <div onclick="toggleAssignment('${a.id}')" title="Click to toggle status" style="width:18px;height:18px;border-radius:5px;border:2px solid ${done?'var(--green)':a.priority==='high'?'var(--red)':'var(--border)'};background:${done?'var(--green)':'transparent'};display:grid;place-items:center;flex-shrink:0;color:white;cursor:pointer">
               ${done ? icons.check() : ''}
             </div>
             <div style="flex:1;min-width:0">
-              <div class="font-semibold" style="font-size:0.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${done?'text-decoration:line-through;opacity:0.5':''}"><span class="${done?'done':''} ${a.priority==='high'?'text-red':''} ${a.priority==='medium'?'text-yellow':''} ${a.priority==='low'?'text-green':''}"></span>${a.title}</div>
-              <div class="text-xs text-muted">${a.subject}</div>
+              <div class="font-semibold" style="font-size:0.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${done?'text-decoration:line-through;opacity:0.5':''}">${a.title}</div>
+              <div style="font-size:0.75rem;color:var(--text-muted);display:flex;align-items:center;gap:6px;margin-top:2px">
+                <span onclick="openSubjectHub('${a.subject}')" style="cursor:pointer;font-weight:600">${a.subject}</span>
+                <span class="type-badge type-${taskType}" style="font-size:0.62rem;padding:1px 6px">${taskType}</span>
+              </div>
             </div>
           </div>
         `;
@@ -2367,7 +2397,7 @@ function renderReview() {
         return `
           <div class="card card-sm notice-card" style="margin-bottom:8px;padding:12px 14px">
             <div style="font-weight:600;font-size:0.9rem">${n.title}</div>
-            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px">${n.category}</div>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px">${n.category} ${n.important ? '· <strong style="color:var(--red)">Important</strong>' : ''}</div>
           </div>
         `;
       }
@@ -2376,7 +2406,7 @@ function renderReview() {
     const isBusy = (dateStr === busyDayDate);
     
     lookaheadHTML += `
-      <div style="margin-bottom:20px">
+      <div style="margin-bottom:16px">
         <div style="font-size:0.85rem;font-weight:600;color:var(--text-secondary);margin-bottom:8px;display:flex;align-items:center;gap:8px">
           ${formatDate(dateStr)}
           ${isBusy ? '<span class="type-badge" style="background:rgba(245,158,11,0.15);color:var(--yellow);padding:2px 6px;font-size:0.65rem">🔥 Busy Day</span>' : ''}
@@ -2387,27 +2417,34 @@ function renderReview() {
   });
   
   if (!lookaheadHTML) {
-    lookaheadHTML = `<div class="card" style="padding:24px;text-align:center;color:var(--text-muted)">Nothing scheduled for the next 7 days.</div>`;
+    lookaheadHTML = `<div class="card" style="padding:20px;text-align:center;color:var(--text-muted)">✨ Nothing major scheduled for the upcoming 7 days.</div>`;
   }
 
   el.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
-      <div style="display:flex;align-items:center;gap:12px">
-        <button class="icon-btn-xs" onclick="navigateTo('dashboard')">←</button>
-        <h2 style="margin:0;font-size:1.2rem;font-weight:700">Weekly Review</h2>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <button class="btn btn-sm btn-secondary" onclick="navigateTo('dashboard')">← Back to Today</button>
+        <div>
+          <div style="font-size:1.25rem;font-weight:800;color:var(--text-primary)">Weekly Reflection & Prep</div>
+          <div style="font-size:0.78rem;color:var(--text-muted)">Reset your workload, review attendance, and prepare for next week</div>
+        </div>
       </div>
     </div>
     
-    <div class="section-heading">Lookback (Last 7 Days)</div>
-    <div class="stat-grid" style="margin-bottom:20px">
+    <div class="section-heading">1. Last Week's Reflection (Lookback)</div>
+    <div class="stat-grid" style="margin-bottom:16px">
       <div class="stat-card">
         <div class="stat-value" style="color:var(--green)">${tasksCompleted.length}</div>
-        <div class="stat-label">Tasks Done</div>
+        <div class="stat-label">Tasks Completed</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" style="color:${tasksRolledOver.length > 0 ? 'var(--red)' : 'var(--green)'}">${tasksRolledOver.length}</div>
+        <div class="stat-label">Overdue / Rollover</div>
       </div>
     </div>
     
     ${tasksRolledOver.length > 0 ? `
-    <div class="section-heading">Rollover (Pending from past 7 days)</div>
+    <div class="section-heading">Rollover Tasks Needing Attention</div>
     <div style="margin-bottom:20px">
       ${tasksRolledOver.map(a => `
         <div class="card card-sm assignment-card" id="rollover-card-${a.id}" style="margin-bottom:8px;display:flex;align-items:center;gap:12px;padding:12px 14px;border-left:3px solid var(--red)">
@@ -2416,18 +2453,36 @@ function renderReview() {
             <div class="text-xs text-muted">${a.subject} · Due: ${formatDate(a.dueDate)}</div>
           </div>
           <div style="display:flex;gap:6px">
-            <button class="icon-btn-xs" style="color:var(--green);border:1px solid var(--border)" onclick="handleRolloverAction('${a.id}', 'done')" title="Mark Done">${icons.check()}</button>
-            <button class="icon-btn-xs" style="border:1px solid var(--border)" onclick="handleRolloverAction('${a.id}', 'reschedule')" title="Reschedule">📅</button>
+            <button class="btn btn-sm btn-secondary" style="color:var(--green);font-size:0.75rem;padding:4px 8px" onclick="handleRolloverAction('${a.id}', 'done')" title="Mark Done">✓ Done</button>
+            <button class="btn btn-sm btn-secondary" style="font-size:0.75rem;padding:4px 8px" onclick="handleRolloverAction('${a.id}', 'reschedule')" title="Reschedule">📅 Reschedule</button>
           </div>
         </div>
       `).join('')}
     </div>` : ''}
 
-    <div class="section-heading">Weekly Class Attendance Tracker</div>
+    <div class="section-heading">2. Weekly Class Attendance Tracker</div>
     ${renderWeeklyAttendanceTracker()}
 
-    <div class="section-heading">Lookahead (Next 7 Days)</div>
+    ${recentNotices.length > 0 ? `
+      <div class="section-heading">3. Recent Important Notices</div>
+      <div style="margin-bottom:20px">
+        ${recentNotices.map(n => `
+          <div class="card card-sm notice-card" onclick="showNotice('${n.id}')" style="margin-bottom:8px;padding:12px 14px;cursor:pointer">
+            <div style="font-weight:600;font-size:0.88rem;color:var(--text-primary)">${n.title}</div>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px">${formatDate(n.date)} · ${n.category} ${n.important ? '· <strong style="color:var(--red)">Important</strong>' : ''}</div>
+          </div>
+        `).join('')}
+      </div>
+    ` : ''}
+
+    <div class="section-heading">4. Upcoming Week Lookahead (Next 7 Days)</div>
     ${lookaheadHTML}
+
+    <div style="margin-top:24px;margin-bottom:32px;text-align:center">
+      <button class="btn btn-primary" onclick="completeWeeklyReset()" style="width:100%;max-width:400px;padding:12px;font-size:0.9rem;font-weight:700">
+        ✓ Complete Weekly Reset & Return to Today
+      </button>
+    </div>
   `;
 }
 
@@ -3111,6 +3166,23 @@ function renderDashboard() {
 
     ${setupBanner}
     ${countdownHTML}
+
+    <!-- WEEKLY REVIEW & PREP BANNER -->
+    ${!isWeeklyReviewDismissed() ? `
+      <div class="card card-sm" style="margin-bottom:16px;padding:12px 16px;background:var(--accent-dim);border:1px solid var(--accent);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1">
+          <span style="font-size:1.2rem;flex-shrink:0">🗓️</span>
+          <div style="min-width:0">
+            <div style="font-weight:700;font-size:0.88rem;color:var(--text-primary)">Weekly Reflection & Prep</div>
+            <div style="font-size:0.76rem;color:var(--text-muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Reflect on past week's attendance, completed tasks, and upcoming deadlines.</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+          <button class="btn btn-sm btn-primary" onclick="navigateTo('review')" style="font-size:0.75rem;padding:4px 10px">Start Review →</button>
+          <button class="btn btn-sm btn-secondary" onclick="dismissWeeklyReview()" style="font-size:0.75rem;padding:4px 8px" title="Dismiss for this week">✕</button>
+        </div>
+      </div>
+    ` : ''}
 
     <!-- 1. ATTENDANCE RISK WARNING BLOCK -->
     ${(() => {
