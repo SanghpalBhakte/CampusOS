@@ -1461,11 +1461,19 @@ function applyCloudDataToLocalState(data) {
     safeSetStorage(KEY_ATTENDANCE, data.attendance);
   }
   if (data.theme && typeof data.theme === 'string') {
-    let t = data.theme;
-    if (LEGACY_THEME_MAP[t]) t = LEGACY_THEME_MAP[t];
-    if (ALL_THEMES.includes(t)) {
-      localStorage.setItem(KEY_THEME, t);
+    let cloudTheme = data.theme;
+    if (LEGACY_THEME_MAP[cloudTheme]) cloudTheme = LEGACY_THEME_MAP[cloudTheme];
+    const localTheme = localStorage.getItem(KEY_THEME);
+    
+    // If local theme is not set yet, adopt cloud theme
+    if (!localTheme && ALL_THEMES.includes(cloudTheme)) {
+      localStorage.setItem(KEY_THEME, cloudTheme);
       initTheme();
+    } else if (localTheme && localTheme !== cloudTheme && currentUser && db) {
+      // Local user preference takes precedence; heal cloud document with current local theme
+      db.collection('users').doc(currentUser.uid).set({
+        theme: localTheme
+      }, { merge: true }).catch(() => {});
     }
   }
   if (data.notificationPrefs && typeof data.notificationPrefs === 'object') {
@@ -1856,10 +1864,14 @@ const LEGACY_THEME_MAP = {
 
 function initTheme() {
   const saved       = localStorage.getItem(KEY_THEME);
-  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  let theme         = saved || (prefersDark ? 'quiet-dark' : 'paper');
+  let theme         = saved || 'paper';
   if (LEGACY_THEME_MAP[theme]) theme = LEGACY_THEME_MAP[theme];
   if (!ALL_THEMES.includes(theme)) theme = 'paper';
+  
+  if (!saved || saved !== theme) {
+    localStorage.setItem(KEY_THEME, theme);
+  }
+  
   document.documentElement.setAttribute('data-theme', theme);
   updateThemeSelector(theme);
 }
@@ -1869,9 +1881,7 @@ function toggleTheme() {
   if (LEGACY_THEME_MAP[current]) current = LEGACY_THEME_MAP[current];
   const nextIdx = (ALL_THEMES.indexOf(current) + 1) % ALL_THEMES.length;
   const next    = ALL_THEMES[nextIdx];
-  document.documentElement.setAttribute('data-theme', next);
-  localStorage.setItem(KEY_THEME, next);
-  updateThemeSelector(next);
+  setTheme(next);
 }
 
 function setTheme(theme) {
@@ -1881,7 +1891,14 @@ function setTheme(theme) {
   localStorage.setItem(KEY_THEME, theme);
   updateThemeSelector(theme);
   renderPage(state.currentPage);
-  syncToCloud();
+  
+  // Instant cloud persistence (no 2.5s delay)
+  if (currentUser && db) {
+    db.collection('users').doc(currentUser.uid).set({
+      theme: theme,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true }).catch(() => {});
+  }
 }
 
 function updateThemeSelector(theme) {
