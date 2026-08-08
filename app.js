@@ -164,26 +164,20 @@ function initFirebase() {
       }
       auth = firebase.auth();
 
-      // Initialize Firestore with modern multi-tab IndexedDB cache (avoids enablePersistence deprecation)
+      // Initialize Firestore with recommended cache settings (eliminates enableMultiTabIndexedDbPersistence deprecation)
+      db = firebase.firestore();
       try {
-        db = firebase.initializeFirestore(firebase.app(), {
-          localCache: (firebase.firestore.persistentLocalCache ?
-            firebase.firestore.persistentLocalCache({ tabManager: firebase.firestore.persistentMultipleTabManager() }) :
-            undefined)
-        });
-      } catch (e) {
-        db = firebase.firestore();
-        try {
-          if (firebase.firestore.persistentLocalCache) {
-            db.settings({
-              localCache: firebase.firestore.persistentLocalCache({ tabManager: firebase.firestore.persistentMultipleTabManager() })
-            });
-          } else {
-            db.enablePersistence({ synchronizeTabs: true }).catch(() => {});
-          }
-        } catch (err) {
-          console.warn("Firestore cache init notice (non-fatal):", err);
+        if (typeof firebase.firestore.persistentLocalCache === 'function') {
+          const tabManager = (typeof firebase.firestore.persistentMultipleTabManager === 'function')
+            ? firebase.firestore.persistentMultipleTabManager()
+            : undefined;
+          db.settings({
+            localCache: firebase.firestore.persistentLocalCache(tabManager ? { tabManager } : {})
+          });
         }
+      } catch (cacheErr) {
+        // Graceful fallback if offline IndexedDB is restricted in browser context (e.g. private browsing)
+        console.info("Firestore cache note (non-fatal):", cacheErr?.message || cacheErr);
       }
 
       // Process redirect authentication result if Returning from redirect sign-in
