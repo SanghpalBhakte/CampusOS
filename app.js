@@ -4451,17 +4451,6 @@ function renderNotices() {
   `;
 }
 
-// ── Resources (Quick Links & Daily Summary) ─────────────────────
-function switchResourcesTab(tab) {
-  state.resourcesTab = tab;
-  window.location.hash = tab;
-  document.querySelectorAll('[data-nav]').forEach(el => {
-    const navVal = el.dataset.nav;
-    el.classList.toggle('active', navVal === 'resources' || navVal === tab);
-  });
-  renderResources();
-}
-
 function formatBytes(bytes) {
   if (!bytes || bytes === 0) return '0 B';
   const k = 1024;
