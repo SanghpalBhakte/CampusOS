@@ -2624,6 +2624,24 @@ function getWeekDays(offset = 0) {
   return week;
 }
 
+function calculateAttendanceStreak() {
+  const attendanceData = safeGetStorage(KEY_ATTENDANCE, {}) || {};
+  const dates = Object.keys(attendanceData).sort().reverse();
+  let streak = 0;
+  for (const d of dates) {
+    const dayClasses = attendanceData[d];
+    const statuses = Object.values(dayClasses);
+    if (!statuses.length) continue;
+    if (statuses.includes('skipped')) {
+      break;
+    }
+    if (statuses.includes('attended')) {
+      streak += statuses.filter(s => s === 'attended').length;
+    }
+  }
+  return streak;
+}
+
 window.setAttendanceWeekOffset = function(offset) {
   state.attendanceWeekOffset = offset;
   renderReview();
@@ -2638,12 +2656,18 @@ window.setAttendance = function(dateStr, classKey, status) {
     showToast('Attendance status cleared', 'info');
   } else {
     data[dateStr][classKey] = status;
-    showToast(status === 'attended' ? 'Marked Attended ✓' : 'Marked Skipped ✕', status === 'attended' ? 'success' : 'error');
+    if (status === 'attended') {
+      triggerConfetti();
+      const streak = calculateAttendanceStreak();
+      showToast(streak >= 3 ? `Attendance logged ✓ · Streak: ${streak} classes! 🔥` : 'Attendance logged: Attended ✓', 'success');
+    } else {
+      showToast('Attendance logged: Bunked ✕', 'info');
+    }
   }
   
   safeSetStorage(KEY_ATTENDANCE, data);
   syncToCloud();
-  if (['timetable', 'review', 'dashboard'].includes(state.currentPage)) {
+  if (['timetable', 'review', 'dashboard', 'resources', 'links'].includes(state.currentPage)) {
     renderPage(state.currentPage);
   }
 };
@@ -2704,11 +2728,11 @@ function renderWeeklyAttendanceTracker() {
             </div>
           </div>
           <div style="display:flex;align-items:center;gap:6px">
-            <button class="btn btn-sm" onclick="setAttendance('${dateStr}', '${classKey}', 'attended')" aria-label="Mark ${c.subject} as attended on ${formatDate(dateStr)}" aria-pressed="${status === 'attended'}" style="padding:4px 10px;font-size:0.75rem;font-weight:600;background:${status==='attended'?'var(--green)':'var(--surface-2)'};color:${status==='attended'?'white':'var(--text-primary)'};border:1px solid ${status==='attended'?'var(--green)':'var(--border)'}">
+            <button class="btn btn-sm" onclick="setAttendance('${dateStr}', '${classKey}', 'attended')" aria-label="Mark ${c.subject} as attended on ${formatDate(dateStr)}" aria-pressed="${status === 'attended'}" style="padding:5px 12px;font-size:0.75rem;font-weight:700;border-radius:var(--radius-xs,6px);background:${status==='attended'?'var(--green)':'var(--surface-2)'};color:${status==='attended'?'white':'var(--text-primary)'};border:1px solid ${status==='attended'?'var(--green)':'var(--border)'};cursor:pointer;transition:transform 0.1s ease">
               ${status==='attended'?'✓ Attended':'Attended'}
             </button>
-            <button class="btn btn-sm" onclick="setAttendance('${dateStr}', '${classKey}', 'skipped')" aria-label="Mark ${c.subject} as skipped on ${formatDate(dateStr)}" aria-pressed="${status === 'skipped'}" style="padding:4px 10px;font-size:0.75rem;font-weight:600;background:${status==='skipped'?'var(--red)':'var(--surface-2)'};color:${status==='skipped'?'white':'var(--text-primary)'};border:1px solid ${status==='skipped'?'var(--red)':'var(--border)'}">
-              ${status==='skipped'?'✕ Skipped':'Skipped'}
+            <button class="btn btn-sm" onclick="setAttendance('${dateStr}', '${classKey}', 'skipped')" aria-label="Mark ${c.subject} as bunked on ${formatDate(dateStr)}" aria-pressed="${status === 'skipped'}" style="padding:5px 12px;font-size:0.75rem;font-weight:700;border-radius:var(--radius-xs,6px);background:${status==='skipped'?'var(--red)':'var(--surface-2)'};color:${status==='skipped'?'white':'var(--text-primary)'};border:1px solid ${status==='skipped'?'var(--red)':'var(--border)'};cursor:pointer;transition:transform 0.1s ease">
+              ${status==='skipped'?'✕ Bunked':'Bunked'}
             </button>
           </div>
         </div>
@@ -2750,6 +2774,7 @@ function renderWeeklyAttendanceTracker() {
   }
 
   const guidance = calculateSmartAttendanceGuidance(totalAttended, totalSkipped, 75);
+  const streak = calculateAttendanceStreak();
 
   const subjectBreakdownHTML = Object.keys(subjectStats).map(subj => {
     const st = subjectStats[subj];
@@ -2767,12 +2792,15 @@ function renderWeeklyAttendanceTracker() {
       ${weekSelectorHTML}
       ${attendanceDaysHTML}
 
-      <!-- Smart Attendance Guidance Card -->
+      <!-- Gamified Attendance & Safe Bunk Guidance Card -->
       <div class="card" style="padding:16px;margin-bottom:16px;background:var(--surface-2);border-left:4px solid ${guidance.isSafe ? 'var(--green)' : 'var(--red)'}">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap">
           <div>
-            <div style="font-weight:700;font-size:0.98rem;color:var(--text-primary)">Smart Attendance Guidance</div>
-            <div style="font-size:0.78rem;color:var(--text-muted);margin-top:2px">Target threshold: <strong>75%</strong> minimum attendance</div>
+            <div style="font-weight:700;font-size:0.98rem;color:var(--text-primary);display:flex;align-items:center;gap:8px">
+              <span>Attendance Health &amp; Safe Bunks</span>
+              ${streak > 0 ? `<span class="type-badge" style="background:rgba(245,158,11,0.15);color:var(--yellow);padding:2px 8px;font-size:0.7rem">🔥 ${streak}-Class Streak</span>` : ''}
+            </div>
+            <div style="font-size:0.78rem;color:var(--text-muted);margin-top:2px">Target threshold: <strong>75%</strong> minimum required attendance</div>
           </div>
           <span class="type-badge" style="font-size:0.75rem;padding:3px 9px;background:${guidance.isSafe ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)'};color:${guidance.isSafe ? 'var(--green)' : 'var(--red)'}">
             ${guidance.badgeLabel}
@@ -3492,14 +3520,14 @@ function renderTimetable() {
           <button class="btn btn-sm ${isAttended ? 'btn-primary' : 'btn-secondary'}"
                   onclick="event.stopPropagation(); setAttendance('${dateStr}', '${classKey}', 'attended')"
                   title="Mark ${c.subject} Attended" aria-label="Mark ${c.subject} as attended" aria-pressed="${isAttended}"
-                  style="padding:4px 9px;font-size:0.78rem;font-weight:700;border-radius:6px;min-width:32px;height:30px;
+                  style="padding:4px 10px;font-size:0.75rem;font-weight:700;border-radius:6px;min-width:32px;height:28px;
                          ${isAttended ? 'background:var(--green);border-color:var(--green);color:#ffffff;' : ''}">
             ✓
           </button>
           <button class="btn btn-sm ${isSkipped ? 'btn-primary' : 'btn-secondary'}"
                   onclick="event.stopPropagation(); setAttendance('${dateStr}', '${classKey}', 'skipped')"
-                  title="Mark ${c.subject} Skipped" aria-label="Mark ${c.subject} as skipped" aria-pressed="${isSkipped}"
-                  style="padding:4px 9px;font-size:0.78rem;font-weight:700;border-radius:6px;min-width:32px;height:30px;
+                  title="Mark ${c.subject} Bunked" aria-label="Mark ${c.subject} as bunked" aria-pressed="${isSkipped}"
+                  style="padding:4px 10px;font-size:0.75rem;font-weight:700;border-radius:6px;min-width:32px;height:28px;
                          ${isSkipped ? 'background:var(--red);border-color:var(--red);color:#ffffff;' : ''}">
             ✕
           </button>
@@ -4345,6 +4373,7 @@ function submitAddTask(editTaskId = null) {
 // ── Notices ───────────────────────────────────────────────────
 function renderNotices() {
   const el = document.getElementById('page-notices');
+  if (!el) return;
   const q  = state.noticeSearch.toLowerCase();
 
   let filtered = NOTICES;
@@ -4364,6 +4393,7 @@ function renderNotices() {
         ${svg('<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>', 12)}
         ${formatDate(n.date)} ${n.important ? '· <strong style="color:var(--red)">Important</strong>' : ''}
       </div>
+    </div>
   `).join('') : `<div class="empty-state-card" style="margin-top:14px">
     <span class="empty-state-icon">🔍</span>
     <div class="empty-state-title">No Announcements Found</div>
@@ -4384,9 +4414,31 @@ function renderNotices() {
     <div class="page-header">
       <div>
         <div class="page-title">Notice Board</div>
-        <div class="page-subtitle">${NOTICES.filter(n=>n.important).length} pinned / important announcements</div>
+        <div class="page-subtitle">${NOTICES.filter(n=>n.important).length} pinned announcements · official campus circulars</div>
       </div>
     </div>
+
+    <!-- Official WhatsApp Broadcast & Dev Notes Bridge Card -->
+    <div class="card" style="padding:14px 18px;margin-bottom:16px;background:var(--surface);border-left:4px solid #25D366;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap">
+      <div style="flex:1;min-width:240px">
+        <div style="font-weight:700;font-size:0.92rem;color:var(--text-primary);display:flex;align-items:center;gap:6px">
+          <span style="color:#25D366;font-size:1.05rem">💬</span>
+          <span>Official Class Broadcasts &amp; WhatsApp Group</span>
+        </div>
+        <div style="font-size:0.78rem;color:var(--text-muted);margin-top:2px">
+          Announcements, timetable shifts, and exam notifications synced with official Class Broadcasts.
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <a href="https://web.whatsapp.com/" target="_blank" rel="noopener" class="btn btn-sm" style="background:#25D366;border-color:#25D366;color:#ffffff;font-size:0.75rem;padding:5px 12px;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:5px;border-radius:var(--radius-xs,6px)">
+          <span>💬</span> Open WhatsApp Group ↗
+        </a>
+        <button class="btn btn-sm btn-secondary" onclick="showDevNotesModal()" style="font-size:0.75rem;padding:5px 12px;font-weight:600">
+          🛠️ Dev Notes
+        </button>
+      </div>
+    </div>
+
     <div class="search-input-wrapper" style="position:relative;display:flex;align-items:center">
       <span class="s-icon">${icons.search()}</span>
       <input type="text" placeholder="Search notices by title, category, or keyword…" value="${state.noticeSearch}"
@@ -4410,6 +4462,25 @@ function switchResourcesTab(tab) {
   renderResources();
 }
 
+function formatBytes(bytes) {
+  if (!bytes || bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
+// ── Study Vault (Resources & Daily Summary) ─────────────────────
+function switchResourcesTab(tab) {
+  state.resourcesTab = tab;
+  window.location.hash = tab;
+  document.querySelectorAll('[data-nav]').forEach(el => {
+    const navVal = el.dataset.nav;
+    el.classList.toggle('active', navVal === 'resources' || navVal === tab || (navVal === 'links' && tab === 'links'));
+  });
+  renderResources();
+}
+
 function renderResources() {
   const el = document.getElementById('page-resources') || document.getElementById('page-links');
   if (!el) return;
@@ -4419,21 +4490,21 @@ function renderResources() {
   el.innerHTML = `
     <div class="page-header" style="margin-bottom: 16px;">
       <div>
-        <div class="page-title">Study Resources &amp; Summary</div>
-        <div class="page-subtitle">Subject quick links, course materials &amp; daily academic briefing</div>
+        <div class="page-title">Study Vault &amp; Summary</div>
+        <div class="page-subtitle">Course notes, syllabus documents, cloud repositories &amp; academic briefing</div>
       </div>
       ${currentTab === 'links' ? `
-        <button class="btn-primary" onclick="addLinkSubject()" style="font-size:0.85rem;padding:8px 14px">+ Add Subject</button>
+        <button class="btn-primary" onclick="addLinkSubject()" style="font-size:0.85rem;padding:8px 14px">+ Add Subject Vault</button>
       ` : ''}
     </div>
 
     <div class="resources-tab-bar" role="tablist" aria-label="Resources sections">
       <button role="tab" aria-selected="${currentTab === 'links'}" class="res-tab-btn ${currentTab === 'links' ? 'active' : ''}" onclick="switchResourcesTab('links')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
         </svg>
-        Subject Links
+        Vault Materials
       </button>
       <button role="tab" aria-selected="${currentTab === 'summary'}" class="res-tab-btn ${currentTab === 'summary' ? 'active' : ''}" onclick="switchResourcesTab('summary')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -4474,9 +4545,9 @@ function renderLinksContent(container) {
     container.innerHTML = `
       <div class="card" style="text-align:center;padding:40px 20px;color:var(--text-muted)">
         <div style="font-size:2.2rem;margin-bottom:12px">📚</div>
-        <div style="font-weight:700;font-size:1.05rem;color:var(--text-primary);margin-bottom:6px">No Study Links Saved Yet</div>
-        <div style="font-size:0.85rem;margin-bottom:20px;max-width:360px;margin-left:auto;margin-right:auto">Keep your course notes, slides, GitHub repos, and drive links organized per subject for instant access.</div>
-        <button class="btn-primary" onclick="addLinkSubject()" style="font-size:0.85rem">+ Add Your First Subject</button>
+        <div style="font-weight:700;font-size:1.05rem;color:var(--text-primary);margin-bottom:6px">No Course Materials in Study Vault</div>
+        <div style="font-size:0.85rem;margin-bottom:20px;max-width:380px;margin-left:auto;margin-right:auto">Attach notes, syllabus PDFs, lab cheat sheets, and cloud drive folders per subject for 1-click access.</div>
+        <button class="btn-primary" onclick="addLinkSubject()" style="font-size:0.85rem">+ Create Your First Subject Vault</button>
       </div>
     `;
     return;
@@ -4496,24 +4567,29 @@ function renderLinksContent(container) {
 
       <div class="link-resources">
         ${s.resources.length === 0 ? `
-          <div style="font-size:0.8rem;color:var(--text-muted);font-style:italic;padding:4px 0">No links added yet. Click below to add one.</div>
-        ` : s.resources.map((r, ri) => `
+          <div style="font-size:0.8rem;color:var(--text-muted);font-style:italic;padding:8px 0">No materials attached yet. Click below to add files or links.</div>
+        ` : s.resources.map((r, ri) => {
+          const isUploaded = r.isUpload || (r.url && r.url.startsWith('data:'));
+          return `
           <div class="resource-item-row">
-            <a class="resource-link" href="${r.url}" target="_blank" rel="noopener">
-              <span class="r-icon">${getResourceIcon(r.icon || 'link')}</span>
+            <a class="resource-link" href="${r.url}" ${isUploaded ? `download="${r.label}"` : 'target="_blank" rel="noopener"'} title="${isUploaded ? 'Click to download ' + r.label : r.url}">
+              <span class="r-icon">${getResourceIcon(r.icon || 'book-open')}</span>
               <span class="resource-label" title="${r.label}">${r.label}</span>
+              ${r.fileSize ? `<span class="type-badge" style="font-size:0.62rem;padding:1px 5px;background:var(--surface-2);color:var(--text-muted);margin-left:4px">${r.fileSize}</span>` : ''}
+              ${isUploaded ? `<span style="font-size:0.75rem;margin-left:auto;color:var(--accent)">📥</span>` : `<span style="font-size:0.75rem;margin-left:auto;color:var(--text-muted)">↗</span>`}
             </a>
             <div class="resource-actions">
               <button class="icon-btn-xs" onclick="editLinkResource(${si},${ri})" title="Edit resource" aria-label="Edit resource">✏️</button>
               <button class="icon-btn-xs icon-btn-danger" onclick="deleteLinkResource(${si},${ri})" title="Delete resource" aria-label="Delete resource">✕</button>
             </div>
-          </div>`).join('')}
+          </div>`;
+        }).join('')}
       </div>
 
       <div style="padding: 10px 16px 14px;">
         <button class="btn-add-resource" onclick="addLinkResource(${si})">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Add Resource
+          Add Vault Material / Upload
         </button>
       </div>
     </div>`).join('');
@@ -4531,11 +4607,11 @@ window.editLinkSubject = function(si) {
 };
 
 window.deleteLinkSubject = function(si) {
-  if (!confirm('Delete this subject and all its resources?')) return;
+  if (!confirm('Delete this subject and all its materials?')) return;
   const links = loadCustomLinks();
   links.splice(si, 1);
   saveCustomLinks(links);
-  showToast('Subject removed', 'info');
+  showToast('Subject removed from vault', 'info');
   renderLinks();
 };
 
@@ -4553,7 +4629,7 @@ window.deleteLinkResource = function(si, ri) {
   const links = loadCustomLinks();
   links[si].resources.splice(ri, 1);
   saveCustomLinks(links);
-  showToast('Resource removed', 'info');
+  showToast('Material removed from vault', 'info');
   renderLinks();
 };
 
@@ -4566,26 +4642,26 @@ function showLinkSubjectModal(si, existing) {
   backdrop.innerHTML = `
     <div class="modal" style="max-width:400px;width:92vw">
       <div class="modal-header">
-        <span class="modal-title">${isNew ? 'Add Subject' : 'Edit Subject'}</span>
+        <span class="modal-title">${isNew ? 'Create Subject Vault' : 'Edit Subject Vault'}</span>
         <button class="modal-close" onclick="document.getElementById('link-subject-modal-backdrop')?.remove()">✕</button>
       </div>
       <div class="modal-body" style="display:flex;flex-direction:column;gap:14px">
         <div>
           <label class="form-label">Subject Name <span style="color:var(--red)">*</span></label>
-          <input id="lsm-name" class="form-input" value="${existing?.subject || ''}" placeholder="e.g. Data Structures" />
+          <input id="lsm-name" class="form-input" value="${existing?.subject || ''}" placeholder="e.g. Data Structures &amp; Algorithms" />
         </div>
         <div>
           <label class="form-label">Short Code</label>
-          <input id="lsm-code" class="form-input" value="${existing?.code || ''}" placeholder="e.g. DS" />
+          <input id="lsm-code" class="form-input" value="${existing?.code || ''}" placeholder="e.g. DSA" />
         </div>
         <div>
-          <label class="form-label">Color (hex)</label>
+          <label class="form-label">Color Indicator</label>
           <input id="lsm-color" type="color" value="${existing?.color || '#6366f1'}" style="width:60px;height:36px;border:none;cursor:pointer;background:none" />
         </div>
       </div>
       <div class="modal-footer">
         <button class="btn-secondary" onclick="document.getElementById('link-subject-modal-backdrop')?.remove()">Cancel</button>
-        <button class="btn-primary" onclick="saveLinkSubject(${si === null ? 'null' : si})">Save</button>
+        <button class="btn-primary" onclick="saveLinkSubject(${si === null ? 'null' : si})">Save Vault</button>
       </div>
     </div>
   `;
@@ -4611,43 +4687,127 @@ window.saveLinkSubject = function(si) {
   }
   saveCustomLinks(links);
   document.getElementById('link-subject-modal-backdrop')?.remove();
-  showToast('Subject saved ✓', 'success');
+  showToast('Subject vault saved ✓', 'success');
   renderLinks();
+};
+
+window.handleVaultFileSelect = function(e) {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    const dataUrl = evt.target.result;
+    const urlEl = document.getElementById('lrm-url');
+    const labelEl = document.getElementById('lrm-label');
+    const fileLabel = document.getElementById('lrm-file-label');
+    const iconEl = document.getElementById('lrm-icon');
+
+    if (urlEl) urlEl.value = dataUrl;
+    if (labelEl && !labelEl.value) labelEl.value = file.name;
+    if (fileLabel) fileLabel.innerHTML = `✓ <strong>${file.name}</strong> (${formatBytes(file.size)})`;
+
+    // Auto-detect icon
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (['pdf', 'doc', 'docx', 'txt', 'ppt', 'pptx'].includes(ext) && iconEl) iconEl.value = 'book-open';
+    else if (['py', 'js', 'cpp', 'c', 'java', 'html', 'css', 'zip'].includes(ext) && iconEl) iconEl.value = 'code';
+    else if (['mp4', 'mov', 'avi', 'mkv'].includes(ext) && iconEl) iconEl.value = 'video';
+    
+    window._uploadedFileMeta = {
+      isUpload: true,
+      fileName: file.name,
+      fileSize: formatBytes(file.size)
+    };
+    showToast(`File attached: ${file.name} ✓`, 'success');
+  };
+  reader.readAsDataURL(file);
+};
+
+window.setResourceInputMode = function(mode) {
+  const fileSec = document.getElementById('lrm-file-section');
+  const urlSec = document.getElementById('lrm-url-section');
+  const fileBtn = document.getElementById('lrm-mode-file-btn');
+  const urlBtn = document.getElementById('lrm-mode-url-btn');
+
+  if (mode === 'file') {
+    if (fileSec) fileSec.style.display = 'block';
+    if (urlSec) urlSec.style.display = 'none';
+    if (fileBtn) { fileBtn.className = 'btn btn-sm btn-primary'; }
+    if (urlBtn) { urlBtn.className = 'btn btn-sm btn-secondary'; }
+  } else {
+    if (fileSec) fileSec.style.display = 'none';
+    if (urlSec) urlSec.style.display = 'block';
+    if (fileBtn) { fileBtn.className = 'btn btn-sm btn-secondary'; }
+    if (urlBtn) { urlBtn.className = 'btn btn-sm btn-primary'; }
+  }
+};
+
+window.autoDetectVaultIcon = function(url) {
+  const iconEl = document.getElementById('lrm-icon');
+  if (!iconEl || !url) return;
+  const u = url.toLowerCase();
+  if (u.includes('drive.google.com') || u.includes('dropbox') || u.includes('onedrive')) iconEl.value = 'database';
+  else if (u.includes('github.com') || u.includes('gitlab') || u.includes('codepen') || u.includes('replit')) iconEl.value = 'code';
+  else if (u.includes('youtube.com') || u.includes('youtu.be') || u.includes('vimeo')) iconEl.value = 'video';
+  else if (u.includes('notion.so') || u.includes('docs.google.com') || u.includes('.pdf')) iconEl.value = 'book-open';
 };
 
 function showLinkResourceModal(si, ri, existing) {
   document.getElementById('link-resource-modal-backdrop')?.remove();
   const isNew = ri === null;
+  const isUpload = existing?.isUpload || (existing?.url && existing.url.startsWith('data:'));
+  window._uploadedFileMeta = isUpload ? { isUpload: true, fileSize: existing.fileSize } : null;
+
   const backdrop = document.createElement('div');
   backdrop.className = 'modal-backdrop';
   backdrop.id = 'link-resource-modal-backdrop';
   backdrop.innerHTML = `
-    <div class="modal" style="max-width:400px;width:92vw">
+    <div class="modal" style="max-width:440px;width:92vw" onclick="event.stopPropagation()">
       <div class="modal-header">
-        <span class="modal-title">${isNew ? 'Add Study Resource' : 'Edit Study Resource'}</span>
+        <span class="modal-title">${isNew ? 'Add Vault Material' : 'Edit Vault Material'}</span>
         <button class="modal-close" onclick="document.getElementById('link-resource-modal-backdrop')?.remove()">✕</button>
       </div>
+
+      <div style="display:flex;gap:6px;margin-bottom:14px;background:var(--surface-2);padding:4px;border-radius:var(--radius-sm)">
+        <button type="button" class="btn btn-sm ${!isUpload ? 'btn-primary' : 'btn-secondary'}" id="lrm-mode-url-btn" onclick="setResourceInputMode('url')" style="flex:1;padding:6px;font-size:0.8rem">🔗 Web / Cloud Link</button>
+        <button type="button" class="btn btn-sm ${isUpload ? 'btn-primary' : 'btn-secondary'}" id="lrm-mode-file-btn" onclick="setResourceInputMode('file')" style="flex:1;padding:6px;font-size:0.8rem">📁 Upload Document</button>
+      </div>
+
       <div class="modal-body" style="display:flex;flex-direction:column;gap:14px">
-        <div>
-          <label class="form-label">Label <span style="color:var(--red)">*</span></label>
-          <input id="lrm-label" class="form-input" value="${existing?.label || ''}" placeholder="e.g. GFG DSA Sheet" />
+        <div id="lrm-file-section" style="display:${isUpload ? 'block' : 'none'}">
+          <label class="form-label">Attach File / Note (PDF, Doc, Image, Code)</label>
+          <input type="file" id="lrm-file-input" style="display:none" onchange="handleVaultFileSelect(event)" accept=".pdf,.doc,.docx,.ppt,.pptx,.txt,.jpg,.jpeg,.png,.zip,.py,.java,.cpp,.c,.js">
+          <div class="card" onclick="document.getElementById('lrm-file-input').click()" style="text-align:center;padding:20px;border:2px dashed var(--border);border-radius:var(--radius-sm);cursor:pointer;background:var(--surface-2)">
+            <div style="font-size:1.6rem;margin-bottom:6px">📥</div>
+            <div id="lrm-file-label" style="font-size:0.86rem;font-weight:600;color:var(--text-primary)">
+              ${existing?.label && isUpload ? `✓ <strong>${existing.label}</strong> (${existing.fileSize || 'Attached File'})` : 'Click to select note, PDF, slide, or code file'}
+            </div>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px">Saved persistently to your local Study Vault</div>
+          </div>
         </div>
+
         <div>
-          <label class="form-label">URL <span style="color:var(--red)">*</span></label>
-          <input id="lrm-url" class="form-input" type="url" value="${existing?.url || ''}" placeholder="https://..." />
+          <label class="form-label">Material Name / Title <span style="color:var(--red)">*</span></label>
+          <input id="lrm-label" class="form-input" value="${existing?.label || ''}" placeholder="e.g. Unit 2 Summary Notes or Lab Manual PDF" />
         </div>
+
+        <div id="lrm-url-section" style="display:${!isUpload ? 'block' : 'none'}">
+          <label class="form-label">URL / Cloud Folder <span style="color:var(--red)">*</span></label>
+          <input id="lrm-url" class="form-input" type="url" value="${existing?.url || ''}" placeholder="https://drive.google.com/... or GitHub link" oninput="autoDetectVaultIcon(this.value)" />
+        </div>
+
         <div>
-          <label class="form-label">Icon</label>
+          <label class="form-label">Category Icon</label>
           <select id="lrm-icon" class="form-input">
-            ${['link','book-open','code','video','eye','graduation-cap','database','cpu','list'].map(ic =>
-              `<option value="${ic}" ${(existing?.icon||'link')===ic?'selected':''}>${ic}</option>`
+            ${['book-open','code','video','graduation-cap','database','link','eye','list'].map(ic =>
+              `<option value="${ic}" ${(existing?.icon||'book-open')===ic?'selected':''}>${ic === 'book-open' ? '📖 Notes / PDF' : ic === 'code' ? '💻 Code / Repo' : ic === 'video' ? '🎥 Lecture Video' : ic === 'graduation-cap' ? '🎓 Syllabus / Guide' : ic === 'database' ? '🗄️ Cloud Drive' : '🔗 Web Resource'}</option>`
             ).join('')}
           </select>
         </div>
       </div>
-      <div class="modal-footer">
+
+      <div class="modal-footer" style="margin-top:16px">
         <button class="btn-secondary" onclick="document.getElementById('link-resource-modal-backdrop')?.remove()">Cancel</button>
-        <button class="btn-primary" onclick="saveLinkResource(${si},${ri === null ? 'null' : ri})">Save</button>
+        <button class="btn-primary" onclick="saveLinkResource(${si},${ri === null ? 'null' : ri})">Save Material</button>
       </div>
     </div>
   `;
@@ -4660,25 +4820,34 @@ window.saveLinkResource = function(si, ri) {
   const urlEl   = document.getElementById('lrm-url');
   const label = labelEl?.value?.trim();
   const url   = urlEl?.value?.trim();
-  const icon  = document.getElementById('lrm-icon')?.value || 'link';
+  const icon  = document.getElementById('lrm-icon')?.value || 'book-open';
+  const meta  = window._uploadedFileMeta || {};
 
   [labelEl, urlEl].forEach(el => el?.classList.remove('error', 'shake'));
 
   if (!label || !url) {
     if (!label && labelEl) { labelEl.classList.add('error', 'shake'); labelEl.focus(); }
     else if (!url && urlEl) { urlEl.classList.add('error', 'shake'); urlEl.focus(); }
-    showToast('Resource label and URL are required.', 'error');
+    showToast('Resource name and file/link are required.', 'error');
     return;
   }
   const links = loadCustomLinks();
+  const item = {
+    label,
+    url,
+    icon,
+    isUpload: !!meta.isUpload || url.startsWith('data:'),
+    fileSize: meta.fileSize || (url.startsWith('data:') ? formatBytes(url.length * 0.75) : '')
+  };
+
   if (ri === null) {
-    links[si].resources.push({ label, url, icon });
+    links[si].resources.push(item);
   } else {
-    links[si].resources[ri] = { label, url, icon };
+    links[si].resources[ri] = item;
   }
   saveCustomLinks(links);
   document.getElementById('link-resource-modal-backdrop')?.remove();
-  showToast('Study resource saved ✓', 'success');
+  showToast('Study vault material saved ✓', 'success');
   renderLinks();
 };
 
@@ -5125,16 +5294,30 @@ function showNotice(id) {
   if (!n) return;
   const backdrop = document.createElement('div');
   backdrop.className = 'modal-backdrop';
+  const whatsappText = `📢 *${n.title}*\n\n${n.content}\n\n🗓️ Date: ${formatDate(n.date)} (${n.category})\n— Shared via Clarity Desk`;
+  const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(whatsappText)}`;
+
   backdrop.innerHTML = `
-    <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal" onclick="event.stopPropagation()" style="max-width:500px;width:92vw">
       <button class="modal-close" onclick="this.closest('.modal-backdrop').remove()">${icons.x()}</button>
-      <div style="margin-bottom:14px">
-        <span class="cat-badge cat-${n.category}">${n.category}</span>
-        ${n.important ? '<span class="cat-badge" style="background:rgba(239,68,68,0.12);color:var(--red);margin-left:6px">Important</span>' : ''}
+      <div style="margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+        <div>
+          <span class="cat-badge cat-${n.category}">${n.category}</span>
+          ${n.important ? '<span class="cat-badge" style="background:rgba(239,68,68,0.12);color:var(--red);margin-left:6px">Important</span>' : ''}
+        </div>
+        <span style="font-size:0.75rem;color:var(--text-muted)">${formatDate(n.date)}</span>
       </div>
-      <h2 style="font-size:1.1rem;font-weight:700;margin-bottom:10px;line-height:1.4">${n.title}</h2>
-      <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:14px">${formatDate(n.date)}</div>
-      <p style="font-size:0.9rem;line-height:1.7;color:var(--text-secondary)">${n.content}</p>
+      <h2 style="font-size:1.15rem;font-weight:700;margin-bottom:10px;line-height:1.4">${n.title}</h2>
+      <p style="font-size:0.9rem;line-height:1.7;color:var(--text-secondary);margin-bottom:20px;white-space:pre-line">${n.content}</p>
+      
+      <div class="modal-footer" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding-top:14px;border-top:1px solid var(--border);flex-wrap:wrap">
+        <a href="${whatsappUrl}" target="_blank" rel="noopener" class="btn btn-sm" style="background:#25D366;border-color:#25D366;color:#ffffff;display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:var(--radius-xs,6px);font-size:0.8rem;text-decoration:none;font-weight:700">
+          <span>💬</span> Forward to WhatsApp
+        </a>
+        <button class="btn btn-sm btn-secondary" onclick="navigator.clipboard.writeText('${n.title.replace(/'/g, "\\'")}\\n\\n${n.content.replace(/'/g, "\\'")}').then(() => showToast('Notice copied to clipboard ✓', 'success'))" style="font-size:0.8rem;padding:6px 12px">
+          📋 Copy Notice
+        </button>
+      </div>
     </div>
   `;
   backdrop.addEventListener('click', () => backdrop.remove());
@@ -5146,6 +5329,51 @@ function showNotice(id) {
   };
   document.addEventListener('keydown', escHandler);
 }
+
+function showDevNotesModal() {
+  document.getElementById('dev-notes-modal-backdrop')?.remove();
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  backdrop.id = 'dev-notes-modal-backdrop';
+  backdrop.innerHTML = `
+    <div class="modal" onclick="event.stopPropagation()" style="max-width:520px;width:92vw">
+      <div class="modal-header">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:1.2rem">🛠️</span>
+          <span class="modal-title">Clarity Desk · System &amp; Dev Notes</span>
+        </div>
+        <button class="modal-close" onclick="document.getElementById('dev-notes-modal-backdrop')?.remove()">${icons.x()}</button>
+      </div>
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:14px;font-size:0.86rem;line-height:1.6;color:var(--text-secondary)">
+        <div class="card" style="padding:12px 14px;background:var(--surface-2);border-left:3px solid var(--accent)">
+          <div style="font-weight:700;color:var(--text-primary);margin-bottom:2px">Engine Architecture &amp; Data Pipeline</div>
+          <div>Offline-first client runtime backed by LocalStorage and real-time Firestore sync. Zero third-party ad trackers.</div>
+        </div>
+
+        <div>
+          <div style="font-weight:700;color:var(--text-primary);margin-bottom:4px">📡 Notice Board &amp; WhatsApp Data Bridge</div>
+          <div>Campus notices and circulars are ingested from official college notification feeds and Class Representative broadcasts. Direct 1-tap WhatsApp sharing allows instant peer-to-peer verification without unauthorized scraping.</div>
+        </div>
+
+        <div>
+          <div style="font-weight:700;color:var(--text-primary);margin-bottom:4px">📁 Study Vault File Engine</div>
+          <div>Supports persistent local document uploads (PDFs, notes, cheat sheets) up to localStorage quota, plus native deep links for Google Drive, GitHub, and Notion repositories.</div>
+        </div>
+
+        <div>
+          <div style="font-weight:700;color:var(--text-primary);margin-bottom:4px">🛡️ Attendance &amp; Safe Bunk Calculator</div>
+          <div>Real-time attendance streak computation with safe buffer margin modeling based on a 75% institutional attendance requirement.</div>
+        </div>
+      </div>
+      <div class="modal-footer" style="margin-top:14px">
+        <button class="btn-primary" onclick="document.getElementById('dev-notes-modal-backdrop')?.remove()" style="width:100%">Done</button>
+      </div>
+    </div>
+  `;
+  backdrop.addEventListener('click', e => { if (e.target === backdrop) backdrop.remove(); });
+  document.body.appendChild(backdrop);
+}
+window.showDevNotesModal = showDevNotesModal;
 
 
 // ── Desk Assistant ────────────────────────────────────────────

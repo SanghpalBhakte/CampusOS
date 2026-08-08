@@ -168,10 +168,10 @@
 
       <div class="nav-item" data-nav="links" onclick="navigateTo('links')" id="sidebar-links">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
         </svg>
-        Study Links
+        Study Vault
       </div>
 
       <div class="nav-item" data-nav="summary" onclick="navigateTo('summary')" id="sidebar-summary">
@@ -215,10 +215,10 @@
       <section id="page-notices" class="section-page" data-page="notices" aria-label="Notice Board"></section>
 
       <!-- Resources -->
-      <section id="page-resources" class="section-page" data-page="resources" aria-label="Study Resources"></section>
+      <section id="page-resources" class="section-page" data-page="resources" aria-label="Study Vault"></section>
 
       <!-- Quick Links -->
-      <section id="page-links" class="section-page" data-page="links" aria-label="Study Links"></section>
+      <section id="page-links" class="section-page" data-page="links" aria-label="Study Vault"></section>
 
       <!-- Daily Summary -->
       <section id="page-summary" class="section-page" data-page="summary" aria-label="Daily Briefing"></section>
@@ -251,13 +251,13 @@
   </button>
 
   <button class="bottom-nav-item" data-nav="assignments" onclick="navigateTo('assignments')">
-    <div class="bnav-dot"></div>
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-      <polyline points="14 2 14 8 20 8"/>
-      <line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/>
+      <polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/>
+      <line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
     </svg>
     Tasks
+    <span class="bnav-dot"></span>
   </button>
 
   <button class="bottom-nav-item" data-nav="notices" onclick="navigateTo('notices')">
@@ -268,12 +268,12 @@
     Notices
   </button>
 
-  <button class="bottom-nav-item" data-nav="resources" onclick="navigateTo('resources')">
+  <button class="bottom-nav-item" data-nav="links" onclick="navigateTo('links')">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
     </svg>
-    Links
+    Vault
   </button>
 
   <button class="bottom-nav-item" data-nav="settings" onclick="navigateTo('settings')">
@@ -373,8 +373,8 @@
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
 <!-- Firebase Config & App Script -->
-<script src="firebase-config.js?v=58"></script>
-<script type="module" src="app.js?v=58"></script>
+<script src="firebase-config.js?v=59"></script>
+<script type="module" src="app.js?v=59"></script>
 
 </body>
 </html>
