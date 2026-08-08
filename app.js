@@ -14,6 +14,7 @@ const KEY_ATTENDANCE       = 'cos_attendance';
 const KEY_GEMINI_KEY       = 'cos_gemini_key';
 const KEY_THEME            = 'cos_theme';
 const KEY_NOTIF_PREFS      = 'cos_notif_prefs';
+const KEY_NOTICE_CHANNELS  = 'cos_notice_channels';
 
 // ── Safe Storage Helpers ─────────────────────────────────────
 function safeGetStorage(key, fallback = null) {
@@ -1479,10 +1480,13 @@ function applyCloudDataToLocalState(data) {
   if (data.notificationPrefs && typeof data.notificationPrefs === 'object') {
     safeSetStorage(KEY_NOTIF_PREFS, data.notificationPrefs);
   }
+  if (data.noticeChannels && typeof data.noticeChannels === 'object') {
+    safeSetStorage(KEY_NOTICE_CHANNELS, data.noticeChannels);
+  }
   updateTopbarProfile();
   setupFABDrag();
   updateNavBadges();
-  if (['settings', 'assignments', 'dashboard'].includes(state.currentPage)) {
+  if (['settings', 'assignments', 'dashboard', 'notices'].includes(state.currentPage)) {
     renderPage(state.currentPage);
   }
 }
@@ -1501,6 +1505,7 @@ function pushLocalDataToCloud(uid) {
     attendance:         safeGetStorage(KEY_ATTENDANCE, {}),
     theme:              localStorage.getItem(KEY_THEME) || 'paper',
     notificationPrefs:  safeGetStorage(KEY_NOTIF_PREFS, null),
+    noticeChannels:     safeGetStorage(KEY_NOTICE_CHANNELS, null),
     updatedAt:          firebase.firestore.FieldValue.serverTimestamp()
   };
   db.collection('users').doc(uid).set(payload, { merge: true }).catch(err => {
@@ -1509,6 +1514,105 @@ function pushLocalDataToCloud(uid) {
     }
     console.warn("Cloud push error:", err);
   });
+}
+
+// ── Notice Channels (Official & WhatsApp Links) ───────────────
+function loadNoticeChannels() {
+  const saved = safeGetStorage(KEY_NOTICE_CHANNELS, null);
+  if (saved && typeof saved === 'object') {
+    return {
+      officialTitle: (saved.officialTitle || 'Official Updates').trim(),
+      officialUrl:   (saved.officialUrl || '').trim(),
+      whatsappTitle: (saved.whatsappTitle || 'WhatsApp Group').trim(),
+      whatsappUrl:   (saved.whatsappUrl || '').trim()
+    };
+  }
+  return {
+    officialTitle: 'Official Updates',
+    officialUrl:   '',
+    whatsappTitle: 'WhatsApp Group',
+    whatsappUrl:   ''
+  };
+}
+
+function saveNoticeChannels(channels) {
+  safeSetStorage(KEY_NOTICE_CHANNELS, channels);
+  syncToCloud();
+}
+
+function showNoticeChannelModal(targetKey) {
+  document.getElementById('notice-channel-modal-backdrop')?.remove();
+  const channels = loadNoticeChannels();
+  const isOfficial = targetKey === 'official';
+  const currentTitle = isOfficial ? channels.officialTitle : channels.whatsappTitle;
+  const currentUrl   = isOfficial ? channels.officialUrl : channels.whatsappUrl;
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  backdrop.id = 'notice-channel-modal-backdrop';
+  backdrop.innerHTML = `
+    <div class="modal" onclick="event.stopPropagation()" style="max-width:460px;width:92vw">
+      <div class="modal-header">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:1.2rem">${isOfficial ? '📢' : '💬'}</span>
+          <span class="modal-title">${isOfficial ? 'Configure Official Notice Source' : 'Configure WhatsApp Group'}</span>
+        </div>
+        <button class="modal-close" onclick="document.getElementById('notice-channel-modal-backdrop')?.remove()">${icons.x()}</button>
+      </div>
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:14px">
+        <div style="font-size:0.82rem;color:var(--text-muted);line-height:1.45">
+          ${isOfficial ? 'Set your college portal link, class channel, or department notice page URL.' : 'Set your official batch or class WhatsApp group invite link for 1-tap access.'}
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Card Title</label>
+          <input type="text" class="form-input" id="nc-modal-title" value="${(currentTitle || '').replace(/"/g, '&quot;')}" placeholder="${isOfficial ? 'e.g. Official Updates or College Portal' : 'e.g. WhatsApp Group or Batch 2026'}">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Destination Link / URL</label>
+          <input type="url" class="form-input" id="nc-modal-url" value="${(currentUrl || '').replace(/"/g, '&quot;')}" placeholder="${isOfficial ? 'https://college.edu/notices' : 'https://chat.whatsapp.com/invite...'}">
+        </div>
+      </div>
+      <div class="modal-footer" style="margin-top:16px;display:flex;justify-content:flex-end;gap:8px">
+        <button class="btn-secondary" onclick="document.getElementById('notice-channel-modal-backdrop')?.remove()">Cancel</button>
+        <button class="btn-primary" onclick="submitNoticeChannelModal('${targetKey}')">Save Changes</button>
+      </div>
+    </div>
+  `;
+  backdrop.addEventListener('click', e => { if (e.target === backdrop) backdrop.remove(); });
+  document.body.appendChild(backdrop);
+}
+
+function submitNoticeChannelModal(targetKey) {
+  const titleEl = document.getElementById('nc-modal-title');
+  const urlEl   = document.getElementById('nc-modal-url');
+  const title   = (titleEl ? titleEl.value : '').trim();
+  const url     = (urlEl ? urlEl.value : '').trim();
+
+  const channels = loadNoticeChannels();
+  if (targetKey === 'official') {
+    channels.officialTitle = title || 'Official Updates';
+    channels.officialUrl   = url;
+  } else {
+    channels.whatsappTitle = title || 'WhatsApp Group';
+    channels.whatsappUrl   = url;
+  }
+
+  saveNoticeChannels(channels);
+  document.getElementById('notice-channel-modal-backdrop')?.remove();
+  showToast('Notice source updated ✓', 'success');
+  if (state.currentPage === 'notices') renderNotices();
+  if (state.currentPage === 'settings') renderSettings();
+}
+
+function handleNoticeSourceClick(targetKey) {
+  const channels = loadNoticeChannels();
+  const url = targetKey === 'official' ? channels.officialUrl : channels.whatsappUrl;
+  if (url && (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('tg://') || url.startsWith('whatsapp://'))) {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  } else {
+    showToast(targetKey === 'official' ? 'Configure your official notice link' : 'Configure your WhatsApp group link', 'info');
+    showNoticeChannelModal(targetKey);
+  }
 }
 
 // ── Custom Quick Links / Resources ───────────────────────────
@@ -4375,6 +4479,7 @@ function renderNotices() {
   const el = document.getElementById('page-notices');
   if (!el) return;
   const q  = state.noticeSearch.toLowerCase();
+  const channels = loadNoticeChannels();
 
   let filtered = NOTICES;
   if (q) filtered = filtered.filter(n =>
@@ -4418,24 +4523,55 @@ function renderNotices() {
       </div>
     </div>
 
-    <!-- Official WhatsApp Broadcast & Dev Notes Bridge Card -->
-    <div class="card" style="padding:14px 18px;margin-bottom:16px;background:var(--surface);border-left:4px solid #25D366;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap">
-      <div style="flex:1;min-width:240px">
-        <div style="font-weight:700;font-size:0.92rem;color:var(--text-primary);display:flex;align-items:center;gap:6px">
-          <span style="color:#25D366;font-size:1.05rem">💬</span>
-          <span>Official Class Broadcasts &amp; WhatsApp Group</span>
+    <!-- ── Quick-Access Notice Sources (3 Soft Linked Cards) ── -->
+    <div class="notice-sources-grid">
+      <!-- Card 1: Official Updates / Official Class Group -->
+      <div class="notice-source-card tint-official" onclick="handleNoticeSourceClick('official')" title="Open official notice source">
+        <div class="notice-source-top">
+          <div class="notice-source-icon-wrap notice-source-icon-official">📢</div>
+          <button class="btn-icon" onclick="event.stopPropagation(); showNoticeChannelModal('official')" title="Edit official channel settings" style="width:24px;height:24px;font-size:0.72rem" aria-label="Edit official channel settings">
+            ✏️
+          </button>
         </div>
-        <div style="font-size:0.78rem;color:var(--text-muted);margin-top:2px">
-          Announcements, timetable shifts, and exam notifications synced with official Class Broadcasts.
+        <div>
+          <div class="notice-source-title">${escHtml_cd(channels.officialTitle || 'Official Updates')}</div>
+          <div class="notice-source-sub">Official notices from your class or department</div>
+        </div>
+        <div class="notice-source-action">
+          <span>${channels.officialUrl ? 'Open Portal / Source ↗' : '+ Configure Link'}</span>
         </div>
       </div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <a href="https://web.whatsapp.com/" target="_blank" rel="noopener" class="btn btn-sm" style="background:#25D366;border-color:#25D366;color:#ffffff;font-size:0.75rem;padding:5px 12px;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:5px;border-radius:var(--radius-xs,6px)">
-          <span>💬</span> Open WhatsApp Group ↗
-        </a>
-        <button class="btn btn-sm btn-secondary" onclick="showDevNotesModal()" style="font-size:0.75rem;padding:5px 12px;font-weight:600">
-          🛠️ Dev Notes
-        </button>
+
+      <!-- Card 2: WhatsApp Group -->
+      <div class="notice-source-card tint-whatsapp" onclick="handleNoticeSourceClick('whatsapp')" title="Open class WhatsApp group">
+        <div class="notice-source-top">
+          <div class="notice-source-icon-wrap notice-source-icon-whatsapp">💬</div>
+          <button class="btn-icon" onclick="event.stopPropagation(); showNoticeChannelModal('whatsapp')" title="Edit WhatsApp group settings" style="width:24px;height:24px;font-size:0.72rem" aria-label="Edit WhatsApp group settings">
+            ✏️
+          </button>
+        </div>
+        <div>
+          <div class="notice-source-title">${escHtml_cd(channels.whatsappTitle || 'WhatsApp Group')}</div>
+          <div class="notice-source-sub">Open your saved WhatsApp group in one tap</div>
+        </div>
+        <div class="notice-source-action" style="color:#25D366">
+          <span>${channels.whatsappUrl ? 'Open WhatsApp Group ↗' : '+ Configure Link'}</span>
+        </div>
+      </div>
+
+      <!-- Card 3: Dev Notes -->
+      <div class="notice-source-card tint-devnotes" onclick="showDevNotesModal()" title="View recent updates and improvements">
+        <div class="notice-source-top">
+          <div class="notice-source-icon-wrap notice-source-icon-devnotes">🛠️</div>
+          <span style="font-size:0.68rem;font-weight:700;background:rgba(245,158,11,0.15);color:var(--yellow);padding:2px 6px;border-radius:4px">v2.4</span>
+        </div>
+        <div>
+          <div class="notice-source-title">Dev Notes</div>
+          <div class="notice-source-sub">See recent fixes, updates, and improvements</div>
+        </div>
+        <div class="notice-source-action" style="color:var(--yellow)">
+          <span>View Updates ↗</span>
+        </div>
       </div>
     </div>
 
@@ -5139,6 +5275,33 @@ function renderSettings() {
       </div>
     </div>
 
+    <div class="section-heading">📢 Notice Channels &amp; Class Groups</div>
+    <div class="card" style="padding:20px;margin-bottom:20px">
+      <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:14px">
+        Customize the title and destination link for quick-access notice sources on your Notice Board.
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Official Channel Card Title</label>
+          <input type="text" class="form-input" id="nc-official-title" value="${(channels.officialTitle || 'Official Updates').replace(/"/g, '&quot;')}" placeholder="e.g. Official Updates or College Portal">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Official Channel Link / Portal URL</label>
+          <input type="url" class="form-input" id="nc-official-url" value="${(channels.officialUrl || '').replace(/"/g, '&quot;')}" placeholder="https://college.edu/notices or portal link">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">WhatsApp Card Title</label>
+          <input type="text" class="form-input" id="nc-wa-title" value="${(channels.whatsappTitle || 'WhatsApp Group').replace(/"/g, '&quot;')}" placeholder="e.g. WhatsApp Group or Batch 2026">
+        </div>
+        <div class="form-group">
+          <label class="form-label">WhatsApp Group Link</label>
+          <input type="url" class="form-input" id="nc-wa-url" value="${(channels.whatsappUrl || '').replace(/"/g, '&quot;')}" placeholder="https://chat.whatsapp.com/invite...">
+        </div>
+      </div>
+    </div>
+
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:32px">
       <button class="btn-primary" onclick="saveSettings()" style="display:flex;align-items:center;gap:6px">
         ${icons.save()} Save Changes
@@ -5151,7 +5314,7 @@ function renderSettings() {
     <div class="section-heading">${icons.trash()} Data &amp; Backup</div>
     <div class="card" style="padding:18px">
       <div style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:14px;line-height:1.6">
-        Your desk data (profile, custom schedule, tasks, attendance records) stays private and stored locally in this browser.
+        Your desk data (profile, custom schedule, tasks, attendance records, notice sources) stays private and stored locally in this browser.
         You can export a portable JSON backup anytime.
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -5160,6 +5323,7 @@ function renderSettings() {
         </button>
         <button class="btn-secondary" onclick="document.getElementById('import-file-input').click()" style="display:flex;align-items:center;gap:6px">
           Restore Backup (.json)
+        </button>
         <input type="file" id="import-file-input" accept=".json" style="display:none" onchange="importData(event)">
         <button class="btn-secondary" onclick="confirmClearTasks()"
           style="color:var(--red);border-color:rgba(239,68,68,0.35)">
@@ -5198,6 +5362,20 @@ function saveSettings() {
   };
   saveNotifPrefs(nPrefs);
 
+  const offTitleEl = document.getElementById('nc-official-title');
+  const offUrlEl   = document.getElementById('nc-official-url');
+  const waTitleEl  = document.getElementById('nc-wa-title');
+  const waUrlEl    = document.getElementById('nc-wa-url');
+  if (offTitleEl || waTitleEl) {
+    const channels = {
+      officialTitle: (offTitleEl ? offTitleEl.value : '').trim() || 'Official Updates',
+      officialUrl:   (offUrlEl ? offUrlEl.value : '').trim(),
+      whatsappTitle: (waTitleEl ? waTitleEl.value : '').trim() || 'WhatsApp Group',
+      whatsappUrl:   (waUrlEl ? waUrlEl.value : '').trim()
+    };
+    saveNoticeChannels(channels);
+  }
+
   // Show "Saved" feedback
   const saved = document.getElementById('settings-saved');
   if (saved) {
@@ -5218,6 +5396,7 @@ function exportData() {
     customTasks:        state.customTasks,
     assignmentStatuses: safeGetStorage(KEY_ASSIGNMENTS, {}),
     notificationPrefs:  loadNotifPrefs(),
+    noticeChannels:     loadNoticeChannels(),
     theme:              localStorage.getItem(KEY_THEME) || 'paper',
     exportedAt:         new Date().toISOString(),
   };
@@ -5251,6 +5430,9 @@ function importData(event) {
       }
       if (data.notificationPrefs) {
         safeSetStorage(KEY_NOTIF_PREFS, data.notificationPrefs);
+      }
+      if (data.noticeChannels && typeof data.noticeChannels === 'object') {
+        saveNoticeChannels(data.noticeChannels);
       }
       if (data.theme) {
         localStorage.setItem(KEY_THEME, data.theme);
@@ -5319,43 +5501,195 @@ function showNotice(id) {
   document.addEventListener('keydown', escHandler);
 }
 
-function showDevNotesModal() {
+const DEV_UPDATES = [
+  {
+    id: 'u1',
+    date: '2026-08-08',
+    title: 'Study Vault & File Attachment Engine',
+    category: 'Study Vault',
+    tag: 'Feature',
+    tagColor: 'var(--accent)',
+    summary: 'Direct note, syllabus PDF, and lab manual uploads with offline storage and 1-click downloads.',
+    points: [
+      'Upload PDFs, lecture slides, lab manuals, and code files directly from your device.',
+      'Auto-extracted file sizes and instant downloads saved offline to your browser storage.',
+      'Renamed Study Links to Study Vault for a calmer, student-first course workspace.'
+    ]
+  },
+  {
+    id: 'u2',
+    date: '2026-08-08',
+    title: 'Smart Attendance Streaks & Safe Bunk Calculator',
+    category: 'Attendance',
+    tag: 'Improvement',
+    tagColor: 'var(--green)',
+    summary: 'Natural college terminology with active streak counter and safe bunk guidance.',
+    points: [
+      'Replaced rigid buttons with authentic student actions (Attended ✓ / Bunked ✕).',
+      'Active streak counter (🔥) with milestone celebration feedback.',
+      'Real-time safe bunk status calculating how many classes you can afford to miss.'
+    ]
+  },
+  {
+    id: 'u3',
+    date: '2026-08-08',
+    title: 'Custom Notice Channels & WhatsApp Integration',
+    category: 'Notices',
+    tag: 'Integration',
+    tagColor: '#25D366',
+    summary: 'Quick-access linked cards for official updates, class WhatsApp groups, and circulars.',
+    points: [
+      'Soft linked cards for your Official Class Group and WhatsApp channels.',
+      '1-tap WhatsApp forward button formats notices for immediate class group sharing.',
+      'Copy Notice action for easy pasting into student chats and channels.'
+    ]
+  },
+  {
+    id: 'u4',
+    date: '2026-08-07',
+    title: 'Expanded Desktop Layout & Breathability',
+    category: 'Dashboard',
+    tag: 'Design',
+    tagColor: 'var(--yellow)',
+    summary: 'Wider desktop container and balanced 2-column grid for comfortable scanning.',
+    points: [
+      'Expanded desktop width to 1160px and 1240px for laptops and large displays.',
+      'Disciplined 2-column grid balancing today\'s classes with tasks and vitals.',
+      'Maintains compact, touch-friendly navigation on mobile devices.'
+    ]
+  },
+  {
+    id: 'u5',
+    date: '2026-08-07',
+    title: 'Zero-Flash Palette Persistence',
+    category: 'Theme',
+    tag: 'Reliability',
+    summary: 'Synchronous pre-render script ensures instant theme restoration without dark/light flash.',
+    points: [
+      'Synchronous head script applies data-theme before the DOM paints.',
+      'Local user selection heals cloud document states across multi-device sync.',
+      'Seamless support across Paper, Cloud, Stone, Quiet Dark, and Café Night palettes.'
+    ]
+  },
+  {
+    id: 'u6',
+    date: '2026-08-06',
+    title: 'Natural IST Greetings & Course Shortcuts',
+    category: 'Navigation',
+    tag: 'Polish',
+    summary: 'Human greeting transitions and direct deep-linking into subject course materials.',
+    points: [
+      'Night greeting now extends smoothly until 5:00 AM to match student study schedules.',
+      'Subject shortcut chips route directly into the specific subject course screen.'
+    ]
+  }
+];
+
+let _devNotesFilter = 'week';
+
+function getFilteredDevUpdates(filter) {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  const todayStr = `${y}-${m}-${d}`;
+
+  if (filter === 'today') {
+    return DEV_UPDATES.filter(u => u.date === todayStr);
+  }
+
+  if (filter === 'week') {
+    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const wy = weekAgo.getFullYear();
+    const wm = String(weekAgo.getMonth() + 1).padStart(2, '0');
+    const wd = String(weekAgo.getDate()).padStart(2, '0');
+    const weekAgoStr = `${wy}-${wm}-${wd}`;
+    return DEV_UPDATES.filter(u => u.date >= weekAgoStr);
+  }
+
+  if (filter === 'month') {
+    const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const my = monthAgo.getFullYear();
+    const mm = String(monthAgo.getMonth() + 1).padStart(2, '0');
+    const md = String(monthAgo.getDate()).padStart(2, '0');
+    const monthAgoStr = `${my}-${mm}-${md}`;
+    return DEV_UPDATES.filter(u => u.date >= monthAgoStr);
+  }
+
+  return DEV_UPDATES;
+}
+
+function showDevNotesModal(filter = null) {
+  if (filter) _devNotesFilter = filter;
   document.getElementById('dev-notes-modal-backdrop')?.remove();
+
+  const entries = getFilteredDevUpdates(_devNotesFilter);
+
+  const entriesHtml = entries.length ? entries.map(item => `
+    <div class="card" style="padding:14px 16px;background:var(--surface-2);border-left:3.5px solid ${item.tagColor};box-shadow:var(--shadow-sm)">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px;flex-wrap:wrap">
+        <div style="font-weight:700;font-size:0.92rem;color:var(--text-primary)">${item.title}</div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:0.7rem;font-weight:600;padding:2px 7px;border-radius:999px;background:rgba(0,0,0,0.06);color:${item.tagColor};border:1px solid ${item.tagColor}33">${item.tag}</span>
+          <span style="font-size:0.75rem;color:var(--text-muted)">${formatDate(item.date)}</span>
+        </div>
+      </div>
+      <div style="font-size:0.83rem;color:var(--text-secondary);line-height:1.45;margin-bottom:8px">${item.summary}</div>
+      <ul style="margin:0;padding-left:18px;font-size:0.8rem;color:var(--text-muted);line-height:1.5">
+        ${item.points.map(pt => `<li style="margin-bottom:3px">${pt}</li>`).join('')}
+      </ul>
+    </div>
+  `).join('') : `
+    <div class="empty-state-card" style="padding:24px 16px">
+      <span class="empty-state-icon">✨</span>
+      <div class="empty-state-title">No Updates for Selected Filter</div>
+      <div class="empty-state-desc">No release notes found for this time range. You can switch to <strong>This Week</strong> or <strong>All Updates</strong> to view recent improvements.</div>
+      <div style="display:flex;gap:8px;justify-content:center;margin-top:10px">
+        <button class="btn btn-sm btn-primary" onclick="showDevNotesModal('week')">View This Week</button>
+        <button class="btn btn-sm btn-secondary" onclick="showDevNotesModal('all')">View All Updates</button>
+      </div>
+    </div>
+  `;
+
   const backdrop = document.createElement('div');
   backdrop.className = 'modal-backdrop';
   backdrop.id = 'dev-notes-modal-backdrop';
   backdrop.innerHTML = `
-    <div class="modal" onclick="event.stopPropagation()" style="max-width:520px;width:92vw">
+    <div class="modal" onclick="event.stopPropagation()" style="max-width:580px;width:94vw;max-height:85vh;display:flex;flex-direction:column">
       <div class="modal-header">
         <div style="display:flex;align-items:center;gap:8px">
           <span style="font-size:1.2rem">🛠️</span>
-          <span class="modal-title">Clarity Desk · System &amp; Dev Notes</span>
+          <div>
+            <span class="modal-title" style="display:block;line-height:1.2">Dev Notes &amp; System Updates</span>
+            <span style="font-size:0.74rem;color:var(--text-muted);font-weight:400">Recent fixes, desk features &amp; engineering improvements</span>
+          </div>
         </div>
         <button class="modal-close" onclick="document.getElementById('dev-notes-modal-backdrop')?.remove()">${icons.x()}</button>
       </div>
-      <div class="modal-body" style="display:flex;flex-direction:column;gap:14px;font-size:0.86rem;line-height:1.6;color:var(--text-secondary)">
-        <div class="card" style="padding:12px 14px;background:var(--surface-2);border-left:3px solid var(--accent)">
-          <div style="font-weight:700;color:var(--text-primary);margin-bottom:2px">Engine Architecture &amp; Data Pipeline</div>
-          <div>Offline-first client runtime backed by LocalStorage and real-time Firestore sync. Zero third-party ad trackers.</div>
-        </div>
 
-        <div>
-          <div style="font-weight:700;color:var(--text-primary);margin-bottom:4px">📡 Notice Board &amp; WhatsApp Data Bridge</div>
-          <div>Campus notices and circulars are ingested from official college notification feeds and Class Representative broadcasts. Direct 1-tap WhatsApp sharing allows instant peer-to-peer verification without unauthorized scraping.</div>
-        </div>
-
-        <div>
-          <div style="font-weight:700;color:var(--text-primary);margin-bottom:4px">📁 Study Vault File Engine</div>
-          <div>Supports persistent local document uploads (PDFs, notes, cheat sheets) up to localStorage quota, plus native deep links for Google Drive, GitHub, and Notion repositories.</div>
-        </div>
-
-        <div>
-          <div style="font-weight:700;color:var(--text-primary);margin-bottom:4px">🛡️ Attendance &amp; Safe Bunk Calculator</div>
-          <div>Real-time attendance streak computation with safe buffer margin modeling based on a 75% institutional attendance requirement.</div>
-        </div>
+      <!-- Time Filter Tabs -->
+      <div style="display:flex;align-items:center;gap:6px;padding:12px 18px 0;background:var(--surface);border-bottom:1px solid var(--border);overflow-x:auto">
+        <button class="filter-chip ${_devNotesFilter === 'today' ? 'active' : ''}" onclick="showDevNotesModal('today')" style="font-size:0.75rem;padding:4px 10px">
+          Today
+        </button>
+        <button class="filter-chip ${_devNotesFilter === 'week' ? 'active' : ''}" onclick="showDevNotesModal('week')" style="font-size:0.75rem;padding:4px 10px">
+          This Week
+        </button>
+        <button class="filter-chip ${_devNotesFilter === 'month' ? 'active' : ''}" onclick="showDevNotesModal('month')" style="font-size:0.75rem;padding:4px 10px">
+          This Month
+        </button>
+        <button class="filter-chip ${_devNotesFilter === 'all' ? 'active' : ''}" onclick="showDevNotesModal('all')" style="font-size:0.75rem;padding:4px 10px">
+          All Updates
+        </button>
       </div>
-      <div class="modal-footer" style="margin-top:14px">
-        <button class="btn-primary" onclick="document.getElementById('dev-notes-modal-backdrop')?.remove()" style="width:100%">Done</button>
+
+      <div class="modal-body" style="overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:12px;padding:16px 18px">
+        ${entriesHtml}
+      </div>
+
+      <div class="modal-footer" style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <span style="font-size:0.75rem;color:var(--text-muted)">Clarity Desk Engine · Local-first</span>
+        <button class="btn-primary" onclick="document.getElementById('dev-notes-modal-backdrop')?.remove()" style="padding:6px 16px;font-size:0.82rem">Done</button>
       </div>
     </div>
   `;
@@ -5919,6 +6253,11 @@ window.saveLinkSubject         = saveLinkSubject;
 window.saveLinkResource        = saveLinkResource;
 window.switchResourcesTab     = switchResourcesTab;
 window.renderResources        = renderResources;
+window.showNoticeChannelModal = showNoticeChannelModal;
+window.submitNoticeChannelModal = submitNoticeChannelModal;
+window.handleNoticeSourceClick = handleNoticeSourceClick;
+window.showDevNotesModal      = showDevNotesModal;
+window.saveNoticeChannelsFromSettings = saveNoticeChannelsFromSettings;
 
 // Desk Assistant
 window.toggleAssistant       = toggleAssistant;

@@ -1248,6 +1248,113 @@ a.card:hover,
   box-shadow: 0 0 0 3px var(--accent-dim);
 }
 
+/* ── Notice Sources Linked Cards ────────────────────────────── */
+.notice-sources-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+@media (max-width: 768px) {
+  .notice-sources-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+}
+
+.notice-source-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 8px);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+  position: relative;
+  overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+}
+
+.notice-source-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--border-btn, var(--border));
+  box-shadow: var(--shadow-md);
+}
+
+.notice-source-card.tint-official {
+  border-left: 3.5px solid var(--accent);
+}
+
+.notice-source-card.tint-whatsapp {
+  border-left: 3.5px solid #25D366;
+}
+
+.notice-source-card.tint-devnotes {
+  border-left: 3.5px solid var(--yellow);
+}
+
+.notice-source-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.notice-source-icon-wrap {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-xs, 6px);
+  display: grid;
+  place-items: center;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.notice-source-icon-official {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+.notice-source-icon-whatsapp {
+  background: rgba(37, 211, 102, 0.14);
+  color: #25D366;
+}
+
+.notice-source-icon-devnotes {
+  background: rgba(245, 158, 11, 0.14);
+  color: var(--yellow);
+}
+
+.notice-source-title {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  line-height: 1.25;
+}
+
+.notice-source-sub {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  line-height: 1.35;
+  margin-top: 2px;
+}
+
+.notice-source-action {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+
 .notice-card {
   background: var(--surface);
   border: 1px solid var(--border);
