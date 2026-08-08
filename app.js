@@ -2040,9 +2040,10 @@ function timeToMinutes(t) {
 
 function greetingWord() {
   const h = new Date().getHours();
-  if (h < 12) return 'Good morning';
-  if (h < 17) return 'Good afternoon';
-  return 'Good evening';
+  if (h >= 5 && h < 12) return 'Good morning';
+  if (h >= 12 && h < 17) return 'Good afternoon';
+  if (h >= 17 && h < 22) return 'Good evening';
+  return 'Good night';
 }
 
 function allTasks() {
@@ -2362,6 +2363,7 @@ window.completeWeeklyReset = function() {
 
 function renderReview() {
   const el = document.getElementById('page-review');
+  if (!el) return;
   const now = new Date();
   
   const last7 = new Date(); last7.setDate(now.getDate() - 7);
@@ -2400,7 +2402,7 @@ function renderReview() {
       busyDayDate = dateStr;
     }
   });
-  if (maxItems < 2) busyDayDate = null; // Only highlight if 2+ items
+  if (maxItems < 2) busyDayDate = null;
 
   let lookaheadHTML = '';
   Object.keys(next7Days).sort().forEach(dateStr => {
@@ -2455,51 +2457,79 @@ function renderReview() {
   }
 
   el.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
       <div style="display:flex;align-items:center;gap:10px">
         <button class="btn btn-sm btn-secondary" onclick="navigateTo('dashboard')">← Back to Today</button>
         <div>
-          <div style="font-size:1.25rem;font-weight:800;color:var(--text-primary)">Weekly Reflection & Prep</div>
-          <div style="font-size:0.78rem;color:var(--text-muted)">Reset your workload, review attendance, and prepare for next week</div>
+          <div style="font-size:1.3rem;font-weight:800;color:var(--text-primary)">Weekly Reflection &amp; Reset</div>
+          <div style="font-size:0.8rem;color:var(--text-muted)">Review last week's coursework and plan your next 7 days</div>
         </div>
       </div>
     </div>
     
-    <div class="section-heading">1. Last Week's Reflection (Lookback)</div>
-    <div class="stat-grid" style="margin-bottom:16px">
-      <div class="stat-card">
-        <div class="stat-value" style="color:var(--green)">${tasksCompleted.length}</div>
-        <div class="stat-label">Tasks Completed</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value" style="color:${tasksRolledOver.length > 0 ? 'var(--red)' : 'var(--green)'}">${tasksRolledOver.length}</div>
-        <div class="stat-label">Overdue / Rollover</div>
-      </div>
-    </div>
-    
-    ${tasksRolledOver.length > 0 ? `
-    <div class="section-heading">Rollover Tasks Needing Attention</div>
-    <div style="margin-bottom:20px">
-      ${tasksRolledOver.map(a => `
-        <div class="card card-sm assignment-card" id="rollover-card-${a.id}" style="margin-bottom:8px;display:flex;align-items:center;gap:12px;padding:12px 14px;border-left:3px solid var(--red)">
-          <div style="flex:1;min-width:0">
-            <div class="font-semibold" style="font-size:0.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${a.title}</div>
-            <div class="text-xs text-muted">${a.subject} · Due: ${formatDate(a.dueDate)}</div>
+    <!-- 1. HIGH-VISIBILITY LAST WEEK LOOKBACK BANNER -->
+    <div class="card" style="padding:18px 20px;margin-bottom:22px;background:var(--surface);border-left:4px solid var(--accent)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+        <div>
+          <div style="font-size:0.95rem;font-weight:700;color:var(--text-primary);display:flex;align-items:center;gap:8px">
+            <span>⏪ Last Week's Reflection</span>
+            <span class="type-badge" style="background:var(--accent-dim);color:var(--accent);font-size:0.7rem;padding:2px 8px">${formatDate(lookbackStr)} – ${formatDate(todayS)}</span>
           </div>
-          <div style="display:flex;gap:6px">
-            <button class="btn btn-sm btn-secondary" style="color:var(--green);font-size:0.75rem;padding:4px 8px" onclick="handleRolloverAction('${a.id}', 'done')" title="Mark Done">✓ Done</button>
-            <button class="btn btn-sm btn-secondary" style="font-size:0.75rem;padding:4px 8px" onclick="handleRolloverAction('${a.id}', 'reschedule')" title="Reschedule">📅 Reschedule</button>
+          <div style="font-size:0.78rem;color:var(--text-muted);margin-top:2px">Lookback summary of completed tasks, rollover items, and study momentum.</div>
+        </div>
+      </div>
+
+      <div class="stat-grid" style="margin-bottom:14px">
+        <div class="stat-card" onclick="state.assignFilter='submitted'; navigateTo('assignments');" title="View completed coursework" style="cursor:pointer">
+          <div class="stat-value" style="color:var(--green)">${tasksCompleted.length}</div>
+          <div class="stat-label">Tasks Completed Last 7 Days →</div>
+        </div>
+        <div class="stat-card" onclick="state.assignFilter='overdue'; navigateTo('assignments');" title="View rollover & overdue tasks" style="cursor:pointer">
+          <div class="stat-value" style="color:${tasksRolledOver.length > 0 ? 'var(--red)' : 'var(--green)'}">${tasksRolledOver.length}</div>
+          <div class="stat-label">Rollover / Overdue Tasks →</div>
+        </div>
+      </div>
+
+      ${tasksCompleted.length > 0 ? `
+        <div style="margin-bottom:14px">
+          <div style="font-size:0.76rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--green);margin-bottom:6px">✓ Completed in this period:</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px">
+            ${tasksCompleted.map(t => `
+              <span class="filter-chip" style="font-size:0.75rem;padding:3px 10px;background:rgba(16,185,129,0.08);color:var(--green);border:1px solid rgba(16,185,129,0.25)">
+                ✓ ${t.title} (${t.subject || 'Task'})
+              </span>
+            `).join('')}
           </div>
         </div>
-      `).join('')}
-    </div>` : ''}
+      ` : ''}
+
+      ${tasksRolledOver.length > 0 ? `
+        <div>
+          <div style="font-size:0.76rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--red);margin-bottom:6px">⚠ Tasks needing attention / reschedule:</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            ${tasksRolledOver.map(a => `
+              <div class="card card-sm assignment-card" id="rollover-card-${a.id}" style="margin-bottom:0;display:flex;align-items:center;gap:12px;padding:10px 14px;border-left:3px solid var(--red)">
+                <div style="flex:1;min-width:0">
+                  <div class="font-semibold" style="font-size:0.88rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${a.title}</div>
+                  <div class="text-xs text-muted">${a.subject} · Due: ${formatDate(a.dueDate)}</div>
+                </div>
+                <div style="display:flex;gap:6px">
+                  <button class="btn btn-sm btn-secondary" style="color:var(--green);font-size:0.75rem;padding:4px 10px" onclick="handleRolloverAction('${a.id}', 'done')" title="Mark Done">✓ Done</button>
+                  <button class="btn btn-sm btn-secondary" style="font-size:0.75rem;padding:4px 10px" onclick="handleRolloverAction('${a.id}', 'reschedule')" title="Reschedule for this week">📅 Reschedule</button>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+    </div>
 
     <div class="section-heading">2. Weekly Class Attendance Tracker</div>
     ${renderWeeklyAttendanceTracker()}
 
     ${recentNotices.length > 0 ? `
-      <div class="section-heading">3. Recent Important Notices</div>
-      <div style="margin-bottom:20px">
+      <div class="section-heading">3. Recent Important Notices (Past 7 Days)</div>
+      <div style="margin-bottom:22px">
         ${recentNotices.map(n => `
           <div class="card card-sm notice-card" onclick="showNotice('${n.id}')" style="margin-bottom:8px;padding:12px 14px;cursor:pointer">
             <div style="font-weight:600;font-size:0.88rem;color:var(--text-primary)">${n.title}</div>
@@ -2514,7 +2544,7 @@ function renderReview() {
 
     <div style="margin-top:24px;margin-bottom:32px;text-align:center">
       <button class="btn btn-primary" onclick="completeWeeklyReset()" style="width:100%;max-width:400px;padding:12px;font-size:0.9rem;font-weight:700">
-        ✓ Complete Weekly Reset & Return to Today
+        ✓ Complete Weekly Reset &amp; Return to Today
       </button>
     </div>
   `;
@@ -3403,7 +3433,7 @@ function renderDashboard() {
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:10px">
           <span style="font-size:0.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;margin-right:4px">Study Shortcuts:</span>
           ${quickLinksPreview.map(s => `
-            <div class="filter-chip" style="font-size:0.74rem;padding:3px 10px;cursor:pointer;display:flex;align-items:center;gap:6px" onclick="navigateTo('resources')">
+            <div class="filter-chip" style="font-size:0.74rem;padding:3px 10px;cursor:pointer;display:flex;align-items:center;gap:6px" onclick="openSubjectHub('${s.subject}')" title="Open ${s.subject} Subject Hub">
               <span style="width:6px;height:6px;border-radius:50%;background:${s.color || 'var(--accent)'}"></span>
               <span>${s.subject}</span>
             </div>
@@ -4014,6 +4044,7 @@ function renderAssignments() {
   const typeFilters = [
     { key:'all',        label:'All Types' },
     { key:'assignment', label:'📝 Assignments' },
+    { key:'general',    label:'📋 General Tasks' },
     { key:'quiz',       label:'⚡ Quizzes' },
     { key:'lab',        label:'🧪 Labs' },
     { key:'project',    label:'💻 Projects' },
@@ -4137,29 +4168,35 @@ function showAddTaskModal(editTaskId = null, prefilledSubject = null) {
     return `<option value="${val}" ${isSel ? 'selected' : ''}>${s.name} (${s.code})</option>`;
   }).join('');
 
+  const isGeneralSel = editTask && (editTask.subject === 'General' || editTask.code === 'GEN');
+
   const backdrop = document.createElement('div');
   backdrop.className = 'modal-backdrop';
   backdrop.id = 'add-task-backdrop';
   backdrop.innerHTML = `
     <div class="modal add-task-modal" onclick="event.stopPropagation()">
       <div class="modal-header">
-        <h2 class="modal-title">${editTask ? 'Edit Academic Task' : 'Add Academic Task'}</h2>
+        <h2 class="modal-title">${editTask ? 'Edit Task' : 'Add Task'}</h2>
         <button class="modal-close" onclick="document.getElementById('add-task-backdrop').remove()">${icons.x()}</button>
       </div>
 
       <div class="form-group">
-        <label class="form-label">Subject <span class="req">*</span></label>
+        <label class="form-label">Subject / Category <span class="req">*</span></label>
         <select class="form-select" id="task-subject">
-          <option value="">Select subject…</option>
-          ${subjectOptions}
-          <option value="General|||GEN">General / Other</option>
+          <option value="">Select subject or category…</option>
+          <optgroup label="Academic Subjects">
+            ${subjectOptions}
+          </optgroup>
+          <optgroup label="General &amp; Personal">
+            <option value="General|||GEN" ${isGeneralSel ? 'selected' : ''}>📋 General Desk Task / Other</option>
+          </optgroup>
         </select>
       </div>
 
       <div class="form-group">
-        <label class="form-label">Title <span class="req">*</span></label>
+        <label class="form-label">Task Title <span class="req">*</span></label>
         <input type="text" class="form-input" id="task-title"
-          placeholder="e.g. Lab Report 3 or End-Sem Revision" maxlength="120"
+          placeholder="e.g. Lab Report 3, Pay fee, or End-Sem Revision" maxlength="120"
           value="${editTask ? editTask.title.replace(/"/g, '&quot;') : ''}">
       </div>
 
@@ -4167,11 +4204,13 @@ function showAddTaskModal(editTaskId = null, prefilledSubject = null) {
         <div class="form-group">
           <label class="form-label">Task Type</label>
           <select class="form-select" id="task-type">
-            <option value="assignment" ${editTask && editTask.taskType === 'assignment' ? 'selected' : ''}>📝 Assignment</option>
+            <option value="assignment" ${!editTask || editTask.taskType === 'assignment' ? 'selected' : ''}>📝 Assignment</option>
+            <option value="general" ${editTask && editTask.taskType === 'general' ? 'selected' : ''}>📋 General / Personal</option>
             <option value="quiz" ${editTask && editTask.taskType === 'quiz' ? 'selected' : ''}>⚡ Quiz / Test</option>
             <option value="lab" ${editTask && editTask.taskType === 'lab' ? 'selected' : ''}>🧪 Lab Report / Viva</option>
             <option value="project" ${editTask && editTask.taskType === 'project' ? 'selected' : ''}>💻 Project</option>
             <option value="exam" ${editTask && editTask.taskType === 'exam' ? 'selected' : ''}>🎯 Exam</option>
+            <option value="study" ${editTask && editTask.taskType === 'study' ? 'selected' : ''}>📚 Self Study</option>
           </select>
         </div>
         <div class="form-group">
@@ -4713,23 +4752,23 @@ function renderSummaryContent(container) {
       : '<div class="card" style="text-align:center;padding:20px;color:var(--text-muted)">No urgent notices today.</div>'
     }
 
-    <div class="section-heading" style="margin-top:20px">Quick Stats</div>
+    <div class="section-heading" style="margin-top:20px">Quick Stats &amp; Direct Views</div>
     <div class="stat-grid" style="margin-bottom:0">
-      <div class="stat-card">
+      <div class="stat-card" onclick="navigateTo('timetable')" title="Open Today's Timetable Schedule" style="cursor:pointer">
         <div class="stat-value">${remaining.length}</div>
-        <div class="stat-label">Classes Remaining</div>
+        <div class="stat-label">Classes Remaining →</div>
       </div>
-      <div class="stat-card">
+      <div class="stat-card" onclick="state.assignFilter='today'; navigateTo('assignments');" title="View Tasks Due Today" style="cursor:pointer">
         <div class="stat-value" style="color:var(--yellow)">${dueTodayItems.length}</div>
-        <div class="stat-label">Due Today</div>
+        <div class="stat-label">Due Today →</div>
       </div>
-      <div class="stat-card">
+      <div class="stat-card" onclick="state.assignFilter='overdue'; navigateTo('assignments');" title="View Overdue Tasks Needing Action" style="cursor:pointer">
         <div class="stat-value" style="color:${overdueItems.length ? 'var(--red)' : 'var(--text-primary)'}">${overdueItems.length}</div>
-        <div class="stat-label">Overdue Tasks</div>
+        <div class="stat-label">Overdue Tasks →</div>
       </div>
-      <div class="stat-card">
+      <div class="stat-card" onclick="state.assignFilter='submitted'; navigateTo('assignments');" title="View Completed Tasks &amp; History" style="cursor:pointer">
         <div class="stat-value" style="color:var(--green)">${allTasks().filter(a => a.status === 'submitted').length}</div>
-        <div class="stat-label">Completed</div>
+        <div class="stat-label">Completed Tasks →</div>
       </div>
     </div>
   `;
@@ -5765,6 +5804,15 @@ function init() {
     const hash = window.location.hash.replace('#', '') || 'dashboard';
     navigate(hash);
   }
+
+  // Deep-link routing for notification clicks and browser back/forward hash navigation
+  window.addEventListener('hashchange', () => {
+    const targetHash = window.location.hash.replace('#', '') || 'dashboard';
+    if (targetHash && targetHash !== state.currentPage && targetHash !== state.resourcesTab) {
+      navigate(targetHash);
+    }
+  });
+
   updateNavBadges();
   checkOnboarding();
 

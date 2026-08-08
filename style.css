@@ -1054,6 +1054,8 @@ a.card:hover,
 .type-project    { background: rgba(14, 165, 233, 0.12); color: #0ea5e9; }
 .type-off        { background: rgba(107, 114, 128, 0.08); color: var(--text-muted); }
 .type-assignment { background: var(--accent-dim); color: var(--accent); }
+.type-general    { background: rgba(148, 163, 184, 0.16); color: var(--text-secondary); }
+.type-study      { background: rgba(168, 85, 247, 0.14); color: #a855f7; }
 .type-quiz       { background: rgba(245, 158, 11, 0.12); color: var(--yellow); }
 .type-exam       { background: rgba(239, 68, 68, 0.12); color: var(--red); }
 
