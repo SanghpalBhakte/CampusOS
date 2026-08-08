@@ -243,7 +243,7 @@ img { display: block; max-width: 100%; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px;
+  padding: 0 18px;
   background: var(--topbar-bg);
   backdrop-filter: var(--topbar-blur);
   -webkit-backdrop-filter: var(--topbar-blur);
@@ -251,7 +251,14 @@ img { display: block; max-width: 100%; }
   position: sticky;
   top: 0;
   z-index: 100;
-  gap: 12px;
+  gap: 16px;
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
 }
 
 .topbar-brand {
@@ -281,7 +288,6 @@ img { display: block; max-width: 100%; }
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
-
 .btn-back {
   display: none;
   align-items: center;
@@ -294,7 +300,7 @@ img { display: block; max-width: 100%; }
   color: var(--text-primary);
   cursor: pointer;
   transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.16s ease;
-  margin-right: 8px;
+  margin-right: 4px;
   flex-shrink: 0;
 }
 
@@ -314,6 +320,7 @@ img { display: block; max-width: 100%; }
   flex: 1;
   max-width: 340px;
   position: relative;
+  min-width: 0;
 }
 
 .topbar-search input {
@@ -2022,7 +2029,16 @@ button:disabled {
 
   .stat-grid { grid-template-columns: repeat(4, 1fr); }
   .links-grid { grid-template-columns: repeat(2, 1fr); }
-  .topbar { padding: 0 24px; }
+  .topbar {
+    padding: 0 24px;
+    gap: 22px;
+  }
+  .topbar-left {
+    margin-right: 6px;
+  }
+  .topbar-search {
+    max-width: 380px;
+  }
 }
 
 @media (min-width: 1024px) {
@@ -2035,6 +2051,16 @@ button:disabled {
     gap: 22px;
   }
   .links-grid { grid-template-columns: repeat(2, 1fr); }
+  .topbar {
+    padding: 0 32px;
+    gap: 28px;
+  }
+  .topbar-left {
+    margin-right: 12px;
+  }
+  .topbar-search {
+    max-width: 420px;
+  }
 }
 
 @media (min-width: 1280px) {
@@ -2044,6 +2070,13 @@ button:disabled {
   }
   .dashboard-grid-2col {
     gap: 24px;
+  }
+  .topbar {
+    padding: 0 40px;
+    gap: 32px;
+  }
+  .topbar-search {
+    max-width: 460px;
   }
 }
 
