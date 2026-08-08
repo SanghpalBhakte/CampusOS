@@ -5390,6 +5390,10 @@ function saveSettings() {
   showToast('Settings saved successfully ✓', 'success');
 }
 
+function saveNoticeChannelsFromSettings() {
+  saveSettings();
+}
+
 function exportData() {
   const data = {
     profile:            loadProfile(),
