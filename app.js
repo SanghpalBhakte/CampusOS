@@ -2977,29 +2977,37 @@ window.showOnboardingModal = function() {
   const p = loadProfile();
 
   backdrop.innerHTML = `
-    <div class="modal-content" style="max-width:440px;padding:24px" id="onboarding-modal-box">
+    <div class="modal-content" style="max-width:440px;padding:26px 24px" id="onboarding-modal-box">
       <div id="onboarding-step-1">
-        <div style="font-size:2.2rem;margin-bottom:8px">👋</div>
-        <h2 style="margin:0 0 4px 0;font-size:1.35rem;font-weight:700">Welcome to Clarity Desk</h2>
-        <div style="font-size:0.8rem;font-weight:600;color:var(--accent);margin-bottom:12px;letter-spacing:0.02em">Less app chaos, more clarity.</div>
-        <div style="font-size:0.88rem;color:var(--text-secondary);line-height:1.55;margin-bottom:24px">
-          Your calm student desk for timetables, attendance health, coursework deadlines, and daily focus.
+        <div style="width:44px;height:44px;border-radius:12px;background:var(--accent-dim);color:var(--accent);display:grid;place-items:center;margin-bottom:16px">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+          </svg>
+        </div>
+        <h2 style="margin:0 0 4px 0;font-size:1.35rem;font-weight:700;letter-spacing:-0.025em;color:var(--text-primary)">Welcome to Clarity Desk</h2>
+        <div style="font-size:0.82rem;font-weight:600;color:var(--accent);margin-bottom:12px;letter-spacing:0.01em">Your calm, unified student workspace</div>
+        <div style="font-size:0.88rem;color:var(--text-secondary);line-height:1.6;margin-bottom:20px">
+          Manage your class schedule, monitor attendance safety, track assignments, and access coursework notes with zero clutter.
         </div>
         <div style="display:flex;flex-direction:column;gap:10px">
-          <button class="btn-primary" onclick="showOnboardingStep2()" style="width:100%;padding:10px;font-weight:600;justify-content:center">Set Up My Desk →</button>
+          <button class="btn-primary" onclick="showOnboardingStep2()" style="width:100%;padding:10px;font-weight:600;justify-content:center;font-size:0.88rem">Set Up My Profile →</button>
           <button class="btn-secondary" onclick="dismissOnboarding()" style="width:100%;padding:8px;font-size:0.82rem;justify-content:center">Explore First</button>
         </div>
       </div>
 
       <div id="onboarding-step-2" style="display:none">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-          <h2 style="margin:0;font-size:1.15rem;font-weight:700">Profile Setup</h2>
-          <span style="font-size:0.75rem;color:var(--text-muted)">Step 1 of 1</span>
+          <div>
+            <h2 style="margin:0;font-size:1.2rem;font-weight:700;letter-spacing:-0.02em;color:var(--text-primary)">Profile Setup</h2>
+            <div style="font-size:0.78rem;color:var(--text-muted);margin-top:2px">Personalizes your timetable and countdown</div>
+          </div>
+          <span style="font-size:0.74rem;color:var(--text-muted);background:var(--surface-2);padding:3px 8px;border-radius:999px;border:1px solid var(--border)">Step 1 of 1</span>
         </div>
         <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:20px">
           <div class="form-group" style="margin-bottom:0">
             <label class="form-label">Full Name <span style="color:var(--red)">*</span></label>
-            <input type="text" class="form-input" id="ob-name" value="${(p.name||'').replace(/"/g, '&quot;')}" placeholder="Full name (e.g. Sanghpal Bhakte)">
+            <input type="text" class="form-input" id="ob-name" value="${(p.name||'').replace(/"/g, '&quot;')}" placeholder="Your full name (e.g. Sanghpal Bhakte)">
           </div>
           <div class="form-group" style="margin-bottom:0">
             <label class="form-label">Roll Number <span style="color:var(--text-muted);font-weight:normal">(optional)</span></label>
@@ -3007,10 +3015,10 @@ window.showOnboardingModal = function() {
           </div>
           <div class="form-group" style="margin-bottom:0">
             <label class="form-label">College / University <span style="color:var(--red)">*</span></label>
-            <input type="text" class="form-input" id="ob-college" value="${(p.college||'').replace(/"/g, '&quot;')}" placeholder="College / University">
+            <input type="text" class="form-input" id="ob-college" value="${(p.college||'').replace(/"/g, '&quot;')}" placeholder="College or University name">
           </div>
           <div class="form-group" style="margin-bottom:0">
-            <label class="form-label">Branch</label>
+            <label class="form-label">Branch / Department</label>
             <input type="text" class="form-input" id="ob-branch" value="${(p.branch||'').replace(/"/g, '&quot;')}" placeholder="Branch (e.g. AI &amp; Data Science)">
           </div>
           <div class="form-group" style="margin-bottom:0">
@@ -3021,7 +3029,7 @@ window.showOnboardingModal = function() {
         </div>
         <div style="display:flex;align-items:center;justify-content:flex-end;gap:10px">
           <button class="btn-secondary" onclick="dismissOnboarding()" style="font-size:0.82rem">Skip</button>
-          <button class="btn-primary" onclick="finishOnboarding()" style="font-size:0.85rem;padding:8px 16px">Finish Setup</button>
+          <button class="btn-primary" onclick="finishOnboarding()" style="font-size:0.85rem;padding:8px 18px">Finish Setup</button>
         </div>
       </div>
     </div>
@@ -3335,12 +3343,13 @@ function renderDashboard() {
   }
 
   const setupBanner = needsSetup ? `
-    <div class="card" style="margin-bottom:18px;display:flex;align-items:center;gap:12px;background:var(--accent-dim);border-color:var(--accent)">
-      <div style="color:var(--accent);flex-shrink:0">${icons.user()}</div>
-      <div style="flex:1;font-size:0.87rem">
-        <strong>Personalize your desk</strong> — set up your name, college, and semester in Settings.
+    <div class="card" style="margin-bottom:18px;display:flex;align-items:center;gap:14px;background:var(--accent-dim);border-color:color-mix(in srgb, var(--accent) 35%, var(--border));padding:14px 18px">
+      <div style="width:36px;height:36px;border-radius:10px;background:color-mix(in srgb, var(--accent) 20%, transparent);color:var(--accent);display:grid;place-items:center;flex-shrink:0">${icons.user()}</div>
+      <div style="flex:1;min-width:200px">
+        <div style="font-weight:650;font-size:0.9rem;color:var(--text-primary);letter-spacing:-0.015em">Personalize your student profile</div>
+        <div style="font-size:0.8rem;color:var(--text-muted);margin-top:2px">Set up your name, college, and semester to customize your timetable and countdown.</div>
       </div>
-      <button class="btn-primary" onclick="navigateTo('settings')" style="flex-shrink:0;padding:6px 14px;font-size:0.8rem">Set Up Desk</button>
+      <button class="btn-primary" onclick="navigateTo('settings')" style="flex-shrink:0;padding:7px 16px;font-size:0.82rem;font-weight:600">Set Up Profile →</button>
     </div>` : '';
 
   // Urgent tasks: Overdue or Due Today first, then due soon
