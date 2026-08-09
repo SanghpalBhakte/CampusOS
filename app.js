@@ -1354,18 +1354,37 @@ function logoutUser() {
   }
 }
 
+const VALID_TASK_TYPES = ['assignment', 'mission', 'general', 'quiz', 'lab', 'project', 'exam', 'study'];
+
 function sanitizeTask(t) {
   if (!t || typeof t !== 'object') return null;
+
+  const rawType = String(t.taskType || t.type || '').toLowerCase();
+  const taskType = VALID_TASK_TYPES.includes(rawType) ? rawType : 'assignment';
+
+  const isNoDeadline = !!(t.noDeadline || (taskType === 'mission' && !t.dueDate));
+
+  let finalDueDate = '';
+  if (!isNoDeadline) {
+    if (typeof t.dueDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(t.dueDate)) {
+      finalDueDate = t.dueDate;
+    } else {
+      finalDueDate = todayStr();
+    }
+  }
+
   return {
     id:          String(t.id || `c-${Date.now()}`),
     subject:     String(t.subject || 'General'),
-    code:        String(t.code || 'OTH'),
+    code:        String(t.code || (t.subject === 'General' ? 'GEN' : t.subject === 'Mission' ? 'MIS' : 'OTH')),
     title:       String(t.title || 'Untitled Task').slice(0, 150),
-    description: String(t.description || '—').slice(0, 500),
-    dueDate:     String(t.dueDate || todayStr()),
+    taskType:    taskType,
+    noDeadline:  isNoDeadline,
+    description: String(t.description !== undefined && t.description !== null ? t.description : '—').slice(0, 500),
+    dueDate:     finalDueDate,
     priority:    ['high', 'medium', 'low'].includes(t.priority) ? t.priority : 'medium',
     status:      t.status === 'submitted' ? 'submitted' : 'pending',
-    marks:       typeof t.marks === 'number' ? Math.max(0, Math.min(100, t.marks)) : 0,
+    marks:       typeof t.marks === 'number' ? Math.max(0, Math.min(100, t.marks)) : (parseInt(t.marks) || 0),
     isCustom:    true,
   };
 }
@@ -1920,19 +1939,25 @@ function checkNoticeNotifications() {
 
 // ── Custom Tasks (fully persisted) ────────────────────────────
 function loadCustomTasks() {
-  return safeGetStorage(KEY_CUSTOM_TASKS, []) || [];
+  const raw = safeGetStorage(KEY_CUSTOM_TASKS, []) || [];
+  if (!Array.isArray(raw)) return [];
+  return raw.map(sanitizeTask).filter(Boolean);
 }
 
 function saveCustomTasks() {
-  // Prune completed tasks older than 14 days to minimize document size and Firestore read/write overhead
+  // Prune completed dated tasks older than 14 days; never prune ongoing/standing missions
   const fourteenDaysAgo = new Date();
   fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
   const cutoffStr = `${fourteenDaysAgo.getFullYear()}-${String(fourteenDaysAgo.getMonth()+1).padStart(2,'0')}-${String(fourteenDaysAgo.getDate()).padStart(2,'0')}`;
 
-  state.customTasks = state.customTasks.filter(t => {
-    if (t.status === 'submitted' && t.dueDate < cutoffStr) return false;
-    return true;
-  });
+  state.customTasks = state.customTasks
+    .map(sanitizeTask)
+    .filter(Boolean)
+    .filter(t => {
+      if (t.noDeadline || (t.taskType === 'mission' && !t.dueDate)) return true;
+      if (t.status === 'submitted' && t.dueDate && t.dueDate < cutoffStr) return false;
+      return true;
+    });
 
   safeSetStorage(KEY_CUSTOM_TASKS, state.customTasks);
   syncToCloud();
@@ -2379,13 +2404,17 @@ window.handleQuickAdd = function() {
   }
 
   const finalizeQuickAdd = (finalDateStr) => {
+    const isMission = subjectCode === 'MIS' || subjectName === 'Mission';
+    const isGen = subjectCode === 'GEN' || subjectName === 'General';
     const t = {
       id: 'c-' + Date.now(),
       subject: subjectName,
       code: subjectCode,
       title: text,
+      taskType: isMission ? 'mission' : isGen ? 'general' : 'assignment',
+      noDeadline: isMission,
       description: 'Added via Quick Add',
-      dueDate: finalDateStr,
+      dueDate: isMission ? '' : finalDateStr,
       priority: 'medium',
       status: 'pending',
       marks: 0,
@@ -4604,17 +4633,33 @@ function submitAddTask(editTaskId = null) {
   const finalDueDate = isNoDeadline ? '' : (dueEl ? dueEl.value : '');
 
   if (editTaskId) {
-    const task = state.customTasks.find(t => t.id === editTaskId);
+    let task = state.customTasks.find(t => t.id === editTaskId);
     if (task) {
       task.subject     = subject;
       task.code        = code;
       task.title       = titleEl.value.trim();
       task.taskType    = taskType;
       task.noDeadline  = isNoDeadline;
-      task.description = descEl.value.trim() || '—';
+      task.description = descEl ? (descEl.value.trim() || '—') : '—';
       task.dueDate     = finalDueDate;
       task.priority    = priorityEl?.value || 'medium';
-      task.marks       = parseInt(marksEl.value) || 0;
+      task.marks       = parseInt(marksEl?.value) || 0;
+    } else {
+      task = {
+        id:          editTaskId,
+        subject,
+        code,
+        title:       titleEl.value.trim(),
+        taskType,
+        noDeadline:  isNoDeadline,
+        description: descEl ? (descEl.value.trim() || '—') : '—',
+        dueDate:     finalDueDate,
+        priority:    priorityEl?.value || 'medium',
+        status:      'pending',
+        marks:       parseInt(marksEl?.value) || 0,
+        isCustom:    true,
+      };
+      state.customTasks.push(task);
     }
   } else {
     const task = {
@@ -4624,11 +4669,11 @@ function submitAddTask(editTaskId = null) {
       title:       titleEl.value.trim(),
       taskType,
       noDeadline:  isNoDeadline,
-      description: descEl.value.trim() || '—',
+      description: descEl ? (descEl.value.trim() || '—') : '—',
       dueDate:     finalDueDate,
       priority:    priorityEl?.value || 'medium',
       status:      'pending',
-      marks:       parseInt(marksEl.value) || 0,
+      marks:       parseInt(marksEl?.value) || 0,
       isCustom:    true,
     };
     state.customTasks.push(task);
@@ -6500,8 +6545,8 @@ window.resetTimetableToDefault = resetTimetableToDefault;
 window.showTimetableEntryModal = showTimetableEntryModal;
 window.saveTimetableEntry      = saveTimetableEntry;
 window.deleteTimetableEntry    = deleteTimetableEntry;
-window.saveLinkSubject         = saveLinkSubject;
-window.saveLinkResource        = saveLinkResource;
+window.saveLinkSubject         = typeof saveLinkSubject !== 'undefined' ? saveLinkSubject : window.saveLinkSubject;
+window.saveLinkResource        = typeof saveLinkResource !== 'undefined' ? saveLinkResource : window.saveLinkResource;
 window.switchResourcesTab     = switchResourcesTab;
 window.renderResources        = renderResources;
 window.showNoticeChannelModal = showNoticeChannelModal;
