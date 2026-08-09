@@ -4239,7 +4239,7 @@ function renderAssignments() {
     { key:'all',       label:'All Tasks' },
     { key:'today',     label:'🔥 Due Today' },
     { key:'upcoming',  label:'📅 Upcoming' },
-    { key:'missions',  label:'🚀 Ongoing Missions' },
+    { key:'ongoing',   label:'🚀 Ongoing Missions' },
     { key:'overdue',   label:'⚠️ Overdue' },
     { key:'exams',     label:'🎯 Exams & Tests' },
     { key:'submitted', label:'✓ Completed' },
@@ -4249,7 +4249,7 @@ function renderAssignments() {
     { key:'all',        label:'All Types' },
     { key:'assignment', label:'📝 Assignments' },
     { key:'mission',    label:'🚀 Missions' },
-    { key:'general',    label:'📋 General Tasks' },
+    { key:'general',    label:'📋 General' },
     { key:'quiz',       label:'⚡ Quizzes' },
     { key:'lab',        label:'🧪 Labs' },
     { key:'project',    label:'💻 Projects' },
@@ -4264,7 +4264,7 @@ function renderAssignments() {
     filtered = filtered.filter(a => a.status === 'pending' && !a.noDeadline && a.dueDate === today);
   } else if (state.assignFilter === 'upcoming') {
     filtered = filtered.filter(a => a.status === 'pending' && !a.noDeadline && a.dueDate && a.dueDate >= today);
-  } else if (state.assignFilter === 'missions') {
+  } else if (state.assignFilter === 'ongoing' || state.assignFilter === 'missions') {
     filtered = filtered.filter(a => a.status === 'pending' && (a.taskType === 'mission' || !!a.noDeadline));
   } else if (state.assignFilter === 'overdue') {
     filtered = filtered.filter(a => isTaskOverdue(a));
@@ -4295,48 +4295,44 @@ function renderAssignments() {
     return (a.dueDate || '').localeCompare(b.dueDate || '');
   });
 
-  const statusBar  = statusFilters.map(f => `<button class="filter-chip ${f.key===state.assignFilter?'active':''}" onclick="setAssignFilter('${f.key}')">${f.label}</button>`).join('');
+  const statusBar  = statusFilters.map(f => `<button class="filter-chip ${(f.key===state.assignFilter || (f.key==='ongoing' && state.assignFilter==='missions'))?'active':''}" onclick="setAssignFilter('${f.key}')">${f.label}</button>`).join('');
   const typeBar    = typeFilters.map(f => `<button class="filter-chip ${f.key===state.assignTypeFilter?'active':''}" onclick="setAssignTypeFilter('${f.key}')">${f.label}</button>`).join('');
   const subjectBar = subjects.map(s => `<button class="filter-chip ${s===state.assignSubjectFilter?'active':''}" onclick="setAssignSubject('${s}')">${s==='all'?'All Subjects':s}</button>`).join('');
 
   const cards = filtered.length ? filtered.map(a => {
-    const isOngoing = !!a.noDeadline || (a.taskType === 'mission' && !a.dueDate);
+    const isMission = a.taskType === 'mission';
+    const isOngoing = !!a.noDeadline || (isMission && !a.dueDate);
     const days = isOngoing ? null : dueDaysLeft(a.dueDate);
     const done = a.status === 'submitted';
-    let label = '';
-    let cls   = '';
-    if (done) {
-      label = 'Completed ✓';
-      cls   = '';
-    } else if (isOngoing) {
-      label = 'Ongoing · No deadline';
-      cls   = 'ongoing';
-    } else if (days !== null) {
-      label = days < 0 ? `${Math.abs(days)}d overdue` : days === 0 ? 'Due Today' : days === 1 ? 'Due Tomorrow' : `${days}d left`;
-      cls   = days < 0 ? 'overdue' : days === 0 ? 'today' : days <= 3 ? 'soon' : '';
-    }
     const isCustom = !!a.isCustom;
     const taskType = a.taskType || 'assignment';
-    const dateMeta = isOngoing ? '🚀 Standing Mission · No deadline' : `${formatDate(a.dueDate)} · ${label}`;
+
+    let stateBadge = '';
+    if (done) {
+      stateBadge = `<span class="due-badge">Completed ✓</span>`;
+    } else if (isOngoing) {
+      stateBadge = `<span class="due-badge ongoing" title="Always active — stays visible until completed"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor"></span> Ongoing · No deadline</span>`;
+    } else if (days !== null) {
+      const label = days < 0 ? `${Math.abs(days)}d overdue` : days === 0 ? 'Due Today' : days === 1 ? 'Due Tomorrow' : `${days}d left`;
+      const cls   = days < 0 ? 'overdue' : days === 0 ? 'today' : days <= 3 ? 'soon' : '';
+      stateBadge = `<span class="due-badge ${cls}">${svg('<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>', 12)} ${formatDate(a.dueDate)} · ${label}</span>`;
+    }
 
     return `
-      <div class="assignment-card priority-${a.priority} ${done?'done':''}" id="ac-${a.id}">
+      <div class="assignment-card ${isMission ? 'is-mission' : ''} priority-${a.priority} ${done?'done':''}" id="ac-${a.id}">
         <div class="assignment-checkbox" onclick="toggleAssignment('${a.id}')">
           ${done ? icons.check() : ''}
         </div>
         <div class="assignment-body">
           <div class="assignment-subject" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
             <span onclick="openSubjectHub('${a.subject}')" style="cursor:pointer;font-weight:700" title="Open ${a.subject} Hub">${a.subject} ${a.code ? '· ' + a.code : ''}</span>
-            <span class="type-badge type-${taskType}">${taskType}</span>
+            <span class="type-badge type-${taskType}">${taskType === 'mission' ? '🚀 Mission' : taskType}</span>
             ${isCustom ? '<span class="session-badge">My task</span>' : ''}
           </div>
           <div class="assignment-title">${a.title}</div>
           ${a.description ? `<div class="assignment-desc">${a.description}</div>` : ''}
           <div class="assignment-footer">
-            <span class="due-badge ${cls}">
-              ${isOngoing ? '' : svg('<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>', 12)}
-              ${dateMeta}
-            </span>
+            ${stateBadge}
             <span class="marks-badge">${a.marks > 0 ? a.marks + ' marks' : ''}</span>
             ${isCustom ? `
               <button class="task-edit-btn" onclick="showAddTaskModal('${a.id}')" title="Edit task" aria-label="Edit task">${icons.edit()}</button>
@@ -4349,8 +4345,15 @@ function renderAssignments() {
     ? `<div class="empty-state-card" style="margin-top:14px">
         <span class="empty-state-icon">📚</span>
         <div class="empty-state-title">No Academic Tasks Yet</div>
-        <div class="empty-state-desc">Stay ahead of submissions, ongoing missions, and exam deadlines. Tap Add Task to organize your desk with ease.</div>
+        <div class="empty-state-desc">Stay ahead of coursework, standing missions, and exam deadlines. Tap Add Task to organize your desk with ease.</div>
         <button class="btn-primary" onclick="showAddTaskModal()" style="font-size:0.82rem;padding:7px 16px">+ Add Your First Task</button>
+      </div>`
+    : (state.assignFilter === 'ongoing' || state.assignFilter === 'missions')
+    ? `<div class="empty-state-card" style="margin-top:14px">
+        <span class="empty-state-icon">🚀</span>
+        <div class="empty-state-title">No Ongoing Missions Active</div>
+        <div class="empty-state-desc">Missions stay visible on your desk without deadlines until you finish them. Tap Add Task to set your first long-term target.</div>
+        <button class="btn-primary" onclick="showAddTaskModal(null, null, 'mission')" style="font-size:0.82rem;padding:7px 16px">+ Create First Mission</button>
       </div>`
     : `<div class="empty-state-card" style="margin-top:14px">
         <span class="empty-state-icon">✨</span>
@@ -4363,7 +4366,7 @@ function renderAssignments() {
     <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start">
       <div>
         <div class="page-title">Tasks &amp; Workload</div>
-        <div class="page-subtitle">${pendingCount()} pending · ${all.filter(a=>a.status==='submitted').length} completed · Academic task &amp; mission tracking</div>
+        <div class="page-subtitle">${pendingCount()} pending · ${all.filter(a=>a.status==='submitted').length} completed · Academic tasks &amp; standing missions</div>
       </div>
       <button class="btn-primary" onclick="showAddTaskModal()" style="display:flex;align-items:center;gap:6px;flex-shrink:0">${icons.plus()} Add Task</button>
     </div>
@@ -4375,16 +4378,19 @@ function renderAssignments() {
 }
 
 // ── Add / Edit Task Modal ──────────────────────────────────────
-window.showAssignmentModal = function(id = null, prefilledSubject = null) {
-  showAddTaskModal(id, prefilledSubject);
+window.showAssignmentModal = function(id = null, prefilledSubject = null, defaultType = null) {
+  showAddTaskModal(id, prefilledSubject, defaultType);
 };
 
-function showAddTaskModal(editTaskId = null, prefilledSubject = null) {
+function showAddTaskModal(editTaskId = null, prefilledSubject = null, defaultType = null) {
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   const defaultDate = tomorrow.toISOString().split('T')[0];
 
   const editTask = editTaskId ? state.customTasks.find(t => t.id === editTaskId) : null;
+  const initialType = editTask ? editTask.taskType : (defaultType || 'assignment');
+  const isOngoing = editTask ? (!!editTask.noDeadline || (editTask.taskType === 'mission' && !editTask.dueDate)) : (initialType === 'mission');
+
   const subjectsList = getSubjectList();
 
   const subjectOptions = subjectsList.map(s => {
@@ -4394,8 +4400,7 @@ function showAddTaskModal(editTaskId = null, prefilledSubject = null) {
   }).join('');
 
   const isGeneralSel = editTask && (editTask.subject === 'General' || editTask.code === 'GEN');
-  const isMissionSubjectSel = editTask && (editTask.subject === 'Mission' || editTask.code === 'MIS');
-  const isOngoing = editTask ? (!!editTask.noDeadline || (editTask.taskType === 'mission' && !editTask.dueDate)) : false;
+  const isMissionSubjectSel = (editTask && (editTask.subject === 'Mission' || editTask.code === 'MIS')) || (!editTask && initialType === 'mission' && !prefilledSubject);
 
   const backdrop = document.createElement('div');
   backdrop.className = 'modal-backdrop';
@@ -4403,7 +4408,7 @@ function showAddTaskModal(editTaskId = null, prefilledSubject = null) {
   backdrop.innerHTML = `
     <div class="modal add-task-modal" onclick="event.stopPropagation()">
       <div class="modal-header">
-        <h2 class="modal-title">${editTask ? 'Edit Task' : 'Add Task'}</h2>
+        <h2 class="modal-title">${editTask ? 'Edit Task' : initialType === 'mission' ? 'Create Mission' : 'Add Task'}</h2>
         <button class="modal-close" onclick="document.getElementById('add-task-backdrop').remove()">${icons.x()}</button>
       </div>
 
@@ -4424,7 +4429,7 @@ function showAddTaskModal(editTaskId = null, prefilledSubject = null) {
       <div class="form-group">
         <label class="form-label">Task Title <span class="req">*</span></label>
         <input type="text" class="form-input" id="task-title"
-          placeholder="e.g. Lab Report 3, Master Dynamic Programming, or Pay Fee" maxlength="120"
+          placeholder="e.g. Master Dynamic Programming, Lab Report 3, or Pay Fee" maxlength="120"
           value="${editTask ? editTask.title.replace(/"/g, '&quot;') : ''}">
       </div>
 
@@ -4432,27 +4437,27 @@ function showAddTaskModal(editTaskId = null, prefilledSubject = null) {
         <div class="form-group">
           <label class="form-label">Task Type</label>
           <select class="form-select" id="task-type" onchange="handleTaskTypeChange(this.value)">
-            <option value="assignment" ${!editTask || editTask.taskType === 'assignment' ? 'selected' : ''}>📝 Assignment</option>
-            <option value="mission" ${editTask && editTask.taskType === 'mission' ? 'selected' : ''}>🚀 Mission (Long-term Goal)</option>
-            <option value="general" ${editTask && editTask.taskType === 'general' ? 'selected' : ''}>📋 General / Personal</option>
-            <option value="quiz" ${editTask && editTask.taskType === 'quiz' ? 'selected' : ''}>⚡ Quiz / Test</option>
-            <option value="lab" ${editTask && editTask.taskType === 'lab' ? 'selected' : ''}>🧪 Lab Report / Viva</option>
-            <option value="project" ${editTask && editTask.taskType === 'project' ? 'selected' : ''}>💻 Project</option>
-            <option value="exam" ${editTask && editTask.taskType === 'exam' ? 'selected' : ''}>🎯 Exam</option>
-            <option value="study" ${editTask && editTask.taskType === 'study' ? 'selected' : ''}>📚 Self Study</option>
+            <option value="assignment" ${initialType === 'assignment' ? 'selected' : ''}>📝 Assignment</option>
+            <option value="mission" ${initialType === 'mission' ? 'selected' : ''}>🚀 Mission (Long-term Goal)</option>
+            <option value="general" ${initialType === 'general' ? 'selected' : ''}>📋 General / Personal</option>
+            <option value="quiz" ${initialType === 'quiz' ? 'selected' : ''}>⚡ Quiz / Test</option>
+            <option value="lab" ${initialType === 'lab' ? 'selected' : ''}>🧪 Lab Report / Viva</option>
+            <option value="project" ${initialType === 'project' ? 'selected' : ''}>💻 Project</option>
+            <option value="exam" ${initialType === 'exam' ? 'selected' : ''}>🎯 Exam</option>
+            <option value="study" ${initialType === 'study' ? 'selected' : ''}>📚 Self Study</option>
           </select>
         </div>
         <div class="form-group" id="task-due-group">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
             <label class="form-label" style="margin-bottom:0" id="task-due-label">Due Date <span class="req" id="task-due-req" style="${isOngoing ? 'display:none' : ''}">*</span></label>
-            <label style="display:inline-flex;align-items:center;gap:5px;font-size:0.75rem;color:var(--text-muted);cursor:pointer;user-select:none">
+            <label style="display:inline-flex;align-items:center;gap:6px;font-size:0.76rem;color:var(--text-secondary);cursor:pointer;user-select:none;font-weight:500">
               <input type="checkbox" id="task-no-deadline" ${isOngoing ? 'checked' : ''} onchange="handleTaskNoDeadlineToggle(this.checked)">
-              <span>No deadline (Ongoing)</span>
+              <span>Ongoing · No deadline</span>
             </label>
           </div>
-          <input type="date" class="form-input" id="task-due" value="${editTask && !isOngoing ? (editTask.dueDate || '') : defaultDate}" ${isOngoing ? 'disabled style="opacity:0.45;background:var(--surface-2)"' : ''}>
-          <div id="task-ongoing-hint" style="font-size:0.74rem;color:var(--text-muted);margin-top:4px;display:${isOngoing ? 'block' : 'none'}">
-            🚀 Standing mission — Stays active on your desk until completed or deleted. Never becomes overdue.
+          <input type="date" class="form-input" id="task-due" value="${editTask && !isOngoing ? (editTask.dueDate || '') : defaultDate}" ${isOngoing ? 'disabled style="opacity:0.45;background:var(--surface-2);cursor:not-allowed"' : ''}>
+          <div id="task-ongoing-hint" style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;line-height:1.4;display:${isOngoing ? 'flex' : 'none'};align-items:center;gap:6px">
+            <span style="color:var(--purple);font-weight:600">✦ Standing Goal:</span> Stays active on your desk until completed or deleted. Never becomes overdue.
           </div>
         </div>
       </div>
@@ -4487,7 +4492,7 @@ function showAddTaskModal(editTaskId = null, prefilledSubject = null) {
 
       <div class="form-actions">
         <button class="btn-secondary" onclick="document.getElementById('add-task-backdrop').remove()">Cancel</button>
-        <button class="btn-primary" onclick="submitAddTask(${editTask ? `'${editTask.id}'` : ''})">${editTask ? 'Save Changes' : 'Add Task'}</button>
+        <button class="btn-primary" onclick="submitAddTask(${editTask ? `'${editTask.id}'` : ''})">${editTask ? 'Save Changes' : initialType === 'mission' ? 'Create Mission' : 'Add Task'}</button>
       </div>
     </div>
   `;

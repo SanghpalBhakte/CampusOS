@@ -1187,9 +1187,19 @@ a.card:hover,
 .assignment-card.done  { opacity: 0.55; }
 .assignment-card.done .assignment-title { text-decoration: line-through; color: var(--text-muted); }
 
+.assignment-card.is-mission {
+  border-color: color-mix(in srgb, var(--purple) 25%, var(--border));
+  background: color-mix(in srgb, var(--purple) 2.5%, var(--surface));
+}
+.assignment-card.is-mission:hover {
+  border-color: var(--purple);
+}
+
 .assignment-card.priority-high   { border-left: 3px solid var(--red); }
 .assignment-card.priority-medium { border-left: 3px solid var(--yellow); }
 .assignment-card.priority-low    { border-left: 3px solid var(--green); }
+.assignment-card.is-mission.priority-medium { border-left: 3px solid var(--purple); }
+.assignment-card.is-mission.priority-low    { border-left: 3px solid color-mix(in srgb, var(--purple) 45%, var(--border)); }
 
 .assignment-checkbox {
   width: 20px; height: 20px;
