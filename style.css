@@ -1117,6 +1117,7 @@ a.card:hover,
 .type-project    { background: rgba(14, 165, 233, 0.12); color: #0ea5e9; }
 .type-off        { background: rgba(107, 114, 128, 0.08); color: var(--text-muted); }
 .type-assignment { background: var(--accent-dim); color: var(--accent); }
+.type-mission    { background: rgba(147, 51, 234, 0.12); color: var(--purple); border: 1px solid rgba(147, 51, 234, 0.22); }
 .type-general    { background: rgba(148, 163, 184, 0.16); color: var(--text-secondary); }
 .type-study      { background: rgba(168, 85, 247, 0.14); color: #a855f7; }
 .type-quiz       { background: rgba(245, 158, 11, 0.12); color: var(--yellow); }
@@ -1255,6 +1256,7 @@ a.card:hover,
 .due-badge.overdue { background: rgba(239,68,68,0.12); color: var(--red); }
 .due-badge.today   { background: rgba(245,158,11,0.12); color: var(--yellow); }
 .due-badge.soon    { background: rgba(99,102,241,0.12); color: var(--accent); }
+.due-badge.ongoing { background: color-mix(in srgb, var(--purple) 12%, var(--surface-2)); color: var(--purple); border: 1px solid color-mix(in srgb, var(--purple) 25%, transparent); }
 
 .marks-badge {
   font-size: 0.75rem;

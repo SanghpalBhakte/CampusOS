@@ -1771,7 +1771,7 @@ function checkScheduledNotifications() {
 
   // 1. Upcoming Tasks
   if (prefs.taskUpcoming === 'day_before') {
-    tasks.filter(t => t.dueDate === tomorrowStr).forEach(t => {
+    tasks.filter(t => !t.noDeadline && t.dueDate === tomorrowStr).forEach(t => {
       const key = `upcoming_daybefore_${t.id}_${today}`;
       if (!notifiedMap[key]) {
         dispatchNotification(`Upcoming Task: ${t.title}`, {
@@ -1783,7 +1783,7 @@ function checkScheduledNotifications() {
       }
     });
   } else if (prefs.taskUpcoming === 'same_day') {
-    tasks.filter(t => t.dueDate === today).forEach(t => {
+    tasks.filter(t => !t.noDeadline && t.dueDate === today).forEach(t => {
       const key = `upcoming_sameday_${t.id}_${today}`;
       if (!notifiedMap[key]) {
         dispatchNotification(`Task Due Today: ${t.title}`, {
@@ -1798,10 +1798,10 @@ function checkScheduledNotifications() {
 
   // 2. Overdue Tasks
   if (prefs.taskOverdue !== 'off') {
-    tasks.filter(t => t.dueDate < today).forEach(t => {
+    tasks.filter(t => isTaskOverdue(t)).forEach(t => {
       const key = `overdue_${t.id}_${today}`;
       if (!notifiedMap[key]) {
-        const days = Math.abs(dueDaysLeft(t.dueDate));
+        const days = Math.abs(dueDaysLeft(t.dueDate) || 1);
         dispatchNotification(`Task Overdue: ${t.title}`, {
           body: `${t.subject || 'Task'} is ${days} day${days > 1 ? 's' : ''} overdue.`,
           tag: key,
@@ -2132,11 +2132,18 @@ function formatDate(dateStr) {
 }
 
 function dueDaysLeft(dateStr) {
-  if (!dateStr) return 0;
+  if (!dateStr) return null;
   const now = new Date(); now.setHours(0,0,0,0);
   const due = new Date(dateStr + 'T00:00:00');
-  if (isNaN(due.getTime())) return 0;
+  if (isNaN(due.getTime())) return null;
   return Math.round((due - now) / 86400000);
+}
+
+function isTaskOverdue(task) {
+  if (!task || task.status !== 'pending') return false;
+  if (task.noDeadline || (task.taskType === 'mission' && !task.dueDate)) return false;
+  if (!task.dueDate) return false;
+  return task.dueDate < todayStr();
 }
 
 function todayStr() {
@@ -2173,8 +2180,7 @@ function pendingCount() {
 }
 
 function overdueCount() {
-  const today = todayStr();
-  return allTasks().filter(a => a.status === 'pending' && a.dueDate < today).length;
+  return allTasks().filter(a => isTaskOverdue(a)).length;
 }
 
 // ── Dynamic Timetable Loading ─────────────────────────────────
@@ -2488,13 +2494,13 @@ function renderReview() {
   const lookbackStr = last7.toISOString().split('T')[0];
   const todayS = todayStr();
   
-  const tasksCompleted = allTasks().filter(t => t.status === 'submitted' && t.dueDate >= lookbackStr && t.dueDate <= todayS);
-  const tasksRolledOver = allTasks().filter(t => t.status === 'pending' && t.dueDate >= lookbackStr && t.dueDate < todayS);
+  const tasksCompleted = allTasks().filter(t => t.status === 'submitted' && t.dueDate && t.dueDate >= lookbackStr && t.dueDate <= todayS);
+  const tasksRolledOver = allTasks().filter(t => isTaskOverdue(t) && t.dueDate >= lookbackStr);
   
   const next7 = new Date(); next7.setDate(now.getDate() + 7);
   const lookaheadStr = next7.toISOString().split('T')[0];
   
-  const upcomingTasks = allTasks().filter(t => t.dueDate >= todayS && t.dueDate <= lookaheadStr);
+  const upcomingTasks = allTasks().filter(t => t.status === 'pending' && !t.noDeadline && t.dueDate && t.dueDate >= todayS && t.dueDate <= lookaheadStr);
   const upcomingNotices = NOTICES.filter(n => n.date >= todayS && n.date <= lookaheadStr);
   const recentNotices = NOTICES.filter(n => n.date >= lookbackStr && n.date <= todayS);
   
@@ -3204,7 +3210,7 @@ function answerTimetableDay(dayMatch) {
 }
 
 function answerOverdueTasks() {
-  const tsks = allTasks().filter(t => t.status === 'pending' && t.dueDate < todayStr());
+  const tsks = allTasks().filter(t => isTaskOverdue(t));
   let html = `<div style="font-weight:600;margin-bottom:8px">Overdue Tasks</div>`;
   if (tsks.length === 0) {
     html += `<div style="font-size:0.85rem">You have no overdue tasks — all clear!</div>`;
@@ -3352,15 +3358,22 @@ function renderDashboard() {
       <button class="btn-primary" onclick="navigateTo('settings')" style="flex-shrink:0;padding:7px 16px;font-size:0.82rem;font-weight:600">Set Up Profile →</button>
     </div>` : '';
 
-  // Urgent tasks: Overdue or Due Today first, then due soon
+  // Urgent & Active tasks: Overdue or Due Today first, then due soon, then standing ongoing missions
   const urgentTasks = allTasks()
     .filter(a => a.status === 'pending')
     .sort((a,b) => {
+      const isOngoingA = !!a.noDeadline || (a.taskType === 'mission' && !a.dueDate);
+      const isOngoingB = !!b.noDeadline || (b.taskType === 'mission' && !b.dueDate);
+      if (isOngoingA && !isOngoingB) return 1;
+      if (!isOngoingA && isOngoingB) return -1;
+      if (isOngoingA && isOngoingB) return a.title.localeCompare(b.title);
       const daysA = dueDaysLeft(a.dueDate);
       const daysB = dueDaysLeft(b.dueDate);
-      if (daysA < 0 && daysB >= 0) return -1;
-      if (daysB < 0 && daysA >= 0) return 1;
-      return a.dueDate.localeCompare(b.dueDate);
+      if (daysA !== null && daysB !== null) {
+        if (daysA < 0 && daysB >= 0) return -1;
+        if (daysB < 0 && daysA >= 0) return 1;
+      }
+      return (a.dueDate || '').localeCompare(b.dueDate || '');
     })
     .slice(0, 4);
 
@@ -3522,10 +3535,19 @@ function renderDashboard() {
           ${urgentTasks.length > 0 ? `
             <div style="display:flex;flex-direction:column;gap:6px">
               ${urgentTasks.map(a => {
-                const days = dueDaysLeft(a.dueDate);
-                const label = days < 0 ? `${Math.abs(days)}d overdue` : days === 0 ? 'Due Today' : `${days}d left`;
-                const cls = days < 0 ? 'overdue' : days === 0 ? 'today' : days <= 3 ? 'soon' : '';
+                const isOngoing = !!a.noDeadline || (a.taskType === 'mission' && !a.dueDate);
+                const days = isOngoing ? null : dueDaysLeft(a.dueDate);
+                let label = '';
+                let cls = '';
+                if (isOngoing) {
+                  label = '🚀 Ongoing';
+                  cls = 'ongoing';
+                } else if (days !== null) {
+                  label = days < 0 ? `${Math.abs(days)}d overdue` : days === 0 ? 'Due Today' : days === 1 ? 'Due Tomorrow' : `${days}d left`;
+                  cls = days < 0 ? 'overdue' : days === 0 ? 'today' : days <= 3 ? 'soon' : '';
+                }
                 const done = a.status === 'submitted';
+                const dateMeta = isOngoing ? 'Standing Mission' : formatDate(a.dueDate);
                 return `
                   <div class="card card-sm assignment-card" style="margin-bottom:0;display:flex;align-items:center;gap:10px;padding:9px 12px">
                     <div onclick="toggleAssignment('${a.id}')" title="Click to mark done" style="width:18px;height:18px;border-radius:4px;border:2px solid ${done ? 'var(--green)' : a.priority==='high' ? 'var(--red)' : a.priority==='medium' ? 'var(--yellow)' : 'var(--border)'};background:${done ? 'var(--green)' : 'transparent'};display:grid;place-items:center;flex-shrink:0;color:white;cursor:pointer;transition:all 0.15s">
@@ -3535,7 +3557,7 @@ function renderDashboard() {
                       <div class="font-semibold" style="font-size:0.86rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${done?'text-decoration:line-through;opacity:0.5':''}">${a.title}</div>
                       <div class="text-xs text-muted" style="display:flex;align-items:center;gap:6px">
                         <span onclick="event.stopPropagation(); openSubjectHub('${a.subject}')" style="color:var(--accent);font-weight:600;cursor:pointer" title="Open ${a.subject} Hub">${a.subject || 'Academic'}</span>
-                        <span>· ${formatDate(a.dueDate)}</span>
+                        <span>· ${dateMeta}</span>
                       </div>
                     </div>
                     <span class="due-badge ${cls}" style="font-size:0.7rem;padding:2px 6px">${label}</span>
@@ -3910,10 +3932,12 @@ function renderSingleSubjectHub(el, subj, allSubjects) {
 
   // Tasks list
   const tasksHTML = tasks.length > 0 ? tasks.map(a => {
-    const days  = dueDaysLeft(a.dueDate);
-    const label = days < 0 ? 'Overdue' : days === 0 ? 'Due Today' : `${days}d left`;
-    const cls   = days < 0 ? 'overdue' : days === 0 ? 'today' : days <= 3 ? 'soon' : '';
+    const isOngoing = !!a.noDeadline || (a.taskType === 'mission' && !a.dueDate);
+    const days  = isOngoing ? null : dueDaysLeft(a.dueDate);
     const done  = a.status === 'submitted';
+    const label = done ? 'Completed ✓' : isOngoing ? '🚀 Ongoing' : days < 0 ? 'Overdue' : days === 0 ? 'Due Today' : `${days}d left`;
+    const cls   = done ? '' : isOngoing ? 'ongoing' : days < 0 ? 'overdue' : days === 0 ? 'today' : days <= 3 ? 'soon' : '';
+    const dateText = isOngoing ? 'Standing Mission' : `Due ${formatDate(a.dueDate)}`;
     return `
       <div class="card card-sm assignment-card" style="margin-bottom:6px;display:flex;align-items:center;gap:10px;padding:10px 12px">
         <div onclick="toggleAssignment('${a.id}')" title="Click to mark done" style="width:18px;height:18px;border-radius:4px;border:2px solid ${done ? 'var(--green)' : a.priority==='high' ? 'var(--red)' : a.priority==='medium' ? 'var(--yellow)' : 'var(--border)'};background:${done ? 'var(--green)' : 'transparent'};display:grid;place-items:center;flex-shrink:0;color:white;cursor:pointer;transition:all 0.15s">
@@ -3921,7 +3945,7 @@ function renderSingleSubjectHub(el, subj, allSubjects) {
         </div>
         <div style="flex:1;min-width:0">
           <div class="font-semibold" style="font-size:0.88rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${done?'text-decoration:line-through;opacity:0.5':''}">${a.title}</div>
-          <div class="text-xs text-muted">Due ${formatDate(a.dueDate)}</div>
+          <div class="text-xs text-muted">${dateText}</div>
         </div>
         <span class="due-badge ${cls}">${label}</span>
       </div>`;
@@ -4179,6 +4203,30 @@ window.setAssignTypeFilter = function(type) {
   renderAssignments();
 };
 
+window.handleTaskTypeChange = function(type) {
+  const chk = document.getElementById('task-no-deadline');
+  if (type === 'mission' && chk && !chk.checked) {
+    chk.checked = true;
+    window.handleTaskNoDeadlineToggle(true);
+  }
+};
+
+window.handleTaskNoDeadlineToggle = function(checked) {
+  const dueInput = document.getElementById('task-due');
+  const reqSpan = document.getElementById('task-due-req');
+  const hint = document.getElementById('task-ongoing-hint');
+  if (dueInput) {
+    dueInput.disabled = checked;
+    dueInput.style.opacity = checked ? '0.45' : '1';
+    dueInput.style.background = checked ? 'var(--surface-2)' : 'var(--surface)';
+    if (checked) {
+      dueInput.classList.remove('error', 'shake');
+    }
+  }
+  if (reqSpan) reqSpan.style.display = checked ? 'none' : 'inline';
+  if (hint) hint.style.display = checked ? 'block' : 'none';
+};
+
 function renderAssignments() {
   const el  = document.getElementById('page-assignments');
   const all = allTasks();
@@ -4191,6 +4239,7 @@ function renderAssignments() {
     { key:'all',       label:'All Tasks' },
     { key:'today',     label:'🔥 Due Today' },
     { key:'upcoming',  label:'📅 Upcoming' },
+    { key:'missions',  label:'🚀 Ongoing Missions' },
     { key:'overdue',   label:'⚠️ Overdue' },
     { key:'exams',     label:'🎯 Exams & Tests' },
     { key:'submitted', label:'✓ Completed' },
@@ -4199,22 +4248,26 @@ function renderAssignments() {
   const typeFilters = [
     { key:'all',        label:'All Types' },
     { key:'assignment', label:'📝 Assignments' },
+    { key:'mission',    label:'🚀 Missions' },
     { key:'general',    label:'📋 General Tasks' },
     { key:'quiz',       label:'⚡ Quizzes' },
     { key:'lab',        label:'🧪 Labs' },
     { key:'project',    label:'💻 Projects' },
     { key:'exam',       label:'🎯 Exams' },
+    { key:'study',      label:'📚 Self Study' },
   ];
 
   let filtered = all;
 
   // Filter by status/deadline
   if (state.assignFilter === 'today') {
-    filtered = filtered.filter(a => a.status === 'pending' && a.dueDate === today);
+    filtered = filtered.filter(a => a.status === 'pending' && !a.noDeadline && a.dueDate === today);
   } else if (state.assignFilter === 'upcoming') {
-    filtered = filtered.filter(a => a.status === 'pending' && a.dueDate >= today);
+    filtered = filtered.filter(a => a.status === 'pending' && !a.noDeadline && a.dueDate && a.dueDate >= today);
+  } else if (state.assignFilter === 'missions') {
+    filtered = filtered.filter(a => a.status === 'pending' && (a.taskType === 'mission' || !!a.noDeadline));
   } else if (state.assignFilter === 'overdue') {
-    filtered = filtered.filter(a => a.status === 'pending' && a.dueDate < today);
+    filtered = filtered.filter(a => isTaskOverdue(a));
   } else if (state.assignFilter === 'exams') {
     filtered = filtered.filter(a => (a.taskType === 'exam' || a.taskType === 'quiz') && a.status === 'pending');
   } else if (state.assignFilter === 'submitted') {
@@ -4231,10 +4284,15 @@ function renderAssignments() {
     filtered = filtered.filter(a => (a.taskType || 'assignment') === state.assignTypeFilter);
   }
 
-  // Sorting: Pending first, then due date ascending
+  // Sorting: Pending first, then due date ascending, with ongoing missions organized
   filtered.sort((a,b) => {
     if (a.status !== b.status) return a.status === 'pending' ? -1 : 1;
-    return a.dueDate.localeCompare(b.dueDate);
+    const isOngoingA = !!a.noDeadline || (a.taskType === 'mission' && !a.dueDate);
+    const isOngoingB = !!b.noDeadline || (b.taskType === 'mission' && !b.dueDate);
+    if (isOngoingA && !isOngoingB) return 1;
+    if (!isOngoingA && isOngoingB) return -1;
+    if (isOngoingA && isOngoingB) return a.title.localeCompare(b.title);
+    return (a.dueDate || '').localeCompare(b.dueDate || '');
   });
 
   const statusBar  = statusFilters.map(f => `<button class="filter-chip ${f.key===state.assignFilter?'active':''}" onclick="setAssignFilter('${f.key}')">${f.label}</button>`).join('');
@@ -4242,12 +4300,24 @@ function renderAssignments() {
   const subjectBar = subjects.map(s => `<button class="filter-chip ${s===state.assignSubjectFilter?'active':''}" onclick="setAssignSubject('${s}')">${s==='all'?'All Subjects':s}</button>`).join('');
 
   const cards = filtered.length ? filtered.map(a => {
-    const days = dueDaysLeft(a.dueDate);
+    const isOngoing = !!a.noDeadline || (a.taskType === 'mission' && !a.dueDate);
+    const days = isOngoing ? null : dueDaysLeft(a.dueDate);
     const done = a.status === 'submitted';
-    const label = done ? 'Completed ✓' : days < 0 ? `${Math.abs(days)}d overdue` : days === 0 ? 'Due Today' : days === 1 ? 'Due Tomorrow' : `${days}d left`;
-    const cls   = done ? '' : days < 0 ? 'overdue' : days === 0 ? 'today' : days <= 3 ? 'soon' : '';
+    let label = '';
+    let cls   = '';
+    if (done) {
+      label = 'Completed ✓';
+      cls   = '';
+    } else if (isOngoing) {
+      label = 'Ongoing · No deadline';
+      cls   = 'ongoing';
+    } else if (days !== null) {
+      label = days < 0 ? `${Math.abs(days)}d overdue` : days === 0 ? 'Due Today' : days === 1 ? 'Due Tomorrow' : `${days}d left`;
+      cls   = days < 0 ? 'overdue' : days === 0 ? 'today' : days <= 3 ? 'soon' : '';
+    }
     const isCustom = !!a.isCustom;
     const taskType = a.taskType || 'assignment';
+    const dateMeta = isOngoing ? '🚀 Standing Mission · No deadline' : `${formatDate(a.dueDate)} · ${label}`;
 
     return `
       <div class="assignment-card priority-${a.priority} ${done?'done':''}" id="ac-${a.id}">
@@ -4264,8 +4334,8 @@ function renderAssignments() {
           ${a.description ? `<div class="assignment-desc">${a.description}</div>` : ''}
           <div class="assignment-footer">
             <span class="due-badge ${cls}">
-              ${svg('<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>', 12)}
-              ${formatDate(a.dueDate)} · ${label}
+              ${isOngoing ? '' : svg('<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>', 12)}
+              ${dateMeta}
             </span>
             <span class="marks-badge">${a.marks > 0 ? a.marks + ' marks' : ''}</span>
             ${isCustom ? `
@@ -4279,13 +4349,13 @@ function renderAssignments() {
     ? `<div class="empty-state-card" style="margin-top:14px">
         <span class="empty-state-icon">📚</span>
         <div class="empty-state-title">No Academic Tasks Yet</div>
-        <div class="empty-state-desc">Stay ahead of submissions, lab tests, and quiz deadlines. Tap Add Task to organize coursework with ease.</div>
+        <div class="empty-state-desc">Stay ahead of submissions, ongoing missions, and exam deadlines. Tap Add Task to organize your desk with ease.</div>
         <button class="btn-primary" onclick="showAddTaskModal()" style="font-size:0.82rem;padding:7px 16px">+ Add Your First Task</button>
       </div>`
     : `<div class="empty-state-card" style="margin-top:14px">
         <span class="empty-state-icon">✨</span>
         <div class="empty-state-title">No Matching Tasks</div>
-        <div class="empty-state-desc">No academic tasks found matching the selected filter. Try switching back to All Tasks or reset your filters.</div>
+        <div class="empty-state-desc">No tasks found matching the selected filter. Try switching back to All Tasks or reset your filters.</div>
         <button class="btn-secondary" onclick="state.assignFilter='all'; state.assignTypeFilter='all'; state.assignSubjectFilter='all'; renderAssignments();" style="font-size:0.82rem;padding:6px 14px">Reset Filters</button>
       </div>`);
 
@@ -4293,7 +4363,7 @@ function renderAssignments() {
     <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start">
       <div>
         <div class="page-title">Tasks &amp; Workload</div>
-        <div class="page-subtitle">${pendingCount()} pending · ${all.filter(a=>a.status==='submitted').length} completed · Academic task &amp; deadline tracking</div>
+        <div class="page-subtitle">${pendingCount()} pending · ${all.filter(a=>a.status==='submitted').length} completed · Academic task &amp; mission tracking</div>
       </div>
       <button class="btn-primary" onclick="showAddTaskModal()" style="display:flex;align-items:center;gap:6px;flex-shrink:0">${icons.plus()} Add Task</button>
     </div>
@@ -4324,6 +4394,8 @@ function showAddTaskModal(editTaskId = null, prefilledSubject = null) {
   }).join('');
 
   const isGeneralSel = editTask && (editTask.subject === 'General' || editTask.code === 'GEN');
+  const isMissionSubjectSel = editTask && (editTask.subject === 'Mission' || editTask.code === 'MIS');
+  const isOngoing = editTask ? (!!editTask.noDeadline || (editTask.taskType === 'mission' && !editTask.dueDate)) : false;
 
   const backdrop = document.createElement('div');
   backdrop.className = 'modal-backdrop';
@@ -4342,8 +4414,9 @@ function showAddTaskModal(editTaskId = null, prefilledSubject = null) {
           <optgroup label="Academic Subjects">
             ${subjectOptions}
           </optgroup>
-          <optgroup label="General &amp; Personal">
+          <optgroup label="General &amp; Life Goals">
             <option value="General|||GEN" ${isGeneralSel ? 'selected' : ''}>📋 General Desk Task / Other</option>
+            <option value="Mission|||MIS" ${isMissionSubjectSel ? 'selected' : ''}>🚀 Long-Term Mission / Target</option>
           </optgroup>
         </select>
       </div>
@@ -4351,15 +4424,16 @@ function showAddTaskModal(editTaskId = null, prefilledSubject = null) {
       <div class="form-group">
         <label class="form-label">Task Title <span class="req">*</span></label>
         <input type="text" class="form-input" id="task-title"
-          placeholder="e.g. Lab Report 3, Pay fee, or End-Sem Revision" maxlength="120"
+          placeholder="e.g. Lab Report 3, Master Dynamic Programming, or Pay Fee" maxlength="120"
           value="${editTask ? editTask.title.replace(/"/g, '&quot;') : ''}">
       </div>
 
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">Task Type</label>
-          <select class="form-select" id="task-type">
+          <select class="form-select" id="task-type" onchange="handleTaskTypeChange(this.value)">
             <option value="assignment" ${!editTask || editTask.taskType === 'assignment' ? 'selected' : ''}>📝 Assignment</option>
+            <option value="mission" ${editTask && editTask.taskType === 'mission' ? 'selected' : ''}>🚀 Mission (Long-term Goal)</option>
             <option value="general" ${editTask && editTask.taskType === 'general' ? 'selected' : ''}>📋 General / Personal</option>
             <option value="quiz" ${editTask && editTask.taskType === 'quiz' ? 'selected' : ''}>⚡ Quiz / Test</option>
             <option value="lab" ${editTask && editTask.taskType === 'lab' ? 'selected' : ''}>🧪 Lab Report / Viva</option>
@@ -4368,9 +4442,18 @@ function showAddTaskModal(editTaskId = null, prefilledSubject = null) {
             <option value="study" ${editTask && editTask.taskType === 'study' ? 'selected' : ''}>📚 Self Study</option>
           </select>
         </div>
-        <div class="form-group">
-          <label class="form-label">Due Date <span class="req">*</span></label>
-          <input type="date" class="form-input" id="task-due" value="${editTask ? editTask.dueDate : defaultDate}">
+        <div class="form-group" id="task-due-group">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <label class="form-label" style="margin-bottom:0" id="task-due-label">Due Date <span class="req" id="task-due-req" style="${isOngoing ? 'display:none' : ''}">*</span></label>
+            <label style="display:inline-flex;align-items:center;gap:5px;font-size:0.75rem;color:var(--text-muted);cursor:pointer;user-select:none">
+              <input type="checkbox" id="task-no-deadline" ${isOngoing ? 'checked' : ''} onchange="handleTaskNoDeadlineToggle(this.checked)">
+              <span>No deadline (Ongoing)</span>
+            </label>
+          </div>
+          <input type="date" class="form-input" id="task-due" value="${editTask && !isOngoing ? (editTask.dueDate || '') : defaultDate}" ${isOngoing ? 'disabled style="opacity:0.45;background:var(--surface-2)"' : ''}>
+          <div id="task-ongoing-hint" style="font-size:0.74rem;color:var(--text-muted);margin-top:4px;display:${isOngoing ? 'block' : 'none'}">
+            🚀 Standing mission — Stays active on your desk until completed or deleted. Never becomes overdue.
+          </div>
         </div>
       </div>
 
@@ -4399,7 +4482,7 @@ function showAddTaskModal(editTaskId = null, prefilledSubject = null) {
       <div class="form-group">
         <label class="form-label">Description / Instructions</label>
         <textarea class="form-input form-textarea" id="task-desc"
-          placeholder="Submission link, syllabus topics, or notes...">${editTask ? editTask.description : ''}</textarea>
+          placeholder="Milestones, notes, syllabus topics, or links...">${editTask ? editTask.description : ''}</textarea>
       </div>
 
       <div class="form-actions">
@@ -4421,13 +4504,16 @@ function showAddTaskModal(editTaskId = null, prefilledSubject = null) {
 }
 
 function submitAddTask(editTaskId = null) {
-  const subjectEl  = document.getElementById('task-subject');
-  const titleEl    = document.getElementById('task-title');
-  const dueEl      = document.getElementById('task-due');
-  const marksEl    = document.getElementById('task-marks');
-  const descEl     = document.getElementById('task-desc');
-  const typeEl     = document.getElementById('task-type');
-  const priorityEl = document.querySelector('input[name="task-priority"]:checked');
+  const subjectEl    = document.getElementById('task-subject');
+  const titleEl      = document.getElementById('task-title');
+  const dueEl        = document.getElementById('task-due');
+  const noDeadlineEl = document.getElementById('task-no-deadline');
+  const marksEl      = document.getElementById('task-marks');
+  const descEl       = document.getElementById('task-desc');
+  const typeEl       = document.getElementById('task-type');
+  const priorityEl   = document.querySelector('input[name="task-priority"]:checked');
+
+  const isNoDeadline = !!(noDeadlineEl && noDeadlineEl.checked);
 
   [subjectEl, titleEl, dueEl].forEach(el => {
     if (el) {
@@ -4447,19 +4533,20 @@ function submitAddTask(editTaskId = null) {
     if (titleEl) { titleEl.classList.add('error', 'shake'); if (!firstInvalid) firstInvalid = titleEl; }
     valid = false;
   }
-  if (!dueEl || !dueEl.value) {
+  if (!isNoDeadline && (!dueEl || !dueEl.value)) {
     if (dueEl) { dueEl.classList.add('error', 'shake'); if (!firstInvalid) firstInvalid = dueEl; }
     valid = false;
   }
 
   if (!valid) {
     if (firstInvalid) firstInvalid.focus();
-    showToast('Please provide a subject, title, and due date.', 'error');
+    showToast(isNoDeadline ? 'Please provide a subject and title.' : 'Please provide a subject, title, and due date.', 'error');
     return;
   }
 
   const [subject, code] = subjectEl.value.split('|||');
   const taskType = typeEl?.value || 'assignment';
+  const finalDueDate = isNoDeadline ? '' : (dueEl ? dueEl.value : '');
 
   if (editTaskId) {
     const task = state.customTasks.find(t => t.id === editTaskId);
@@ -4468,8 +4555,9 @@ function submitAddTask(editTaskId = null) {
       task.code        = code;
       task.title       = titleEl.value.trim();
       task.taskType    = taskType;
+      task.noDeadline  = isNoDeadline;
       task.description = descEl.value.trim() || '—';
-      task.dueDate     = dueEl.value;
+      task.dueDate     = finalDueDate;
       task.priority    = priorityEl?.value || 'medium';
       task.marks       = parseInt(marksEl.value) || 0;
     }
@@ -4480,8 +4568,9 @@ function submitAddTask(editTaskId = null) {
       code,
       title:       titleEl.value.trim(),
       taskType,
+      noDeadline:  isNoDeadline,
       description: descEl.value.trim() || '—',
-      dueDate:     dueEl.value,
+      dueDate:     finalDueDate,
       priority:    priorityEl?.value || 'medium',
       status:      'pending',
       marks:       parseInt(marksEl.value) || 0,
@@ -4492,7 +4581,7 @@ function submitAddTask(editTaskId = null) {
 
   saveCustomTasks();
   document.getElementById('add-task-backdrop')?.remove();
-  showToast(editTaskId ? 'Task updated ✓' : 'Task added to desk ✓', 'success');
+  showToast(editTaskId ? 'Task updated ✓' : (taskType === 'mission' || isNoDeadline) ? 'Mission added to desk ✓' : 'Task added to desk ✓', 'success');
   renderPage(state.currentPage);
   updateNavBadges();
 }
@@ -5003,9 +5092,10 @@ function renderSummaryContent(container) {
   const today    = new Date();
   const todayDay = today.getDay();
   const classes  = loadTimetable()[todayDay] || [];
-  const dueTodayItems = allTasks().filter(a => a.dueDate === todayStr() && a.status === 'pending');
+  const dueTodayItems = allTasks().filter(a => !a.noDeadline && a.dueDate === todayStr() && a.status === 'pending');
   const importantNotices = NOTICES.filter(n => n.important).slice(0, 3);
-  const overdueItems = allTasks().filter(a => a.status === 'pending' && a.dueDate < todayStr());
+  const overdueItems = allTasks().filter(a => isTaskOverdue(a));
+  const ongoingMissions = allTasks().filter(a => a.status === 'pending' && (a.taskType === 'mission' || !!a.noDeadline));
   const currentMin   = currentTimeMinutes();
   const remaining    = classes.filter(c => c.type !== 'off' && c.subject !== 'Recess' && timeToMinutes(c.end || '23:59') > currentMin);
   container.innerHTML = `
@@ -5045,6 +5135,17 @@ function renderSummaryContent(container) {
       : '<div class="card" style="text-align:center;padding:20px;color:var(--text-muted)">🌿 No tasks due today — all clear!</div>'
     }
 
+    ${ongoingMissions.length ? `
+      <div class="section-heading" style="margin-top:20px;color:var(--purple)">🚀 Ongoing Missions</div>
+      ${ongoingMissions.map(a => `
+        <div class="summary-item" style="border-left:3px solid var(--purple)">
+          <div class="summary-icon" style="background:rgba(147,51,234,0.12);color:var(--purple)">${icons.target()}</div>
+          <div style="flex:1;min-width:0">
+            <div class="summary-text-main">${a.title}</div>
+            <div class="summary-text-sub">${a.subject} · Standing Goal · Active</div>
+          </div>
+        </div>`).join('')}` : ''}
+
     ${overdueItems.length ? `
       <div class="section-heading" style="margin-top:20px;color:var(--red)">⚠ Overdue Tasks</div>
       ${overdueItems.map(a => `
@@ -5052,7 +5153,7 @@ function renderSummaryContent(container) {
           <div class="summary-icon" style="background:rgba(239,68,68,0.12);color:var(--red)">${icons.alert()}</div>
           <div style="flex:1;min-width:0">
             <div class="summary-text-main">${a.title}</div>
-            <div class="summary-text-sub">${a.subject} · ${Math.abs(dueDaysLeft(a.dueDate))}d overdue</div>
+            <div class="summary-text-sub">${a.subject} · ${Math.abs(dueDaysLeft(a.dueDate) || 1)}d overdue</div>
           </div>
         </div>`).join('')}` : ''}
 
@@ -6037,8 +6138,7 @@ const ClarityAssistant = (() => {
   }
 
   function buildTasksOverdue() {
-    const today = todayISO();
-    const overdue = allTasks().filter(t => t.status === 'pending' && t.dueDate < today);
+    const overdue = allTasks().filter(t => isTaskOverdue(t));
     if (overdue.length === 0) return `No overdue tasks. You're on top of things.`;
 
     const items = overdue.map(t =>
@@ -6049,7 +6149,7 @@ const ClarityAssistant = (() => {
 
   function buildTasksToday() {
     const today = todayISO();
-    const due = allTasks().filter(t => t.status === 'pending' && t.dueDate === today);
+    const due = allTasks().filter(t => t.status === 'pending' && !t.noDeadline && t.dueDate === today);
     if (due.length === 0) return `Nothing due today. Good.`;
     const items = due.map(t =>
       `<li><span class="cd-tag cd-tag-today">Due Today</span><span class="cd-item-label">${escHtml(t.title)}</span><span class="cd-item-meta">${escHtml(t.subject)}</span></li>`
@@ -6060,9 +6160,9 @@ const ClarityAssistant = (() => {
   function buildTasksWeek() {
     const today = todayISO();
     const weekEnd = nDaysFromNow(7);
-    const upcoming = allTasks().filter(t => t.status === 'pending' && t.dueDate >= today && t.dueDate <= weekEnd);
+    const upcoming = allTasks().filter(t => t.status === 'pending' && !t.noDeadline && t.dueDate && t.dueDate >= today && t.dueDate <= weekEnd);
     if (upcoming.length === 0) return `Nothing due in the next 7 days.`;
-    const items = upcoming.sort((a, b) => a.dueDate.localeCompare(b.dueDate)).map(t => {
+    const items = upcoming.sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || '')).map(t => {
       const isToday = t.dueDate === today;
       const tag = isToday ? '<span class="cd-tag cd-tag-today">Today</span>' : '';
       return `<li>${tag}<span class="cd-item-label">${escHtml(t.title)}</span><span class="cd-item-meta">${escHtml(t.subject)} · Due ${fmtDate(t.dueDate)}</span></li>`;
@@ -6073,12 +6173,22 @@ const ClarityAssistant = (() => {
   function buildTasksAll() {
     const pending = allTasks().filter(t => t.status === 'pending');
     if (pending.length === 0) return `No pending tasks. Your desk is clear.`;
-    const today = todayISO();
-    const sorted = [...pending].sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+    const sorted = [...pending].sort((a, b) => {
+      const isOngoingA = !!a.noDeadline || (a.taskType === 'mission' && !a.dueDate);
+      const isOngoingB = !!b.noDeadline || (b.taskType === 'mission' && !b.dueDate);
+      if (isOngoingA && !isOngoingB) return 1;
+      if (!isOngoingA && isOngoingB) return -1;
+      if (isOngoingA && isOngoingB) return a.title.localeCompare(b.title);
+      return (a.dueDate || '').localeCompare(b.dueDate || '');
+    });
     const items = sorted.map(t => {
-      const isOverdue = t.dueDate < today;
-      const tag = isOverdue ? '<span class="cd-tag cd-tag-overdue">Overdue</span>' : '';
-      return `<li>${tag}<span class="cd-item-label">${escHtml(t.title)}</span><span class="cd-item-meta">${escHtml(t.subject)} · ${fmtDate(t.dueDate)}</span></li>`;
+      const isOngoing = !!t.noDeadline || (t.taskType === 'mission' && !t.dueDate);
+      const isOverdue = isTaskOverdue(t);
+      const tag = isOngoing
+        ? '<span class="cd-tag" style="background:rgba(147,51,234,0.14);color:var(--purple)">Mission</span>'
+        : isOverdue ? '<span class="cd-tag cd-tag-overdue">Overdue</span>' : '';
+      const meta = isOngoing ? `${escHtml(t.subject)} · Ongoing Mission` : `${escHtml(t.subject)} · Due ${fmtDate(t.dueDate)}`;
+      return `<li>${tag}<span class="cd-item-label">${escHtml(t.title)}</span><span class="cd-item-meta">${meta}</span></li>`;
     }).join('');
     return `<strong>${pending.length} pending task${pending.length !== 1 ? 's' : ''}:</strong><ul class="cd-list">${items}</ul>`;
   }
