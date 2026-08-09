@@ -2030,8 +2030,13 @@ function updateThemeSelector(theme) {
 const PAGES = ['dashboard', 'timetable', 'subjects', 'assignments', 'notices', 'resources', 'links', 'summary', 'settings', 'review'];
 const sectionHistory = [];
 
-function navigate(page, isBack = false) {
+function navigate(page, isBack = false, keepActiveSubject = false) {
   if (!PAGES.includes(page)) page = 'dashboard';
+
+  // Unless explicitly instructed to keep active subject, clear activeSubject state
+  if (!keepActiveSubject) {
+    state.activeSubject = null;
+  }
 
   const current = state.currentPage;
   if (!isBack && current && current !== page) {
@@ -2068,11 +2073,33 @@ function navigate(page, isBack = false) {
 }
 
 // Immediately attach to window so inline onclick handlers work without waiting for full script load
-window.navigateTo = function(page) { navigate(page, false); };
-window.navigate   = function(page) { navigate(page, false); };
+window.navigateTo = function(page) { navigate(page, false, false); };
+window.navigate   = function(page) { navigate(page, false, false); };
 window.navigateBack = function() {
+  // If currently inside a single subject hub detail view, back action returns to list or previous route
+  if (state.currentPage === 'subjects' && state.activeSubject) {
+    state.activeSubject = null;
+    if (sectionHistory.length > 0) {
+      const prev = sectionHistory.pop();
+      if (prev === 'subjects_overview' || prev === 'subjects') {
+        updateBackButtonUI();
+        renderSubjects();
+        return;
+      } else {
+        navigate(prev, true);
+        return;
+      }
+    } else {
+      updateBackButtonUI();
+      renderSubjects();
+      return;
+    }
+  }
+
   if (sectionHistory.length > 0) {
-    const prev = sectionHistory.pop();
+    let prev = sectionHistory.pop();
+    if (prev === 'subjects_overview') prev = 'subjects';
+    state.activeSubject = null;
     navigate(prev, true);
   }
 };
@@ -2080,7 +2107,8 @@ window.navigateBack = function() {
 function updateBackButtonUI() {
   const backBtn = document.getElementById('nav-back-btn');
   if (!backBtn) return;
-  if (sectionHistory.length > 0) {
+  const hasHistory = sectionHistory.length > 0 || (state.currentPage === 'subjects' && !!state.activeSubject);
+  if (hasHistory) {
     backBtn.style.display = 'inline-flex';
     backBtn.disabled = false;
   } else {
@@ -3741,8 +3769,30 @@ function renderTimetable() {
 
 // ── Subject Hub System ─────────────────────────────────────────
 window.openSubjectHub = function(subjName) {
+  if (!subjName) return;
+  const current = state.currentPage;
+  if (current === 'subjects' && !state.activeSubject) {
+    sectionHistory.push('subjects_overview');
+  } else if (current && current !== 'subjects') {
+    if (sectionHistory.length === 0 || sectionHistory[sectionHistory.length - 1] !== current) {
+      sectionHistory.push(current);
+    }
+  }
   state.activeSubject = subjName;
-  navigateTo('subjects');
+  navigate('subjects', false, true);
+};
+
+window.closeSubjectHub = function() {
+  state.activeSubject = null;
+  if (sectionHistory.length > 0 && sectionHistory[sectionHistory.length - 1] === 'subjects_overview') {
+    sectionHistory.pop();
+  }
+  if (state.currentPage === 'subjects') {
+    updateBackButtonUI();
+    renderSubjects();
+  } else {
+    navigateTo('subjects');
+  }
 };
 
 function getSubjectList() {
@@ -3964,7 +4014,7 @@ function renderSingleSubjectHub(el, subj, allSubjects) {
 
   el.innerHTML = `
     <div style="margin-bottom:16px">
-      <button class="btn btn-sm btn-secondary" onclick="state.activeSubject = null; renderSubjects()" style="margin-bottom:12px;font-size:0.8rem">
+      <button class="btn btn-sm btn-secondary" onclick="closeSubjectHub()" style="margin-bottom:12px;font-size:0.8rem;display:inline-flex;align-items:center;gap:6px">
         ← All Subjects
       </button>
 
