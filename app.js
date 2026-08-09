@@ -1497,7 +1497,7 @@ function pushLocalDataToCloud(uid) {
     customLinks:        safeGetStorage(KEY_CUSTOM_LINKS, null),
     assignmentStatuses: safeGetStorage(KEY_ASSIGNMENTS, {}),
     attendance:         safeGetStorage(KEY_ATTENDANCE, {}),
-    theme:              localStorage.getItem(KEY_THEME) || 'paper',
+    theme:              localStorage.getItem(KEY_THEME) || 'paper-slate',
     notificationPrefs:  safeGetStorage(KEY_NOTIF_PREFS, null),
     noticeChannels:     safeGetStorage(KEY_NOTICE_CHANNELS, null),
     updatedAt:          firebase.firestore.FieldValue.serverTimestamp()
@@ -1949,22 +1949,41 @@ const state = {
   customTasks:         loadCustomTasks(),   // persisted across reloads
 };
 
-// ── Theme ─────────────────────────────────────────────────────
-const ALL_THEMES = ['paper', 'cloud', 'stone', 'quiet-dark', 'cafe-night'];
+// ── Theme (6 Distinct Environments) ───────────────────────────
+const ALL_THEMES = [
+  'paper-slate',
+  'midnight-ink',
+  'espresso-desk',
+  'sandstone-notes',
+  'forest-study',
+  'misty-mint'
+];
+
 const LEGACY_THEME_MAP = {
-  'soft-neutral': 'paper', light: 'paper',
-  'mist-blue': 'cloud', glass: 'cloud',
-  sandstone: 'stone', emerald: 'stone',
-  'warm-study': 'stone', 'espresso-paper': 'stone',
-  dark: 'quiet-dark', 'cocoa-night': 'quiet-dark', sunset: 'quiet-dark',
-  cafe: 'cafe-night',
+  'paper':           'paper-slate',
+  'soft-neutral':    'paper-slate',
+  'light':           'paper-slate',
+  'cloud':           'paper-slate',
+  'mist-blue':       'paper-slate',
+  'glass':           'paper-slate',
+  'quiet-dark':      'midnight-ink',
+  'dark':            'midnight-ink',
+  'cocoa-night':     'espresso-desk',
+  'cafe-night':      'espresso-desk',
+  'cafe':            'espresso-desk',
+  'espresso-paper':  'espresso-desk',
+  'stone':           'sandstone-notes',
+  'sandstone':       'sandstone-notes',
+  'warm-study':      'sandstone-notes',
+  'sunset':          'sandstone-notes',
+  'emerald':         'forest-study'
 };
 
 function initTheme() {
-  const saved       = localStorage.getItem(KEY_THEME);
-  let theme         = saved || 'paper';
+  const saved = localStorage.getItem(KEY_THEME);
+  let theme   = saved || 'paper-slate';
   if (LEGACY_THEME_MAP[theme]) theme = LEGACY_THEME_MAP[theme];
-  if (!ALL_THEMES.includes(theme)) theme = 'paper';
+  if (!ALL_THEMES.includes(theme)) theme = 'paper-slate';
   
   if (!saved || saved !== theme) {
     localStorage.setItem(KEY_THEME, theme);
@@ -1975,7 +1994,7 @@ function initTheme() {
 }
 
 function toggleTheme() {
-  let current = document.documentElement.getAttribute('data-theme') || 'paper';
+  let current = document.documentElement.getAttribute('data-theme') || 'paper-slate';
   if (LEGACY_THEME_MAP[current]) current = LEGACY_THEME_MAP[current];
   const nextIdx = (ALL_THEMES.indexOf(current) + 1) % ALL_THEMES.length;
   const next    = ALL_THEMES[nextIdx];
@@ -5142,28 +5161,32 @@ function renderSettings() {
     <div class="section-heading">${icons.layers()} Appearance</div>
     <div class="card" style="padding:20px;margin-bottom:20px">
       <div class="form-group" style="margin-bottom:0">
-        <label class="form-label" style="margin-bottom:6px">Choose a palette</label>
-        <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:12px">Five distinct themes. Each saves automatically and restores on your next visit.</div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(148px, 1fr));gap:10px">
-          <button class="filter-chip ${['paper','soft-neutral','light'].includes(document.documentElement?.getAttribute('data-theme') || 'paper')?'active':''}" onclick="setTheme('paper')" style="justify-content:flex-start">
-            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#147980;margin-right:6px"></span>
-            📄 Paper
+        <label class="form-label" style="margin-bottom:6px">Choose a workspace environment</label>
+        <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:14px">Six curated palettes with distinct atmospheres. Saves automatically and restores on your next visit.</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(154px, 1fr));gap:10px">
+          <button class="filter-chip ${(document.documentElement?.getAttribute('data-theme') || 'paper-slate') === 'paper-slate' ? 'active' : ''}" onclick="setTheme('paper-slate')" style="justify-content:flex-start">
+            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#2563eb;margin-right:6px"></span>
+            📄 Paper Slate
           </button>
-          <button class="filter-chip ${['cloud','mist-blue','glass'].includes(document.documentElement?.getAttribute('data-theme'))?'active':''}" onclick="setTheme('cloud')" style="justify-content:flex-start">
-            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#1e3a8a;margin-right:6px"></span>
-            ☁️ Cloud
+          <button class="filter-chip ${document.documentElement?.getAttribute('data-theme') === 'midnight-ink' ? 'active' : ''}" onclick="setTheme('midnight-ink')" style="justify-content:flex-start">
+            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#6366f1;margin-right:6px"></span>
+            🌌 Midnight Ink
           </button>
-          <button class="filter-chip ${['stone','sandstone','emerald','warm-study','espresso-paper'].includes(document.documentElement?.getAttribute('data-theme'))?'active':''}" onclick="setTheme('stone')" style="justify-content:flex-start">
-            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#2c6e63;margin-right:6px"></span>
-            🪨 Stone
-          </button>
-          <button class="filter-chip ${['quiet-dark','dark','cocoa-night','sunset'].includes(document.documentElement?.getAttribute('data-theme'))?'active':''}" onclick="setTheme('quiet-dark')" style="justify-content:flex-start">
-            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#52719a;margin-right:6px"></span>
-            🌒 Quiet Dark
-          </button>
-          <button class="filter-chip ${['cafe-night','cafe'].includes(document.documentElement?.getAttribute('data-theme'))?'active':''}" onclick="setTheme('cafe-night')" style="justify-content:flex-start">
+          <button class="filter-chip ${document.documentElement?.getAttribute('data-theme') === 'espresso-desk' ? 'active' : ''}" onclick="setTheme('espresso-desk')" style="justify-content:flex-start">
             <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#d97706;margin-right:6px"></span>
-            ☕️ Café Night
+            ☕ Espresso Desk
+          </button>
+          <button class="filter-chip ${document.documentElement?.getAttribute('data-theme') === 'sandstone-notes' ? 'active' : ''}" onclick="setTheme('sandstone-notes')" style="justify-content:flex-start">
+            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#c25e2e;margin-right:6px"></span>
+            📜 Sandstone Notes
+          </button>
+          <button class="filter-chip ${document.documentElement?.getAttribute('data-theme') === 'forest-study' ? 'active' : ''}" onclick="setTheme('forest-study')" style="justify-content:flex-start">
+            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#10b981;margin-right:6px"></span>
+            🌲 Forest Study
+          </button>
+          <button class="filter-chip ${document.documentElement?.getAttribute('data-theme') === 'misty-mint' ? 'active' : ''}" onclick="setTheme('misty-mint')" style="justify-content:flex-start">
+            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#0d9488;margin-right:6px"></span>
+            🍃 Misty Mint
           </button>
         </div>
       </div>
@@ -5397,7 +5420,7 @@ function exportData() {
     assignmentStatuses: safeGetStorage(KEY_ASSIGNMENTS, {}),
     notificationPrefs:  loadNotifPrefs(),
     noticeChannels:     loadNoticeChannels(),
-    theme:              localStorage.getItem(KEY_THEME) || 'paper',
+    theme:              localStorage.getItem(KEY_THEME) || 'paper-slate',
     exportedAt:         new Date().toISOString(),
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });

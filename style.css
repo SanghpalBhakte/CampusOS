@@ -1,36 +1,40 @@
 /* ============================================================
-   Clarity Desk — Design System & Multi-Theme Styles
-   5 Themes: Paper · Cloud · Stone · Quiet Dark · Café Night
+   Clarity Desk — 6 Distinct Themes Design System
+   1. Paper Slate   (Clean, neutral, readable, academic)
+   2. Midnight Ink  (True near-black / midnight dark, electric indigo)
+   3. Espresso Desk (Warm, premium, cozy café dark mahogany & amber)
+   4. Sandstone Notes (Soft, warm, notebook-like parchment & terracotta)
+   5. Forest Study  (Deep, calm, botanical evergreen & emerald)
+   6. Misty Mint    (Fresh, airy, light eucalyptus sage)
    ============================================================ */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
-/* ── 1) Paper — Default Theme (Warm Off-White, Graphite, Muted Teal) ── */
+/* ── 1) Paper Slate — Default (Clean, Neutral, Academic Slate) ── */
 :root,
-[data-theme="paper"],
-[data-theme="soft-neutral"],
-[data-theme="light"] {
+[data-theme="paper-slate"],
+[data-theme="paper"] {
   --font: 'Inter', system-ui, -apple-system, sans-serif;
 
-  /* Surfaces — Warm Off-White Editorial Paper */
-  --bg:            #f8f6f0;
+  /* Surfaces — Crisp, Neutral Slate Paper */
+  --bg:            #f8fafc;
   --surface:       #ffffff;
-  --surface-2:     #f0ece3;
-  --surface-3:     #e6e2d8;
-  --border:        #e3ded3;
-  --border-light:  #ebe7dc;
-  --border-btn:    #d5cfc2;
+  --surface-2:     #f1f5f9;
+  --surface-3:     #e2e8f0;
+  --border:        #cbd5e1;
+  --border-light:  #e2e8f0;
+  --border-btn:    #94a3b8;
 
-  /* Text — Muted Graphite */
-  --text-primary:  #232628;
-  --text-secondary:#52575c;
-  --text-muted:    #767c82;
+  /* Text — Deep Charcoal & Slate */
+  --text-primary:  #0f172a;
+  --text-secondary:#334155;
+  --text-muted:    #64748b;
 
-  /* Accent — Muted Teal */
-  --accent:        #147980;
-  --accent-light:  #1da1ab;
-  --accent-dim:    rgba(20, 121, 128, 0.08);
-  --accent-hover:  #0e5c62;
+  /* Accent — Academic Royal Slate Blue */
+  --accent:        #2563eb;
+  --accent-light:  #3b82f6;
+  --accent-dim:    rgba(37, 99, 235, 0.08);
+  --accent-hover:  #1d4ed8;
 
   /* Status Colors */
   --green:  #10b981;
@@ -41,7 +45,7 @@
   --pink:   #ec4899;
 
   /* Banner */
-  --banner-bg: linear-gradient(135deg, #0e5c62 0%, #1a2327 100%);
+  --banner-bg: linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%);
   --banner-text: #ffffff;
 
   --topbar-bg:      var(--surface);
@@ -66,80 +70,22 @@
   --radius-xs: 6px;
 
   /* Shadows */
-  --shadow:    0 1px 3px rgba(35, 38, 40, 0.05), 0 4px 12px rgba(35, 38, 40, 0.03);
-  --shadow-md: 0 4px 6px -1px rgba(35, 38, 40, 0.08), 0 12px 24px -4px rgba(35, 38, 40, 0.06);
+  --shadow:    0 1px 3px rgba(15, 23, 42, 0.05), 0 4px 12px rgba(15, 23, 42, 0.03);
+  --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.08), 0 12px 24px -4px rgba(15, 23, 42, 0.06);
 
   /* Transitions */
   --ease: 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* ── 2) Cloud — Clean Academic (Slate Gray, Pure White, Restrained Deep Navy) ── */
-[data-theme="cloud"],
-[data-theme="mist-blue"],
-[data-theme="glass"] {
-  --bg:            #f1f5f9;
-  --surface:       #ffffff;
-  --surface-2:     #e2e8f0;
-  --surface-3:     #cbd5e1;
-  --border:        #cbd5e1;
-  --border-light:  #e2e8f0;
-  --border-btn:    #94a3b8;
-
-  --text-primary:  #0f172a;
-  --text-secondary:#334155;
-  --text-muted:    #64748b;
-
-  --accent:        #2563eb;
-  --accent-light:  #3b82f6;
-  --accent-dim:    rgba(37, 99, 235, 0.08);
-  --accent-hover:  #1d4ed8;
-
-  --banner-bg: linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%);
-  --banner-text: #ffffff;
-
-  --shadow:    0 1px 3px rgba(15, 23, 42, 0.05), 0 4px 12px rgba(15, 23, 42, 0.03);
-  --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.08), 0 12px 24px -4px rgba(15, 23, 42, 0.06);
-}
-
-/* ── 3) Stone — Sand & Mineral Neutrals with Desaturated Teal Accent ── */
-[data-theme="stone"],
-[data-theme="sandstone"],
-[data-theme="emerald"] {
-  --bg:            #f3f0e8;
-  --surface:       #faf8f3;
-  --surface-2:     #e6e2d6;
-  --surface-3:     #d8d3c5;
-  --border:        #d5d0c3;
-  --border-light:  #e3ded2;
-  --border-btn:    #c5bfae;
-
-  --text-primary:  #2a2723;
-  --text-secondary:#5a554c;
-  --text-muted:    #7e786e;
-
-  --accent:        #2c6e63;
-  --accent-light:  #3b8a7d;
-  --accent-dim:    rgba(44, 110, 99, 0.08);
-  --accent-hover:  #1e4d45;
-
-  --banner-bg: linear-gradient(135deg, #1e4d45 0%, #1e1c19 100%);
-  --banner-text: #ffffff;
-
-  --shadow:    0 1px 3px rgba(42, 39, 35, 0.05), 0 4px 12px rgba(42, 39, 35, 0.03);
-  --shadow-md: 0 4px 6px -1px rgba(42, 39, 35, 0.08), 0 12px 24px -4px rgba(42, 39, 35, 0.06);
-}
-
-/* ── 4) Quiet Dark — Low-Glare Operational Night (Dark Obsidian Slate & Desaturated Indigo) ── */
-[data-theme="quiet-dark"],
-[data-theme="dark"],
-[data-theme="cocoa-night"],
-[data-theme="sunset"] {
-  --bg:            #0f172a;
-  --surface:       #1e293b;
-  --surface-2:     #334155;
-  --surface-3:     #475569;
+/* ── 2) Midnight Ink — True Near-Black Midnight (Obsidian Dark & Electric Indigo) ── */
+[data-theme="midnight-ink"],
+[data-theme="quiet-dark"] {
+  --bg:            #08090d;
+  --surface:       #11131a;
+  --surface-2:     #1a1d27;
+  --surface-3:     #262b3a;
   --border:        rgba(255, 255, 255, 0.12);
-  --border-light:  rgba(255, 255, 255, 0.07);
+  --border-light:  rgba(255, 255, 255, 0.06);
   --border-btn:    rgba(255, 255, 255, 0.24);
 
   --text-primary:  #f8fafc;
@@ -158,32 +104,31 @@
   --purple: #a78bfa;
   --pink:   #f472b6;
 
-  --banner-bg: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  --banner-bg: linear-gradient(135deg, #181b2a 0%, #08090d 100%);
   --banner-text: #f8fafc;
 
-  --shadow:    0 2px 8px rgba(0, 0, 0, 0.32);
-  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.50);
+  --shadow:    0 2px 8px rgba(0, 0, 0, 0.45);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.65);
 }
 
-/* ── 5) Café Night — Cozy Espresso Evening (Warm Charcoal Espresso & Amber Caramel) ── */
+/* ── 3) Espresso Desk — Warm Premium Café (Dark Roast Mahogany & Golden Caramel) ── */
+[data-theme="espresso-desk"],
 [data-theme="cafe-night"] {
-  --font: 'Inter', system-ui, -apple-system, sans-serif;
+  --bg:            #171310;
+  --surface:       #221b16;
+  --surface-2:     #2d241e;
+  --surface-3:     #3b3028;
+  --border:        rgba(245, 230, 211, 0.13);
+  --border-light:  rgba(245, 230, 211, 0.07);
+  --border-btn:    rgba(245, 230, 211, 0.25);
 
-  --bg:            #161412;
-  --surface:       #201c18;
-  --surface-2:     #2a241e;
-  --surface-3:     #362e26;
-  --border:        rgba(245, 237, 226, 0.12);
-  --border-light:  rgba(245, 237, 226, 0.07);
-  --border-btn:    rgba(245, 237, 226, 0.24);
-
-  --text-primary:  #f5ede2;
-  --text-secondary:#d4c6b5;
-  --text-muted:    #9e8e7c;
+  --text-primary:  #fbf0e4;
+  --text-secondary:#d8c2ad;
+  --text-muted:    #9e8571;
 
   --accent:        #d97706;
   --accent-light:  #f59e0b;
-  --accent-dim:    rgba(217, 119, 6, 0.16);
+  --accent-dim:    rgba(217, 119, 6, 0.18);
   --accent-hover:  #b45309;
 
   --green:  #34d399;
@@ -193,16 +138,112 @@
   --purple: #c084fc;
   --pink:   #f472b6;
 
-  --banner-bg: linear-gradient(135deg, #2a1e16 0%, #161412 100%);
-  --banner-text: #f5ede2;
+  --banner-bg: linear-gradient(135deg, #321e14 0%, #171310 100%);
+  --banner-text: #fbf0e4;
 
-  --shadow:    0 2px 8px rgba(0, 0, 0, 0.38);
-  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.55);
-  --ease: 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  --shadow:    0 2px 8px rgba(0, 0, 0, 0.42);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.60);
 }
 
-/* Warm Study removed — too visually similar to Stone.
-   Users on 'warm-study' will be remapped to 'stone' via LEGACY_THEME_MAP. */
+/* ── 4) Sandstone Notes — Soft Organic Notebook (Parchment Linen & Warm Terracotta) ── */
+[data-theme="sandstone-notes"],
+[data-theme="stone"] {
+  --bg:            #f5f0e6;
+  --surface:       #fffdfa;
+  --surface-2:     #eae3d3;
+  --surface-3:     #ddd4c1;
+  --border:        #d8cdba;
+  --border-light:  #e8dfcd;
+  --border-btn:    #c4b79f;
+
+  --text-primary:  #2d241e;
+  --text-secondary:#5e5045;
+  --text-muted:    #887768;
+
+  --accent:        #c25e2e;
+  --accent-light:  #d97341;
+  --accent-dim:    rgba(194, 94, 46, 0.10);
+  --accent-hover:  #9e4419;
+
+  --green:  #10b981;
+  --yellow: #d97706;
+  --red:    #dc2626;
+  --blue:   #0284c7;
+  --purple: #7c3aed;
+  --pink:   #db2777;
+
+  --banner-bg: linear-gradient(135deg, #4a2818 0%, #2d241e 100%);
+  --banner-text: #fffdfa;
+
+  --shadow:    0 1px 3px rgba(45, 36, 30, 0.05), 0 4px 12px rgba(45, 36, 30, 0.03);
+  --shadow-md: 0 4px 6px -1px rgba(45, 36, 30, 0.08), 0 12px 24px -4px rgba(45, 36, 30, 0.06);
+}
+
+/* ── 5) Forest Study — Deep Botanical Calm (Evergreen Pine Night & Emerald Glow) ── */
+[data-theme="forest-study"] {
+  --bg:            #0a1410;
+  --surface:       #121f19;
+  --surface-2:     #1a2d24;
+  --surface-3:     #253e32;
+  --border:        rgba(167, 243, 208, 0.14);
+  --border-light:  rgba(167, 243, 208, 0.08);
+  --border-btn:    rgba(167, 243, 208, 0.25);
+
+  --text-primary:  #ecfdf5;
+  --text-secondary:#a7f3d0;
+  --text-muted:    #6ee7b7;
+
+  --accent:        #10b981;
+  --accent-light:  #34d399;
+  --accent-dim:    rgba(16, 185, 129, 0.18);
+  --accent-hover:  #059669;
+
+  --green:  #34d399;
+  --yellow: #fbbf24;
+  --red:    #f87171;
+  --blue:   #38bdf8;
+  --purple: #c084fc;
+  --pink:   #f472b6;
+
+  --banner-bg: linear-gradient(135deg, #133a29 0%, #0a1410 100%);
+  --banner-text: #ecfdf5;
+
+  --shadow:    0 2px 8px rgba(0, 0, 0, 0.45);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.65);
+}
+
+/* ── 6) Misty Mint — Fresh Airy Eucalyptus (Cool Sage Mint & Deep Spruce) ── */
+[data-theme="misty-mint"] {
+  --bg:            #edf7f4;
+  --surface:       #ffffff;
+  --surface-2:     #dcf0ea;
+  --surface-3:     #cbe6de;
+  --border:        #c0ded4;
+  --border-light:  #d8ede6;
+  --border-btn:    #9ec7bb;
+
+  --text-primary:  #133830;
+  --text-secondary:#336357;
+  --text-muted:    #528377;
+
+  --accent:        #0d9488;
+  --accent-light:  #14b8a6;
+  --accent-dim:    rgba(13, 148, 136, 0.09);
+  --accent-hover:  #0f766e;
+
+  --green:  #059669;
+  --yellow: #d97706;
+  --red:    #e11d48;
+  --blue:   #0284c7;
+  --purple: #7c3aed;
+  --pink:   #db2777;
+
+  --banner-bg: linear-gradient(135deg, #115e59 0%, #133830 100%);
+  --banner-text: #ffffff;
+
+  --shadow:    0 1px 3px rgba(19, 56, 48, 0.05), 0 4px 12px rgba(19, 56, 48, 0.03);
+  --shadow-md: 0 4px 6px -1px rgba(19, 56, 48, 0.08), 0 12px 24px -4px rgba(19, 56, 48, 0.06);
+}
 
 /* ── Reset & Base ───────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }

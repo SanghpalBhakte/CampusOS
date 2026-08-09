@@ -6,18 +6,18 @@
   <script>
     (function() {
       try {
-        var t = localStorage.getItem('cos_theme') || 'paper';
+        var t = localStorage.getItem('cos_theme') || 'paper-slate';
         var m = {
-          'soft-neutral': 'paper', light: 'paper',
-          'mist-blue': 'cloud', glass: 'cloud',
-          sandstone: 'stone', emerald: 'stone',
-          'warm-study': 'stone', 'espresso-paper': 'stone',
-          dark: 'quiet-dark', 'cocoa-night': 'quiet-dark', sunset: 'quiet-dark',
-          cafe: 'cafe-night'
+          'paper': 'paper-slate', 'soft-neutral': 'paper-slate', 'light': 'paper-slate',
+          'cloud': 'paper-slate', 'mist-blue': 'paper-slate', 'glass': 'paper-slate',
+          'stone': 'sandstone-notes', 'sandstone': 'sandstone-notes', 'warm-study': 'sandstone-notes', 'sunset': 'sandstone-notes',
+          'espresso-paper': 'espresso-desk', 'cafe': 'espresso-desk', 'cafe-night': 'espresso-desk', 'cocoa-night': 'espresso-desk',
+          'quiet-dark': 'midnight-ink', 'dark': 'midnight-ink',
+          'emerald': 'forest-study'
         };
         if (m[t]) t = m[t];
-        var valid = ['paper', 'cloud', 'stone', 'quiet-dark', 'cafe-night'];
-        if (!valid.includes(t)) t = 'paper';
+        var valid = ['paper-slate', 'midnight-ink', 'espresso-desk', 'sandstone-notes', 'forest-study', 'misty-mint'];
+        if (!valid.includes(t)) t = 'paper-slate';
         document.documentElement.setAttribute('data-theme', t);
       } catch(e) {}
     })();
@@ -104,11 +104,12 @@
         <span>Ask Desk</span>
       </button>
       <select id="theme-selector" class="theme-selector-topbar" aria-label="Select visual theme" title="Select visual theme" onchange="setTheme(this.value)">
-        <option value="paper">📄 Paper</option>
-        <option value="cloud">☁️ Cloud</option>
-        <option value="stone">🪨 Stone</option>
-        <option value="quiet-dark">🌒 Quiet Dark</option>
-        <option value="cafe-night">☕️ Café Night</option>
+        <option value="paper-slate">📄 Paper Slate</option>
+        <option value="midnight-ink">🌌 Midnight Ink</option>
+        <option value="espresso-desk">☕ Espresso Desk</option>
+        <option value="sandstone-notes">📜 Sandstone Notes</option>
+        <option value="forest-study">🌲 Forest Study</option>
+        <option value="misty-mint">🍃 Misty Mint</option>
       </select>
       <div class="avatar" id="topbar-avatar" onclick="navigateTo('settings')" title="Your Profile" style="cursor:pointer">?</div>
     </div>
@@ -373,8 +374,8 @@
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
 <!-- Firebase Config & App Script -->
-<script src="firebase-config.js?v=66"></script>
-<script type="module" src="app.js?v=66"></script>
+<script src="firebase-config.js?v=67"></script>
+<script type="module" src="app.js?v=67"></script>
 
 </body>
 </html>
