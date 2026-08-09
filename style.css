@@ -1,10 +1,10 @@
 /* ============================================================
    Clarity Desk — 6 Distinct Themes Design System
    1. Paper Slate     (Clean, neutral, readable, academic)
-   2. Midnight Ink    (True near-black / midnight dark, electric indigo)
+   2. Midnight Ink    (True near-black obsidian & electric indigo)
    3. Espresso Desk   (Warm, premium, cozy café dark mahogany & amber)
    4. Sandstone Notes (Soft, warm, notebook-like parchment & terracotta)
-   5. Nordic Frost    (Calm deep arctic navy slate & glacial steel blue)
+   5. Nordic Frost    (Crisp glacial frost ice & polar azure)
    6. Misty Mint      (Soft, airy, light eucalyptus sage mist)
    ============================================================ */
 
@@ -179,38 +179,38 @@
   --shadow-md: 0 4px 6px -1px rgba(45, 36, 30, 0.08), 0 12px 24px -4px rgba(45, 36, 30, 0.06);
 }
 
-/* ── 5) Nordic Frost — Calm Arctic Twilight (Deep Navy Slate & Glacial Steel Blue) ── */
+/* ── 5) Nordic Frost — Crisp Glacial Frost (Icy Arctic Mist & Polar Azure) ── */
 [data-theme="nordic-frost"],
 [data-theme="forest-study"] {
-  --bg:            #0a1017;
-  --surface:       #111b26;
-  --surface-2:     #182635;
-  --surface-3:     #223447;
-  --border:        rgba(186, 230, 253, 0.12);
-  --border-light:  rgba(186, 230, 253, 0.06);
-  --border-btn:    rgba(186, 230, 253, 0.24);
+  --bg:            #eaf0f6;
+  --surface:       #ffffff;
+  --surface-2:     #dae6f2;
+  --surface-3:     #c6d8e8;
+  --border:        #b3cde0;
+  --border-light:  #d0e0ed;
+  --border-btn:    #8bb2ce;
 
-  --text-primary:  #f0f6fc;
-  --text-secondary:#94a3b8;
-  --text-muted:    #64748b;
+  --text-primary:  #0b2138;
+  --text-secondary:#2b4965;
+  --text-muted:    #527494;
 
-  --accent:        #38bdf8;
-  --accent-light:  #60a5fa;
-  --accent-dim:    rgba(56, 189, 248, 0.14);
-  --accent-hover:  #0284c7;
+  --accent:        #0284c7;
+  --accent-light:  #38bdf8;
+  --accent-dim:    rgba(2, 132, 199, 0.09);
+  --accent-hover:  #0369a1;
 
-  --green:  #34d399;
-  --yellow: #fbbf24;
-  --red:    #f87171;
-  --blue:   #38bdf8;
-  --purple: #a78bfa;
-  --pink:   #f472b6;
+  --green:  #059669;
+  --yellow: #d97706;
+  --red:    #dc2626;
+  --blue:   #0284c7;
+  --purple: #7c3aed;
+  --pink:   #db2777;
 
-  --banner-bg: linear-gradient(135deg, #15273b 0%, #0a1017 100%);
-  --banner-text: #f0f6fc;
+  --banner-bg: linear-gradient(135deg, #0369a1 0%, #0b2138 100%);
+  --banner-text: #ffffff;
 
-  --shadow:    0 2px 8px rgba(0, 0, 0, 0.45);
-  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.65);
+  --shadow:    0 1px 3px rgba(11, 33, 56, 0.05), 0 4px 12px rgba(11, 33, 56, 0.03);
+  --shadow-md: 0 4px 6px -1px rgba(11, 33, 56, 0.08), 0 12px 24px -4px rgba(11, 33, 56, 0.06);
 }
 
 /* ── 6) Misty Mint — Soft Airy Eucalyptus (Calm Sage Mist & Deep Sea-Pine) ── */

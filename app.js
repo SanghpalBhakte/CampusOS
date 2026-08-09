@@ -5191,7 +5191,7 @@ function renderSettings() {
             📜 Sandstone Notes
           </button>
           <button class="filter-chip ${document.documentElement?.getAttribute('data-theme') === 'nordic-frost' ? 'active' : ''}" onclick="setTheme('nordic-frost')" style="justify-content:flex-start">
-            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#38bdf8;margin-right:6px"></span>
+            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#0284c7;margin-right:6px"></span>
             ❄️ Nordic Frost
           </button>
           <button class="filter-chip ${document.documentElement?.getAttribute('data-theme') === 'misty-mint' ? 'active' : ''}" onclick="setTheme('misty-mint')" style="justify-content:flex-start">
