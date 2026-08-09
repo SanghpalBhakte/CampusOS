@@ -1955,7 +1955,7 @@ const ALL_THEMES = [
   'midnight-ink',
   'espresso-desk',
   'sandstone-notes',
-  'forest-study',
+  'nordic-frost',
   'misty-mint'
 ];
 
@@ -1976,7 +1976,8 @@ const LEGACY_THEME_MAP = {
   'sandstone':       'sandstone-notes',
   'warm-study':      'sandstone-notes',
   'sunset':          'sandstone-notes',
-  'emerald':         'forest-study'
+  'forest-study':    'nordic-frost',
+  'emerald':         'nordic-frost'
 };
 
 function initTheme() {
@@ -5180,12 +5181,12 @@ function renderSettings() {
             <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#c25e2e;margin-right:6px"></span>
             📜 Sandstone Notes
           </button>
-          <button class="filter-chip ${document.documentElement?.getAttribute('data-theme') === 'forest-study' ? 'active' : ''}" onclick="setTheme('forest-study')" style="justify-content:flex-start">
-            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#10b981;margin-right:6px"></span>
-            🌲 Forest Study
+          <button class="filter-chip ${document.documentElement?.getAttribute('data-theme') === 'nordic-frost' ? 'active' : ''}" onclick="setTheme('nordic-frost')" style="justify-content:flex-start">
+            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#38bdf8;margin-right:6px"></span>
+            ❄️ Nordic Frost
           </button>
           <button class="filter-chip ${document.documentElement?.getAttribute('data-theme') === 'misty-mint' ? 'active' : ''}" onclick="setTheme('misty-mint')" style="justify-content:flex-start">
-            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#0d9488;margin-right:6px"></span>
+            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#1b7a6d;margin-right:6px"></span>
             🍃 Misty Mint
           </button>
         </div>

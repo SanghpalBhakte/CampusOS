@@ -13,10 +13,10 @@
           'stone': 'sandstone-notes', 'sandstone': 'sandstone-notes', 'warm-study': 'sandstone-notes', 'sunset': 'sandstone-notes',
           'espresso-paper': 'espresso-desk', 'cafe': 'espresso-desk', 'cafe-night': 'espresso-desk', 'cocoa-night': 'espresso-desk',
           'quiet-dark': 'midnight-ink', 'dark': 'midnight-ink',
-          'emerald': 'forest-study'
+          'forest-study': 'nordic-frost', 'emerald': 'nordic-frost'
         };
         if (m[t]) t = m[t];
-        var valid = ['paper-slate', 'midnight-ink', 'espresso-desk', 'sandstone-notes', 'forest-study', 'misty-mint'];
+        var valid = ['paper-slate', 'midnight-ink', 'espresso-desk', 'sandstone-notes', 'nordic-frost', 'misty-mint'];
         if (!valid.includes(t)) t = 'paper-slate';
         document.documentElement.setAttribute('data-theme', t);
       } catch(e) {}
@@ -108,7 +108,7 @@
         <option value="midnight-ink">🌌 Midnight Ink</option>
         <option value="espresso-desk">☕ Espresso Desk</option>
         <option value="sandstone-notes">📜 Sandstone Notes</option>
-        <option value="forest-study">🌲 Forest Study</option>
+        <option value="nordic-frost">❄️ Nordic Frost</option>
         <option value="misty-mint">🍃 Misty Mint</option>
       </select>
       <div class="avatar" id="topbar-avatar" onclick="navigateTo('settings')" title="Your Profile" style="cursor:pointer">?</div>
@@ -374,8 +374,8 @@
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
 <!-- Firebase Config & App Script -->
-<script src="firebase-config.js?v=67"></script>
-<script type="module" src="app.js?v=67"></script>
+<script src="firebase-config.js?v=68"></script>
+<script type="module" src="app.js?v=68"></script>
 
 </body>
 </html>

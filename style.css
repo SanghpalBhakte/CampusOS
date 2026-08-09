@@ -1,11 +1,11 @@
 /* ============================================================
    Clarity Desk — 6 Distinct Themes Design System
-   1. Paper Slate   (Clean, neutral, readable, academic)
-   2. Midnight Ink  (True near-black / midnight dark, electric indigo)
-   3. Espresso Desk (Warm, premium, cozy café dark mahogany & amber)
+   1. Paper Slate     (Clean, neutral, readable, academic)
+   2. Midnight Ink    (True near-black / midnight dark, electric indigo)
+   3. Espresso Desk   (Warm, premium, cozy café dark mahogany & amber)
    4. Sandstone Notes (Soft, warm, notebook-like parchment & terracotta)
-   5. Forest Study  (Deep, calm, botanical evergreen & emerald)
-   6. Misty Mint    (Fresh, airy, light eucalyptus sage)
+   5. Nordic Frost    (Calm deep arctic navy slate & glacial steel blue)
+   6. Misty Mint      (Soft, airy, light eucalyptus sage mist)
    ============================================================ */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
@@ -179,57 +179,58 @@
   --shadow-md: 0 4px 6px -1px rgba(45, 36, 30, 0.08), 0 12px 24px -4px rgba(45, 36, 30, 0.06);
 }
 
-/* ── 5) Forest Study — Deep Botanical Calm (Evergreen Pine Night & Emerald Glow) ── */
+/* ── 5) Nordic Frost — Calm Arctic Twilight (Deep Navy Slate & Glacial Steel Blue) ── */
+[data-theme="nordic-frost"],
 [data-theme="forest-study"] {
-  --bg:            #0a1410;
-  --surface:       #121f19;
-  --surface-2:     #1a2d24;
-  --surface-3:     #253e32;
-  --border:        rgba(167, 243, 208, 0.14);
-  --border-light:  rgba(167, 243, 208, 0.08);
-  --border-btn:    rgba(167, 243, 208, 0.25);
+  --bg:            #0a1017;
+  --surface:       #111b26;
+  --surface-2:     #182635;
+  --surface-3:     #223447;
+  --border:        rgba(186, 230, 253, 0.12);
+  --border-light:  rgba(186, 230, 253, 0.06);
+  --border-btn:    rgba(186, 230, 253, 0.24);
 
-  --text-primary:  #ecfdf5;
-  --text-secondary:#a7f3d0;
-  --text-muted:    #6ee7b7;
+  --text-primary:  #f0f6fc;
+  --text-secondary:#94a3b8;
+  --text-muted:    #64748b;
 
-  --accent:        #10b981;
-  --accent-light:  #34d399;
-  --accent-dim:    rgba(16, 185, 129, 0.18);
-  --accent-hover:  #059669;
+  --accent:        #38bdf8;
+  --accent-light:  #60a5fa;
+  --accent-dim:    rgba(56, 189, 248, 0.14);
+  --accent-hover:  #0284c7;
 
   --green:  #34d399;
   --yellow: #fbbf24;
   --red:    #f87171;
   --blue:   #38bdf8;
-  --purple: #c084fc;
+  --purple: #a78bfa;
   --pink:   #f472b6;
 
-  --banner-bg: linear-gradient(135deg, #133a29 0%, #0a1410 100%);
-  --banner-text: #ecfdf5;
+  --banner-bg: linear-gradient(135deg, #15273b 0%, #0a1017 100%);
+  --banner-text: #f0f6fc;
 
   --shadow:    0 2px 8px rgba(0, 0, 0, 0.45);
   --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.65);
 }
 
-/* ── 6) Misty Mint — Fresh Airy Eucalyptus (Cool Sage Mint & Deep Spruce) ── */
+/* ── 6) Misty Mint — Soft Airy Eucalyptus (Calm Sage Mist & Deep Sea-Pine) ── */
 [data-theme="misty-mint"] {
-  --bg:            #edf7f4;
+  --bg:            #f0f5f3;
   --surface:       #ffffff;
-  --surface-2:     #dcf0ea;
-  --surface-3:     #cbe6de;
-  --border:        #c0ded4;
-  --border-light:  #d8ede6;
-  --border-btn:    #9ec7bb;
+  --surface-2:     #e2ebe7;
+  --surface-3:     #d2dfda;
+  --border:        #c4d4ce;
+  --border-light:  #dbe6e1;
+  --border-btn:    #a3bcb2;
 
-  --text-primary:  #133830;
-  --text-secondary:#336357;
-  --text-muted:    #528377;
+  --text-primary:  #182824;
+  --text-secondary:#3e544e;
+  --text-muted:    #637b74;
 
-  --accent:        #0d9488;
-  --accent-light:  #14b8a6;
-  --accent-dim:    rgba(13, 148, 136, 0.09);
-  --accent-hover:  #0f766e;
+  --accent:        #1b7a6d;
+  --accent-light:  #259687;
+  --accent-dim:    rgba(27, 122, 109, 0.08);
+  --accent-hover:  #135c52;
 
   --green:  #059669;
   --yellow: #d97706;
@@ -238,11 +239,11 @@
   --purple: #7c3aed;
   --pink:   #db2777;
 
-  --banner-bg: linear-gradient(135deg, #115e59 0%, #133830 100%);
+  --banner-bg: linear-gradient(135deg, #184e44 0%, #182824 100%);
   --banner-text: #ffffff;
 
-  --shadow:    0 1px 3px rgba(19, 56, 48, 0.05), 0 4px 12px rgba(19, 56, 48, 0.03);
-  --shadow-md: 0 4px 6px -1px rgba(19, 56, 48, 0.08), 0 12px 24px -4px rgba(19, 56, 48, 0.06);
+  --shadow:    0 1px 3px rgba(24, 40, 36, 0.05), 0 4px 12px rgba(24, 40, 36, 0.03);
+  --shadow-md: 0 4px 6px -1px rgba(24, 40, 36, 0.08), 0 12px 24px -4px rgba(24, 40, 36, 0.06);
 }
 
 /* ── Reset & Base ───────────────────────────────────────────── */
