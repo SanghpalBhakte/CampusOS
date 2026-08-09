@@ -5065,8 +5065,10 @@ function renderSummaryContent(container) {
 // ── Settings ────────────────────────────────────────────────
 function renderSettings() {
   const el = document.getElementById('page-settings');
-  const p  = liveProfile;
-  const nPrefs = loadNotifPrefs();
+  if (!el) return;
+  const p  = liveProfile || loadProfile() || {};
+  const nPrefs = loadNotifPrefs() || {};
+  const channels = loadNoticeChannels() || {};
   const notifPermission = (typeof Notification !== 'undefined') ? Notification.permission : 'unsupported';
   const isGranted = notifPermission === 'granted';
   const isDenied  = notifPermission === 'denied';
@@ -5130,7 +5132,7 @@ function renderSettings() {
     <div class="card" style="padding:20px;margin-bottom:20px">
       <div class="form-group" style="margin-bottom:0">
         <label class="form-label">End-Semester Exam Date</label>
-        <input type="date" class="form-input" id="s-exam-date" value="${p.examDate}" style="max-width:240px">
+        <input type="date" class="form-input" id="s-exam-date" value="${p.examDate || ''}" style="max-width:240px">
         <div style="font-size:0.78rem;color:var(--text-muted);margin-top:6px">
           Shows a calm daily countdown on your dashboard once set.
         </div>
@@ -5329,11 +5331,11 @@ function renderSettings() {
 }
 
 function saveSettings() {
-  const nameToSave = (document.getElementById('s-name').value || '').trim();
-  const rawCollege = (document.getElementById('s-college').value || '').trim();
-  const rawBranch = (document.getElementById('s-branch').value || '').trim();
-  const rawYear = (document.getElementById('s-year').value || '').trim();
-  const rawRoll = (document.getElementById('s-roll').value || '').trim();
+  const nameToSave = (document.getElementById('s-name')?.value || '').trim();
+  const rawCollege = (document.getElementById('s-college')?.value || '').trim();
+  const rawBranch  = (document.getElementById('s-branch')?.value || '').trim();
+  const rawYear    = (document.getElementById('s-year')?.value || '').trim();
+  const rawRoll    = (document.getElementById('s-roll')?.value || '').trim();
 
   const profile = {
     name:     nameToSave,
@@ -5341,7 +5343,7 @@ function saveSettings() {
     branch:   (rawBranch.toLowerCase().includes('artificial intelligence & data science')) ? '' : rawBranch,
     year:     (rawYear.toLowerCase().includes('2nd year — semester 3')) ? '' : rawYear,
     rollNo:   (rawRoll.toLowerCase() === 'your roll no.') ? '' : rawRoll,
-    examDate: document.getElementById('s-exam-date').value || '',
+    examDate: document.getElementById('s-exam-date')?.value || '',
   };
   safeSetStorage(KEY_PROFILE, profile);
   Object.assign(liveProfile, profile);
