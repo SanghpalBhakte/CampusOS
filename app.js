@@ -5624,25 +5624,25 @@ function showDevNotesModal(filter = null) {
   const entries = getFilteredDevUpdates(_devNotesFilter);
 
   const entriesHtml = entries.length ? entries.map(item => `
-    <div class="card" style="padding:14px 16px;background:var(--surface-2);border-left:3.5px solid ${item.tagColor};box-shadow:var(--shadow-sm)">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px;flex-wrap:wrap">
-        <div style="font-weight:700;font-size:0.92rem;color:var(--text-primary)">${item.title}</div>
-        <div style="display:flex;align-items:center;gap:6px">
-          <span style="font-size:0.7rem;font-weight:600;padding:2px 7px;border-radius:999px;background:rgba(0,0,0,0.06);color:${item.tagColor};border:1px solid ${item.tagColor}33">${item.tag}</span>
-          <span style="font-size:0.75rem;color:var(--text-muted)">${formatDate(item.date)}</span>
+    <div class="dev-update-card" style="border-left-color: ${item.tagColor};">
+      <div class="dev-update-header">
+        <div class="dev-update-title">${escHtml_cd(item.title)}</div>
+        <div class="dev-update-meta">
+          <span class="dev-update-tag" style="background: color-mix(in srgb, ${item.tagColor} 14%, transparent); color: ${item.tagColor}; border: 1px solid color-mix(in srgb, ${item.tagColor} 30%, transparent);">${item.tag}</span>
+          <span class="dev-update-date">${formatDate(item.date)}</span>
         </div>
       </div>
-      <div style="font-size:0.83rem;color:var(--text-secondary);line-height:1.45;margin-bottom:8px">${item.summary}</div>
-      <ul style="margin:0;padding-left:18px;font-size:0.8rem;color:var(--text-muted);line-height:1.5">
-        ${item.points.map(pt => `<li style="margin-bottom:3px">${pt}</li>`).join('')}
+      <div class="dev-update-summary">${escHtml_cd(item.summary)}</div>
+      <ul class="dev-update-list">
+        ${item.points.map(pt => `<li>${escHtml_cd(pt)}</li>`).join('')}
       </ul>
     </div>
   `).join('') : `
-    <div class="empty-state-card" style="padding:24px 16px">
+    <div class="empty-state-card" style="padding:28px 16px;margin:10px 0">
       <span class="empty-state-icon">✨</span>
       <div class="empty-state-title">No Updates for Selected Filter</div>
       <div class="empty-state-desc">No release notes found for this time range. You can switch to <strong>This Week</strong> or <strong>All Updates</strong> to view recent improvements.</div>
-      <div style="display:flex;gap:8px;justify-content:center;margin-top:10px">
+      <div style="display:flex;gap:8px;justify-content:center;margin-top:12px">
         <button class="btn btn-sm btn-primary" onclick="showDevNotesModal('week')">View This Week</button>
         <button class="btn btn-sm btn-secondary" onclick="showDevNotesModal('all')">View All Updates</button>
       </div>
@@ -5653,41 +5653,41 @@ function showDevNotesModal(filter = null) {
   backdrop.className = 'modal-backdrop';
   backdrop.id = 'dev-notes-modal-backdrop';
   backdrop.innerHTML = `
-    <div class="modal" onclick="event.stopPropagation()" style="max-width:580px;width:94vw;max-height:85vh;display:flex;flex-direction:column">
-      <div class="modal-header">
-        <div style="display:flex;align-items:center;gap:8px">
-          <span style="font-size:1.2rem">🛠️</span>
+    <div class="modal dev-notes-dialog" onclick="event.stopPropagation()">
+      <div class="dev-notes-header">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:1.3rem">🛠️</span>
           <div>
-            <span class="modal-title" style="display:block;line-height:1.2">Dev Notes &amp; System Updates</span>
-            <span style="font-size:0.74rem;color:var(--text-muted);font-weight:400">Recent fixes, desk features &amp; engineering improvements</span>
+            <div class="modal-title" style="font-size:1.05rem;line-height:1.2">Dev Notes &amp; System Updates</div>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px">Recent fixes, desk features &amp; engineering improvements</div>
           </div>
         </div>
-        <button class="modal-close" onclick="document.getElementById('dev-notes-modal-backdrop')?.remove()">${icons.x()}</button>
+        <button class="modal-close" onclick="document.getElementById('dev-notes-modal-backdrop')?.remove()" title="Close (Esc)" aria-label="Close modal">${icons.x()}</button>
       </div>
 
-      <!-- Time Filter Tabs -->
-      <div style="display:flex;align-items:center;gap:6px;padding:12px 18px 0;background:var(--surface);border-bottom:1px solid var(--border);overflow-x:auto">
-        <button class="filter-chip ${_devNotesFilter === 'today' ? 'active' : ''}" onclick="showDevNotesModal('today')" style="font-size:0.75rem;padding:4px 10px">
+      <!-- Time Filter Tabs (Pinned Bar) -->
+      <div class="dev-notes-filter-bar" role="tablist" aria-label="Filter updates by time">
+        <button class="dev-filter-pill ${_devNotesFilter === 'today' ? 'active' : ''}" onclick="showDevNotesModal('today')">
           Today
         </button>
-        <button class="filter-chip ${_devNotesFilter === 'week' ? 'active' : ''}" onclick="showDevNotesModal('week')" style="font-size:0.75rem;padding:4px 10px">
+        <button class="dev-filter-pill ${_devNotesFilter === 'week' ? 'active' : ''}" onclick="showDevNotesModal('week')">
           This Week
         </button>
-        <button class="filter-chip ${_devNotesFilter === 'month' ? 'active' : ''}" onclick="showDevNotesModal('month')" style="font-size:0.75rem;padding:4px 10px">
+        <button class="dev-filter-pill ${_devNotesFilter === 'month' ? 'active' : ''}" onclick="showDevNotesModal('month')">
           This Month
         </button>
-        <button class="filter-chip ${_devNotesFilter === 'all' ? 'active' : ''}" onclick="showDevNotesModal('all')" style="font-size:0.75rem;padding:4px 10px">
+        <button class="dev-filter-pill ${_devNotesFilter === 'all' ? 'active' : ''}" onclick="showDevNotesModal('all')">
           All Updates
         </button>
       </div>
 
-      <div class="modal-body" style="overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:12px;padding:16px 18px">
+      <div class="dev-notes-body">
         ${entriesHtml}
       </div>
 
-      <div class="modal-footer" style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+      <div class="dev-notes-footer">
         <span style="font-size:0.75rem;color:var(--text-muted)">Clarity Desk Engine · Local-first</span>
-        <button class="btn-primary" onclick="document.getElementById('dev-notes-modal-backdrop')?.remove()" style="padding:6px 16px;font-size:0.82rem">Done</button>
+        <button class="btn-primary" onclick="document.getElementById('dev-notes-modal-backdrop')?.remove()" style="padding:6px 18px;font-size:0.82rem">Done</button>
       </div>
     </div>
   `;
