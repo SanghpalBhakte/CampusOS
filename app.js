@@ -5643,13 +5643,23 @@ function getFilteredDevUpdates(filter) {
   return DEV_UPDATES;
 }
 
-function showDevNotesModal(filter = null) {
-  if (filter) _devNotesFilter = filter;
-  document.getElementById('dev-notes-modal-backdrop')?.remove();
+function renderDevNotesEntriesHtml(filter) {
+  const entries = getFilteredDevUpdates(filter);
+  if (!entries.length) {
+    return `
+      <div class="empty-state-card" style="padding:28px 16px;margin:10px 0">
+        <span class="empty-state-icon">✨</span>
+        <div class="empty-state-title">No Updates for Selected Filter</div>
+        <div class="empty-state-desc">No release notes found for this time range. You can switch to <strong>This Week</strong> or <strong>All Updates</strong> to view recent improvements.</div>
+        <div style="display:flex;gap:8px;justify-content:center;margin-top:12px">
+          <button class="btn btn-sm btn-primary" onclick="setDevNotesFilter('week')">View This Week</button>
+          <button class="btn btn-sm btn-secondary" onclick="setDevNotesFilter('all')">View All Updates</button>
+        </div>
+      </div>
+    `;
+  }
 
-  const entries = getFilteredDevUpdates(_devNotesFilter);
-
-  const entriesHtml = entries.length ? entries.map(item => `
+  return entries.map(item => `
     <div class="dev-update-card" style="border-left-color: ${item.tagColor};">
       <div class="dev-update-header">
         <div class="dev-update-title">${escHtml_cd(item.title)}</div>
@@ -5663,17 +5673,60 @@ function showDevNotesModal(filter = null) {
         ${item.points.map(pt => `<li>${escHtml_cd(pt)}</li>`).join('')}
       </ul>
     </div>
-  `).join('') : `
-    <div class="empty-state-card" style="padding:28px 16px;margin:10px 0">
-      <span class="empty-state-icon">✨</span>
-      <div class="empty-state-title">No Updates for Selected Filter</div>
-      <div class="empty-state-desc">No release notes found for this time range. You can switch to <strong>This Week</strong> or <strong>All Updates</strong> to view recent improvements.</div>
-      <div style="display:flex;gap:8px;justify-content:center;margin-top:12px">
-        <button class="btn btn-sm btn-primary" onclick="showDevNotesModal('week')">View This Week</button>
-        <button class="btn btn-sm btn-secondary" onclick="showDevNotesModal('all')">View All Updates</button>
-      </div>
-    </div>
-  `;
+  `).join('');
+}
+
+function setDevNotesFilter(newFilter) {
+  if (!newFilter) newFilter = 'week';
+  _devNotesFilter = newFilter;
+
+  const backdrop = document.getElementById('dev-notes-modal-backdrop');
+  if (!backdrop) {
+    showDevNotesModal(newFilter);
+    return;
+  }
+
+  // Smoothly update active pill state without remounting the dialog
+  const filterBar = backdrop.querySelector('.dev-notes-filter-bar');
+  if (filterBar) {
+    filterBar.querySelectorAll('.dev-filter-pill').forEach(btn => {
+      const pillFilter = btn.getAttribute('data-filter');
+      if (pillFilter === newFilter) {
+        btn.classList.add('active');
+        btn.setAttribute('aria-selected', 'true');
+      } else {
+        btn.classList.remove('active');
+        btn.setAttribute('aria-selected', 'false');
+      }
+    });
+  }
+
+  const bodyEl = backdrop.querySelector('.dev-notes-body');
+  if (!bodyEl) return;
+
+  // Gentle, calm in-place transition without screen flash
+  bodyEl.classList.remove('fade-in');
+  bodyEl.classList.add('switching');
+
+  setTimeout(() => {
+    bodyEl.innerHTML = renderDevNotesEntriesHtml(newFilter);
+    bodyEl.scrollTop = 0;
+    bodyEl.classList.remove('switching');
+    bodyEl.classList.add('fade-in');
+  }, 90);
+}
+window.setDevNotesFilter = setDevNotesFilter;
+
+function showDevNotesModal(filter = null) {
+  if (filter) _devNotesFilter = filter;
+
+  const existingBackdrop = document.getElementById('dev-notes-modal-backdrop');
+  if (existingBackdrop) {
+    setDevNotesFilter(_devNotesFilter);
+    return;
+  }
+
+  const entriesHtml = renderDevNotesEntriesHtml(_devNotesFilter);
 
   const backdrop = document.createElement('div');
   backdrop.className = 'modal-backdrop';
@@ -5693,21 +5746,21 @@ function showDevNotesModal(filter = null) {
 
       <!-- Time Filter Tabs (Pinned Bar) -->
       <div class="dev-notes-filter-bar" role="tablist" aria-label="Filter updates by time">
-        <button class="dev-filter-pill ${_devNotesFilter === 'today' ? 'active' : ''}" onclick="showDevNotesModal('today')">
+        <button class="dev-filter-pill ${_devNotesFilter === 'today' ? 'active' : ''}" data-filter="today" role="tab" aria-selected="${_devNotesFilter === 'today'}" onclick="setDevNotesFilter('today')">
           Today
         </button>
-        <button class="dev-filter-pill ${_devNotesFilter === 'week' ? 'active' : ''}" onclick="showDevNotesModal('week')">
+        <button class="dev-filter-pill ${_devNotesFilter === 'week' ? 'active' : ''}" data-filter="week" role="tab" aria-selected="${_devNotesFilter === 'week'}" onclick="setDevNotesFilter('week')">
           This Week
         </button>
-        <button class="dev-filter-pill ${_devNotesFilter === 'month' ? 'active' : ''}" onclick="showDevNotesModal('month')">
+        <button class="dev-filter-pill ${_devNotesFilter === 'month' ? 'active' : ''}" data-filter="month" role="tab" aria-selected="${_devNotesFilter === 'month'}" onclick="setDevNotesFilter('month')">
           This Month
         </button>
-        <button class="dev-filter-pill ${_devNotesFilter === 'all' ? 'active' : ''}" onclick="showDevNotesModal('all')">
+        <button class="dev-filter-pill ${_devNotesFilter === 'all' ? 'active' : ''}" data-filter="all" role="tab" aria-selected="${_devNotesFilter === 'all'}" onclick="setDevNotesFilter('all')">
           All Updates
         </button>
       </div>
 
-      <div class="dev-notes-body">
+      <div class="dev-notes-body fade-in">
         ${entriesHtml}
       </div>
 
