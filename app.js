@@ -1973,10 +1973,26 @@ const state = {
   currentPage:         'dashboard',
   ttDay:               new Date().getDay(),
   assignFilter:        'all',
+  assignTypeFilter:    'all',
   assignSubjectFilter: 'all',
   noticeSearch:        '',
   assignments:         loadAssignments(),
   customTasks:         loadCustomTasks(),   // persisted across reloads
+};
+window.state = state;
+
+window.filterAndNavigateToAssignments = function(filter, typeFilter = null, subjectFilter = null) {
+  if (filter) state.assignFilter = filter;
+  if (typeFilter) state.assignTypeFilter = typeFilter;
+  if (subjectFilter) state.assignSubjectFilter = subjectFilter;
+  navigateTo('assignments');
+};
+
+window.resetAssignmentFilters = function() {
+  state.assignFilter = 'all';
+  state.assignTypeFilter = 'all';
+  state.assignSubjectFilter = 'all';
+  renderAssignments();
 };
 
 // ── Theme (6 Distinct Environments) ───────────────────────────
@@ -2667,11 +2683,11 @@ function renderReview() {
       </div>
 
       <div class="stat-grid" style="margin-bottom:14px">
-        <div class="stat-card" onclick="state.assignFilter='submitted'; navigateTo('assignments');" title="View completed coursework" style="cursor:pointer">
+        <div class="stat-card" onclick="filterAndNavigateToAssignments('submitted')" title="View completed coursework" style="cursor:pointer">
           <div class="stat-value" style="color:var(--green)">${tasksCompleted.length}</div>
           <div class="stat-label">Tasks Completed Last 7 Days →</div>
         </div>
-        <div class="stat-card" onclick="state.assignFilter='overdue'; navigateTo('assignments');" title="View rollover & overdue tasks" style="cursor:pointer">
+        <div class="stat-card" onclick="filterAndNavigateToAssignments('overdue')" title="View rollover & overdue tasks" style="cursor:pointer">
           <div class="stat-value" style="color:${tasksRolledOver.length > 0 ? 'var(--red)' : 'var(--green)'}">${tasksRolledOver.length}</div>
           <div class="stat-label">Rollover / Overdue Tasks →</div>
         </div>
@@ -4778,7 +4794,7 @@ function renderAssignments() {
         <span class="empty-state-icon">✨</span>
         <div class="empty-state-title">No Matching Tasks</div>
         <div class="empty-state-desc">No tasks found matching the selected filter. Try switching back to All Tasks or reset your filters.</div>
-        <button class="btn-secondary" onclick="state.assignFilter='all'; state.assignTypeFilter='all'; state.assignSubjectFilter='all'; renderAssignments();" style="font-size:0.82rem;padding:6px 14px">Reset Filters</button>
+        <button class="btn-secondary" onclick="resetAssignmentFilters()" style="font-size:0.82rem;padding:6px 14px">Reset Filters</button>
       </div>`);
 
   el.innerHTML = `
@@ -5616,15 +5632,15 @@ function renderSummaryContent(container) {
         <div class="stat-value">${remaining.length}</div>
         <div class="stat-label">Classes Remaining →</div>
       </div>
-      <div class="stat-card" onclick="state.assignFilter='today'; navigateTo('assignments');" title="View Tasks Due Today" style="cursor:pointer">
+      <div class="stat-card" onclick="filterAndNavigateToAssignments('today')" title="View Tasks Due Today" style="cursor:pointer">
         <div class="stat-value" style="color:var(--yellow)">${dueTodayItems.length}</div>
         <div class="stat-label">Due Today →</div>
       </div>
-      <div class="stat-card" onclick="state.assignFilter='overdue'; navigateTo('assignments');" title="View Overdue Tasks Needing Action" style="cursor:pointer">
+      <div class="stat-card" onclick="filterAndNavigateToAssignments('overdue')" title="View Overdue Tasks Needing Action" style="cursor:pointer">
         <div class="stat-value" style="color:${overdueItems.length ? 'var(--red)' : 'var(--text-primary)'}">${overdueItems.length}</div>
         <div class="stat-label">Overdue Tasks →</div>
       </div>
-      <div class="stat-card" onclick="state.assignFilter='submitted'; navigateTo('assignments');" title="View Completed Tasks &amp; History" style="cursor:pointer">
+      <div class="stat-card" onclick="filterAndNavigateToAssignments('submitted')" title="View Completed Tasks &amp; History" style="cursor:pointer">
         <div class="stat-value" style="color:var(--green)">${allTasks().filter(a => a.status === 'submitted').length}</div>
         <div class="stat-label">Completed Tasks →</div>
       </div>
