@@ -1530,6 +1530,31 @@ a.card:hover,
   box-shadow: 0 20px 48px rgba(0, 0, 0, 0.22);
 }
 
+/* ── Subject Attendance UI Cards ───────────────────────────── */
+.attendance-subject-card {
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.attendance-subject-card:hover {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-sm);
+}
+
+.attendance-action-btn {
+  border-radius: var(--radius-sm, 8px);
+  padding: 5px 10px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 /* ── Dev Notes & Changelog Dedicated Dialog ─────────────────── */
 .dev-notes-dialog {
   max-width: 620px;

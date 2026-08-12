@@ -13,6 +13,7 @@ const KEY_TIMETABLE_CHOICE = 'cos_timetable_choice';
 const KEY_CUSTOM_LINKS     = 'cos_custom_links';
 const KEY_ATTENDANCE          = 'cos_attendance';
 const KEY_ATTENDANCE_BASELINE = 'cos_attendance_baseline';
+const KEY_ATTENDANCE_LIVE     = 'cos_attendance_live';
 const KEY_GEMINI_KEY          = 'cos_gemini_key';
 const KEY_THEME               = 'cos_theme';
 const KEY_NOTIF_PREFS         = 'cos_notif_prefs';
@@ -1482,6 +1483,9 @@ function applyCloudDataToLocalState(data) {
   if (data.attendanceBaseline && typeof data.attendanceBaseline === 'object') {
     safeSetStorage(KEY_ATTENDANCE_BASELINE, data.attendanceBaseline);
   }
+  if (data.attendanceLive && typeof data.attendanceLive === 'object') {
+    safeSetStorage(KEY_ATTENDANCE_LIVE, data.attendanceLive);
+  }
   if (data.theme && typeof data.theme === 'string') {
     let cloudTheme = data.theme;
     if (LEGACY_THEME_MAP[cloudTheme]) cloudTheme = LEGACY_THEME_MAP[cloudTheme];
@@ -1526,6 +1530,7 @@ function pushLocalDataToCloud(uid) {
     assignmentStatuses: safeGetStorage(KEY_ASSIGNMENTS, {}),
     attendance:         safeGetStorage(KEY_ATTENDANCE, {}),
     attendanceBaseline: safeGetStorage(KEY_ATTENDANCE_BASELINE, {}),
+    attendanceLive:     safeGetStorage(KEY_ATTENDANCE_LIVE, {}),
     theme:              localStorage.getItem(KEY_THEME) || 'paper-slate',
     notificationPrefs:  safeGetStorage(KEY_NOTIF_PREFS, null),
     noticeChannels:     safeGetStorage(KEY_NOTICE_CHANNELS, null),
@@ -3156,6 +3161,18 @@ window.showOnboardingModal = function() {
             </div>
           </div>
 
+          <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;margin-top:4px">
+            <div style="font-weight:600;font-size:0.86rem;color:var(--text-primary);margin-bottom:2px">
+              Set your current attendance (Optional)
+            </div>
+            <div style="font-size:0.78rem;color:var(--text-secondary);line-height:1.45;margin-bottom:10px">
+              Add your present and absent counts once. Clarity Desk will continue from there.
+            </div>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="showBaselineModal()" style="font-size:0.78rem;padding:5px 12px;display:inline-flex;align-items:center;gap:6px">
+              📊 Set Current Attendance Counts →
+            </button>
+          </div>
+
           <div id="ob-error" style="color:var(--red);font-size:0.78rem;display:none">Please enter your Full Name and College to finish setup.</div>
         </div>
         <div style="display:flex;align-items:center;justify-content:flex-end;gap:10px">
@@ -3981,7 +3998,7 @@ function getSubjectList() {
   return Array.from(map.values());
 }
 
-// ── Mid-Semester Attendance Baseline System ─────────────────────
+// ── Manual Baseline & Live Attendance System ─────────────────────
 
 function loadAttendanceBaselines() {
   return safeGetStorage(KEY_ATTENDANCE_BASELINE, {}) || {};
@@ -3989,6 +4006,15 @@ function loadAttendanceBaselines() {
 
 function saveAttendanceBaselines(baselines) {
   safeSetStorage(KEY_ATTENDANCE_BASELINE, baselines);
+  syncToCloud();
+}
+
+function loadLiveAttendanceActions() {
+  return safeGetStorage(KEY_ATTENDANCE_LIVE, {}) || {};
+}
+
+function saveLiveAttendanceActions(actions) {
+  safeSetStorage(KEY_ATTENDANCE_LIVE, actions);
   syncToCloud();
 }
 
@@ -4038,6 +4064,79 @@ function getSubjectBaseline(subjItem) {
   };
 }
 
+function getSubjectLiveActions(subjItem) {
+  const liveActions = loadLiveAttendanceActions();
+  if (!subjItem) return { present: 0, missed: 0, leave: 0 };
+
+  const codeKey = (subjItem.code || '').trim();
+  const nameKey = (subjItem.name || '').trim();
+  const cleanCode = codeKey.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const cleanName = nameKey.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  let match = null;
+  if (codeKey && liveActions[codeKey]) match = liveActions[codeKey];
+  else if (nameKey && liveActions[nameKey]) match = liveActions[nameKey];
+  else {
+    for (const [k, v] of Object.entries(liveActions)) {
+      const cleanK = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if ((cleanCode && cleanK === cleanCode) || (cleanName && cleanK === cleanName)) {
+        match = v;
+        break;
+      }
+    }
+  }
+
+  if (!match || typeof match !== 'object') {
+    return { present: 0, missed: 0, leave: 0 };
+  }
+
+  return {
+    present: Math.max(0, parseInt(match.present) || 0),
+    missed: Math.max(0, parseInt(match.missed) || 0),
+    leave: Math.max(0, parseInt(match.leave) || 0),
+  };
+}
+
+function logSubjectAttendanceAction(subjectKey, action) {
+  const subjects = getSubjectList();
+  const subj = subjects.find(s => (s.code || s.name) === subjectKey || s.name.toLowerCase() === subjectKey.toLowerCase()) || { name: subjectKey, code: subjectKey };
+  const storageKey = (subj.code || subj.name).trim();
+
+  const liveActions = loadLiveAttendanceActions();
+  if (!liveActions[storageKey]) {
+    liveActions[storageKey] = { present: 0, missed: 0, leave: 0 };
+  }
+
+  if (action === 'present') {
+    liveActions[storageKey].present = (liveActions[storageKey].present || 0) + 1;
+    triggerConfetti();
+    showToast(`Logged Present (+1) for ${subj.name} ✓`, 'success');
+  } else if (action === 'missed') {
+    liveActions[storageKey].missed = (liveActions[storageKey].missed || 0) + 1;
+    showToast(`Logged Missed (+1) for ${subj.name}`, 'info');
+  } else if (action === 'leave') {
+    liveActions[storageKey].leave = (liveActions[storageKey].leave || 0) + 1;
+    showToast(`Logged Leave (+1) for ${subj.name}`, 'info');
+  }
+
+  saveLiveAttendanceActions(liveActions);
+  renderPage(state.currentPage);
+}
+
+function undoSubjectAttendanceAction(subjectKey) {
+  const subjects = getSubjectList();
+  const subj = subjects.find(s => (s.code || s.name) === subjectKey || s.name.toLowerCase() === subjectKey.toLowerCase()) || { name: subjectKey, code: subjectKey };
+  const storageKey = (subj.code || subj.name).trim();
+
+  const liveActions = loadLiveAttendanceActions();
+  if (!liveActions[storageKey]) return;
+
+  delete liveActions[storageKey];
+  saveLiveAttendanceActions(liveActions);
+  showToast(`Reset live attendance adjustments for ${subj.name}`, 'info');
+  renderPage(state.currentPage);
+}
+
 function getSubjectAttendance(subjItem) {
   const attendanceData = safeGetStorage(KEY_ATTENDANCE, {}) || {};
   let dailyAttended = 0;
@@ -4061,22 +4160,60 @@ function getSubjectAttendance(subjItem) {
   });
 
   const baseline = getSubjectBaseline(subjItem);
-  const attended = baseline.present + dailyAttended;
-  const skipped = (baseline.absent + baseline.leave + baseline.notEntered) + dailySkipped;
-  const total = baseline.totalCount + dailyAttended + dailySkipped;
-  const pct = total > 0 ? Math.round((attended / total) * 100) : null;
-  const exactPct = total > 0 ? parseFloat(((attended / total) * 100).toFixed(2)) : null;
+  const liveAdj = getSubjectLiveActions(subjItem);
+
+  const present = baseline.present + dailyAttended + liveAdj.present;
+  const absent = baseline.absent + dailySkipped + liveAdj.missed;
+  const leave = baseline.leave + liveAdj.leave;
+  const notEntered = baseline.notEntered;
+
+  const attended = present;
+  const skipped = absent + leave + notEntered;
+  const total = present + absent + leave + notEntered;
+
+  const pct = total > 0 ? Math.round((present / total) * 100) : null;
+  const exactPct = total > 0 ? parseFloat(((present / total) * 100).toFixed(2)) : null;
+
+  const isSafe = pct !== null ? pct >= 75 : null;
+  const statusLine = pct === null ? 'Attendance not set yet' : isSafe ? 'Safe Zone' : 'Needs Recovery';
+
+  let insightMessage = '';
+  let safeSkips = 0;
+  let classesToAttend = 0;
+
+  if (pct !== null) {
+    if (isSafe) {
+      safeSkips = Math.max(0, Math.floor((present - 0.75 * total) / 0.75));
+      insightMessage = safeSkips > 0
+        ? `Can safely miss ${safeSkips} class${safeSkips !== 1 ? 'es' : ''} · Target: 75%`
+        : `On target at ${pct}% · Attend next class to build buffer`;
+    } else {
+      classesToAttend = Math.max(1, Math.ceil((0.75 * total - present) / 0.25));
+      insightMessage = `Need to attend ${classesToAttend} class${classesToAttend !== 1 ? 'es' : ''} continuously to reach 75%`;
+    }
+  }
 
   return {
+    present,
+    absent,
+    leave,
+    notEntered,
     attended,
     skipped,
     total,
     pct,
     exactPct,
+    isSafe,
+    statusLine,
+    insightMessage,
+    safeSkips,
+    classesToAttend,
     baseline,
+    liveAdj,
     dailyAttended,
     dailySkipped,
-    hasBaseline: baseline.hasBaseline
+    hasBaseline: baseline.hasBaseline,
+    hasAnyData: baseline.hasBaseline || (dailyAttended + dailySkipped + liveAdj.present + liveAdj.missed + liveAdj.leave) > 0
   };
 }
 
@@ -4142,10 +4279,14 @@ function showBaselineModal(preselectedSubject = null) {
     <div class="modal baseline-dialog" onclick="event.stopPropagation()" style="max-width:520px;padding:26px 24px">
       <div class="modal-header" style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px">
         <div>
-          <h2 class="modal-title" style="margin:0;font-size:1.25rem;font-weight:700">Set Current Attendance</h2>
-          <div style="font-size:0.8rem;color:var(--text-muted);margin-top:3px">Enter your real college portal / ERP attendance counts as a baseline</div>
+          <h2 class="modal-title" style="margin:0;font-size:1.25rem;font-weight:700">Set your current attendance</h2>
+          <div style="font-size:0.8rem;color:var(--text-muted);margin-top:3px">Add your present and absent counts once. Clarity Desk will continue from there.</div>
         </div>
         <button class="modal-close" onclick="document.getElementById('baseline-modal-backdrop')?.remove()">${icons.x()}</button>
+      </div>
+
+      <div style="background:var(--surface-2);border-left:3px solid var(--accent);border-radius:6px;padding:9px 12px;margin-bottom:16px;font-size:0.79rem;color:var(--text-secondary);line-height:1.45">
+        💡 Set your current attendance to calculate from the right starting point. Future attendance actions update automatically from this baseline.
       </div>
 
       <div class="form-group" style="margin-bottom:16px">
@@ -4170,7 +4311,7 @@ function showBaselineModal(preselectedSubject = null) {
         </div>
         <div class="form-group" style="margin-bottom:0">
           <label class="form-label" style="display:flex;align-items:center;gap:6px">
-            <span style="color:var(--yellow)">●</span> Leaves Applied <span style="color:var(--text-muted);font-weight:normal">(optional)</span>
+            <span style="color:var(--yellow)">●</span> Leave Count <span style="color:var(--text-muted);font-weight:normal">(optional)</span>
           </label>
           <input type="number" id="ab-leave" min="0" class="form-input" value="${baseline.hasBaseline ? baseline.leave : ''}" placeholder="0" oninput="updateBaselinePreview()">
         </div>
@@ -4249,7 +4390,7 @@ function updateBaselinePreview() {
   if (totalCount === 0) {
     previewEl.innerHTML = `
       <div style="font-size:0.8rem;color:var(--text-muted);text-align:center;padding:4px 0">
-        Enter your present and absent counts from your portal to view instant percentage and recovery guidance.
+        Enter your present and absent counts to view instant percentage and recovery guidance.
       </div>
     `;
     return;
@@ -4263,7 +4404,7 @@ function updateBaselinePreview() {
         Conducted: <strong>${totalCount}</strong> sessions (${presentVal} attended)
       </div>
       <span class="type-badge" style="font-size:0.75rem;padding:2px 8px;background:${isSafe ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)'};color:${isSafe ? 'var(--green)' : 'var(--red)'}">
-        ${isSafe ? 'Safe Zone' : 'Risk Zone'} · ${pctFormatted}%
+        ${isSafe ? 'Safe Zone' : 'Needs Recovery'} · ${pctFormatted}%
       </span>
     </div>
     <div style="font-size:0.78rem;color:var(--text-secondary);line-height:1.45">
@@ -4363,33 +4504,75 @@ function renderSubjectsOverview(el, subjects) {
     return;
   }
 
+  const anyMissingBaseline = subjects.some(s => !getSubjectAttendance(s).hasBaseline);
+
   const cardsHTML = subjects.map(s => {
     const att = getSubjectAttendance(s);
     const tasks = allTasks().filter(t => (t.subject || '').toLowerCase() === s.name.toLowerCase() || (t.subject || '').toLowerCase() === s.code.toLowerCase());
     const pendingTasks = tasks.filter(t => t.status === 'pending');
-    const links = loadCustomLinks().filter(l => (l.subject || '').toLowerCase() === s.name.toLowerCase() || (l.subject || '').toLowerCase() === s.code.toLowerCase());
 
     const attStatusClass = att.pct === null ? 'muted' : att.pct >= 75 ? 'green' : 'red';
-    const attLabel = att.pct !== null ? `${att.exactPct !== null ? att.exactPct : att.pct}% Attendance` : 'No Baseline Set';
+    const attLabel = att.pct !== null ? `${att.exactPct !== null ? att.exactPct : att.pct}%` : 'Attendance not set yet';
 
     return `
-      <div class="card" style="padding:16px;cursor:pointer;transition:transform 0.15s, border-color 0.15s;border-left:4px solid ${s.color || 'var(--accent)'}" onclick="openSubjectHub('${s.name}')">
-        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px">
-          <div>
-            <div style="font-weight:700;font-size:1rem;color:var(--text-primary)">${s.name}</div>
+      <div class="card attendance-subject-card" style="padding:18px;border-left:4px solid ${s.color || 'var(--accent)'}">
+        <!-- Subject Header -->
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px">
+          <div style="cursor:pointer" onclick="openSubjectHub('${s.name}')">
+            <div style="font-weight:700;font-size:1.02rem;color:var(--text-primary)">${s.name}</div>
             <div style="font-size:0.78rem;color:var(--text-muted);margin-top:2px">${s.code} ${s.teacher ? '· Prof. ' + s.teacher : ''} ${s.room ? '· ' + s.room : ''}</div>
           </div>
-          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
-            <span class="type-badge" style="font-size:0.7rem;padding:3px 8px;background:${attStatusClass==='green'?'rgba(16,185,129,0.15)':attStatusClass==='red'?'rgba(239,68,68,0.15)':'var(--surface-2)'};color:${attStatusClass==='green'?'var(--green)':attStatusClass==='red'?'var(--red)':'var(--text-muted)'}">
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px">
+            <span class="type-badge" style="font-size:0.75rem;padding:3px 9px;background:${attStatusClass==='green'?'rgba(16,185,129,0.15)':attStatusClass==='red'?'rgba(239,68,68,0.15)':'var(--surface-2)'};color:${attStatusClass==='green'?'var(--green)':attStatusClass==='red'?'var(--red)':'var(--text-muted)'}">
               ${attLabel}
+            </span>
+            <span style="font-size:0.68rem;font-weight:600;color:${att.pct===null?'var(--text-muted)':att.pct>=75?'var(--green)':'var(--red)'}">
+              ${att.statusLine}
             </span>
           </div>
         </div>
 
-        <div style="display:flex;gap:12px;font-size:0.78rem;color:var(--text-secondary);margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
+        <!-- Attendance Summary Pill -->
+        <div style="font-size:0.78rem;color:var(--text-secondary);background:var(--surface-2);padding:6px 10px;border-radius:6px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px">
+          <div>
+            ${att.total > 0 ? `<strong>${att.present}</strong> Present · <strong>${att.absent}</strong> Missed${att.leave > 0 ? ` · <strong>${att.leave}</strong> Leave` : ''}` : 'No attendance recorded yet'}
+          </div>
+          <div style="color:var(--text-muted);font-size:0.74rem">
+            ${att.total > 0 ? `Total: <strong>${att.total}</strong>` : 'Starting point not set'}
+          </div>
+        </div>
+
+        <!-- Insight Row -->
+        ${att.pct !== null ? `
+          <div style="font-size:0.76rem;color:var(--text-secondary);margin-bottom:12px;line-height:1.4">
+            💡 ${att.insightMessage}
+          </div>
+        ` : `
+          <div style="font-size:0.76rem;color:var(--text-muted);margin-bottom:12px">
+            Add your current counts once so future attendance stays accurate.
+          </div>
+        `}
+
+        <!-- Workload Metadata -->
+        <div style="display:flex;gap:12px;font-size:0.76rem;color:var(--text-secondary);margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border)">
           <div>📅 <strong>${s.slots.length}</strong> slot${s.slots.length!==1?'s':''}/wk</div>
-          <div>📝 <strong>${pendingTasks.length}</strong> task${pendingTasks.length!==1?'s':''} pending</div>
-          <div>🔗 <strong>${links.length}</strong> resource${links.length!==1?'s':''}</div>
+          <div>📝 <strong>${pendingTasks.length}</strong> pending task${pendingTasks.length!==1?'s':''}</div>
+        </div>
+
+        <!-- Action Buttons: Present, Missed, Leave, Edit baseline -->
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-sm btn-secondary attendance-action-btn" onclick="event.stopPropagation(); logSubjectAttendanceAction('${s.code || s.name}', 'present')" title="Log 1 class attended" style="color:var(--green);border-color:rgba(16,185,129,0.3)">
+            ✓ Present
+          </button>
+          <button class="btn btn-sm btn-secondary attendance-action-btn" onclick="event.stopPropagation(); logSubjectAttendanceAction('${s.code || s.name}', 'missed')" title="Log 1 class missed" style="color:var(--red);border-color:rgba(239,68,68,0.3)">
+            ✕ Missed
+          </button>
+          <button class="btn btn-sm btn-secondary attendance-action-btn" onclick="event.stopPropagation(); logSubjectAttendanceAction('${s.code || s.name}', 'leave')" title="Log 1 leave applied" style="color:var(--yellow);border-color:rgba(245,158,11,0.3)">
+            🏖️ Leave
+          </button>
+          <button class="btn btn-sm btn-secondary attendance-action-btn" onclick="event.stopPropagation(); showBaselineModal('${s.code || s.name}')" style="margin-left:auto;font-size:0.74rem">
+            ✏️ Edit Baseline
+          </button>
         </div>
       </div>
     `;
@@ -4405,7 +4588,22 @@ function renderSubjectsOverview(el, subjects) {
         📊 Set Attendance Baseline
       </button>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(280px, 1fr));gap:14px">
+
+    ${anyMissingBaseline ? `
+      <div class="card" style="padding:14px 18px;margin-bottom:18px;background:var(--surface-2);border-left:3px solid var(--accent);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div>
+          <div style="font-weight:700;font-size:0.9rem;color:var(--text-primary)">Set your current attendance</div>
+          <div style="font-size:0.8rem;color:var(--text-secondary);margin-top:2px">
+            Add your present and absent counts once. Clarity Desk will continue from there.
+          </div>
+        </div>
+        <button class="btn btn-sm btn-primary" onclick="showBaselineModal()" style="font-size:0.82rem;padding:6px 14px;white-space:nowrap">
+          📊 Set Current Attendance
+        </button>
+      </div>
+    ` : ''}
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(290px, 1fr));gap:14px">
       ${cardsHTML}
     </div>
   `;
@@ -4480,7 +4678,7 @@ function renderSingleSubjectHub(el, subj, allSubjects) {
           </div>
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
             <span class="type-badge" style="font-size:0.8rem;padding:5px 12px;background:${att.pct===null?'var(--surface-2)':att.pct>=75?'rgba(16,185,129,0.15)':'rgba(239,68,68,0.15)'};color:${att.pct===null?'var(--text-muted)':att.pct>=75?'var(--green)':'var(--red)'}">
-              ${att.pct !== null ? `${att.exactPct !== null ? att.exactPct : att.pct}% Attendance (${att.attended}/${att.total})` : 'No Attendance Set'}
+              ${att.pct !== null ? `${att.exactPct !== null ? att.exactPct : att.pct}% Attendance (${att.attended}/${att.total})` : 'Attendance not set yet'}
             </span>
             <button class="btn btn-sm ${att.hasBaseline ? 'btn-secondary' : 'btn-primary'}" onclick="showBaselineModal('${subj.code || subj.name}')" style="display:inline-flex;align-items:center;gap:6px;font-size:0.78rem;padding:5px 11px">
               📊 ${att.hasBaseline ? 'Edit Baseline' : 'Set Baseline'}
@@ -4491,9 +4689,31 @@ function renderSingleSubjectHub(el, subj, allSubjects) {
         ${att.hasBaseline ? `
           <div style="font-size:0.78rem;color:var(--text-secondary);margin-top:12px;padding:8px 12px;background:var(--surface-2);border-radius:6px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
             <div>📌 ERP Baseline: <strong>${att.baseline.present} / ${att.baseline.totalCount}</strong> (${att.baseline.totalCount > 0 ? ((att.baseline.present/att.baseline.totalCount)*100).toFixed(2) : 0}%)</div>
-            <div>${att.dailyAttended > 0 || att.dailySkipped > 0 ? `Live marked: <strong>+${att.dailyAttended}</strong> attended, <strong>+${att.dailySkipped}</strong> missed` : 'Live tracking active from baseline'}</div>
+            <div>${(att.dailyAttended > 0 || att.dailySkipped > 0 || att.liveAdj.present > 0 || att.liveAdj.missed > 0) ? `Live marked: <strong>+${att.dailyAttended + att.liveAdj.present}</strong> attended, <strong>+${att.dailySkipped + att.liveAdj.missed}</strong> missed` : 'Live tracking active from baseline'}</div>
           </div>
         ` : ''}
+
+        <!-- Quick Log Action Bar on Subject Hub -->
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
+          <span style="font-size:0.74rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em">Quick Action:</span>
+          <button class="btn btn-sm btn-secondary attendance-action-btn" onclick="logSubjectAttendanceAction('${subj.code || subj.name}', 'present')" style="color:var(--green);border-color:rgba(16,185,129,0.35)">
+            ✓ Present (+1)
+          </button>
+          <button class="btn btn-sm btn-secondary attendance-action-btn" onclick="logSubjectAttendanceAction('${subj.code || subj.name}', 'missed')" style="color:var(--red);border-color:rgba(239,68,68,0.35)">
+            ✕ Missed (+1)
+          </button>
+          <button class="btn btn-sm btn-secondary attendance-action-btn" onclick="logSubjectAttendanceAction('${subj.code || subj.name}', 'leave')" style="color:var(--yellow);border-color:rgba(245,158,11,0.35)">
+            🏖️ Leave (+1)
+          </button>
+          <button class="btn btn-sm btn-secondary attendance-action-btn" onclick="showBaselineModal('${subj.code || subj.name}')" style="margin-left:auto">
+            ✏️ Edit Baseline
+          </button>
+          ${(att.liveAdj.present > 0 || att.liveAdj.missed > 0 || att.liveAdj.leave > 0) ? `
+            <button class="btn btn-xs btn-secondary" onclick="undoSubjectAttendanceAction('${subj.code || subj.name}')" title="Reset live manual adjustments" style="color:var(--text-muted);font-size:0.72rem;padding:3px 7px">
+              ↩ Reset Live Adjustments
+            </button>
+          ` : ''}
+        </div>
 
         <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:10px;margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
           <div style="background:var(--surface-2);padding:10px 12px;border-radius:8px">
@@ -4514,15 +4734,15 @@ function renderSingleSubjectHub(el, subj, allSubjects) {
           </div>
         </div>
 
-        ${(() => {
-          const subjSkipped = att.total - att.attended;
-          const subjGuidance = calculateSmartAttendanceGuidance(att.attended, subjSkipped, 75);
-          return att.pct !== null ? `
-            <div style="font-size:0.8rem;color:var(--text-primary);margin-top:12px;padding:8px 12px;background:var(--surface-2);border-radius:6px;border-left:3px solid ${subjGuidance.isSafe ? 'var(--green)' : 'var(--red)'}">
-              💡 ${subjGuidance.message}
-            </div>
-          ` : '';
-        })()}
+        ${att.pct !== null ? `
+          <div style="font-size:0.8rem;color:var(--text-primary);margin-top:12px;padding:8px 12px;background:var(--surface-2);border-radius:6px;border-left:3px solid ${att.isSafe ? 'var(--green)' : 'var(--red)'}">
+            💡 ${att.insightMessage}
+          </div>
+        ` : `
+          <div style="font-size:0.8rem;color:var(--text-muted);margin-top:12px;padding:8px 12px;background:var(--surface-2);border-radius:6px">
+            💡 Add your current counts once so future attendance stays accurate from the right starting point.
+          </div>
+        `}
       </div>
     </div>
 
@@ -7004,12 +7224,14 @@ window.handleNoticeSourceClick = handleNoticeSourceClick;
 window.showDevNotesModal      = showDevNotesModal;
 window.saveNoticeChannelsFromSettings = saveNoticeChannelsFromSettings;
 
-// Attendance Baseline
+// Attendance Baseline & Live Actions
 window.showBaselineModal           = showBaselineModal;
 window.onBaselineSubjectChange     = onBaselineSubjectChange;
 window.updateBaselinePreview       = updateBaselinePreview;
 window.saveSubjectBaselineFromModal = saveSubjectBaselineFromModal;
 window.clearSubjectBaseline        = clearSubjectBaseline;
+window.logSubjectAttendanceAction  = logSubjectAttendanceAction;
+window.undoSubjectAttendanceAction = undoSubjectAttendanceAction;
 
 // Desk Assistant
 window.toggleAssistant       = toggleAssistant;
