@@ -2,13 +2,14 @@
 // Clarity Desk — App Logic & Interactive Functions
 // ============================================================
 
-import { STUDENT, TIMETABLE, ASSIGNMENTS, NOTICES, QUICK_LINKS } from './data.js';
+import { STUDENT, TIMETABLE, EMPTY_TIMETABLE, ASSIGNMENTS, NOTICES, QUICK_LINKS } from './data.js';
 
 // ── localStorage Keys ─────────────────────────────────────────
 const KEY_PROFILE          = 'cos_profile';
 const KEY_ASSIGNMENTS      = 'cos_assignments';
 const KEY_CUSTOM_TASKS     = 'cos_custom_tasks';
 const KEY_CUSTOM_TIMETABLE = 'cos_custom_timetable';
+const KEY_TIMETABLE_CHOICE = 'cos_timetable_choice';
 const KEY_CUSTOM_LINKS     = 'cos_custom_links';
 const KEY_ATTENDANCE          = 'cos_attendance';
 const KEY_ATTENDANCE_BASELINE = 'cos_attendance_baseline';
@@ -1465,6 +1466,9 @@ function applyCloudDataToLocalState(data) {
   if (data.customTimetable && typeof data.customTimetable === 'object') {
     safeSetStorage(KEY_CUSTOM_TIMETABLE, data.customTimetable);
   }
+  if (data.timetableChoice && typeof data.timetableChoice === 'string') {
+    safeSetStorage(KEY_TIMETABLE_CHOICE, data.timetableChoice);
+  }
   if (Array.isArray(data.customLinks)) {
     safeSetStorage(KEY_CUSTOM_LINKS, data.customLinks);
   }
@@ -1517,6 +1521,7 @@ function pushLocalDataToCloud(uid) {
     profile:            loadProfile(),
     customTasks:        sanitizedTasks,
     customTimetable:    safeGetStorage(KEY_CUSTOM_TIMETABLE, null),
+    timetableChoice:    safeGetStorage(KEY_TIMETABLE_CHOICE, null),
     customLinks:        safeGetStorage(KEY_CUSTOM_LINKS, null),
     assignmentStatuses: safeGetStorage(KEY_ASSIGNMENTS, {}),
     attendance:         safeGetStorage(KEY_ATTENDANCE, {}),
@@ -2275,14 +2280,24 @@ function isTeachingClass(c) {
   return !isBreakEntry(c);
 }
 
+function getEmptyTimetable() {
+  return { 0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] };
+}
+
 function loadTimetable() {
   const saved = safeGetStorage(KEY_CUSTOM_TIMETABLE, null);
   if (saved && typeof saved === 'object') return saved;
-  return TIMETABLE;
+  const choice = safeGetStorage(KEY_TIMETABLE_CHOICE, null);
+  if (choice === 'aids') {
+    return TIMETABLE;
+  }
+  return getEmptyTimetable();
 }
 
 function isCustomTimetableActive() {
-  return !!safeGetStorage(KEY_CUSTOM_TIMETABLE, null);
+  const saved = safeGetStorage(KEY_CUSTOM_TIMETABLE, null);
+  if (!saved || typeof saved !== 'object') return false;
+  return Object.values(saved).some(arr => Array.isArray(arr) && arr.length > 0);
 }
 
 function saveTimetable(ttMap) {
@@ -2291,10 +2306,21 @@ function saveTimetable(ttMap) {
 }
 
 function resetTimetableToDefault() {
-  if (!confirm("Reset timetable back to official Sem 3 default schedule?")) return;
-  localStorage.removeItem(KEY_CUSTOM_TIMETABLE);
+  if (!confirm("Clear your timetable schedule and start with a clean slate?")) return;
+  safeSetStorage(KEY_CUSTOM_TIMETABLE, getEmptyTimetable());
+  safeSetStorage(KEY_TIMETABLE_CHOICE, 'clean');
   syncToCloud();
   renderPage(state.currentPage);
+  showToast("Timetable schedule cleared ✓", "info");
+}
+
+function loadOfficialAidsTimetable() {
+  if (!confirm("Load the official Sem 3 SY AI-DS timetable schedule? This will set up your weekly classes.")) return;
+  safeSetStorage(KEY_CUSTOM_TIMETABLE, TIMETABLE);
+  safeSetStorage(KEY_TIMETABLE_CHOICE, 'aids');
+  syncToCloud();
+  renderPage(state.currentPage);
+  showToast("Official SY AI-DS timetable loaded ✓", "success");
 }
 
 function todayClasses() {
@@ -3110,6 +3136,26 @@ window.showOnboardingModal = function() {
             <label class="form-label">Year &amp; Semester</label>
             <input type="text" class="form-input" id="ob-year" value="${(p.year||'').replace(/"/g, '&quot;')}" placeholder="Year &amp; semester (e.g. 2nd Year)">
           </div>
+
+          <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;margin-top:4px">
+            <div style="font-weight:600;font-size:0.86rem;color:var(--text-primary);margin-bottom:4px">
+              Are you a Second Year (SY) AI &amp; Data Science student?
+            </div>
+            <div style="font-size:0.78rem;color:var(--text-secondary);line-height:1.45;margin-bottom:10px">
+              We have the official Sem 3 AI-DS class schedule pre-configured. You can load it right away, or start with a clean schedule to build or scan your own timetable.
+            </div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+              <label style="display:flex;align-items:center;gap:6px;font-size:0.82rem;cursor:pointer;padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface)">
+                <input type="radio" name="ob-tt-choice" value="aids" id="ob-tt-aids" style="accent-color:var(--accent)">
+                <span>Yes, load SY AI-DS timetable</span>
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:0.82rem;cursor:pointer;padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface)">
+                <input type="radio" name="ob-tt-choice" value="clean" id="ob-tt-clean" checked style="accent-color:var(--accent)">
+                <span>No, start clean</span>
+              </label>
+            </div>
+          </div>
+
           <div id="ob-error" style="color:var(--red);font-size:0.78rem;display:none">Please enter your Full Name and College to finish setup.</div>
         </div>
         <div style="display:flex;align-items:center;justify-content:flex-end;gap:10px">
@@ -3132,7 +3178,12 @@ window.showOnboardingStep2 = function() {
 
 window.dismissOnboarding = function() {
   localStorage.setItem('cos_onboarding_dismissed', 'true');
+  const existingChoice = safeGetStorage(KEY_TIMETABLE_CHOICE, null);
+  if (!existingChoice) {
+    safeSetStorage(KEY_TIMETABLE_CHOICE, 'clean');
+  }
   document.getElementById('onboarding-backdrop')?.remove();
+  renderPage(state.currentPage);
 };
 
 window.finishOnboarding = function() {
@@ -3145,12 +3196,33 @@ window.finishOnboarding = function() {
     return;
   }
 
+  const isAidsOptIn = !!document.getElementById('ob-tt-aids')?.checked;
+
+  let branchVal = (document.getElementById('ob-branch')?.value || '').trim();
+  let yearVal = (document.getElementById('ob-year')?.value || '').trim();
+
+  if (isAidsOptIn) {
+    if (!branchVal) branchVal = 'AI & Data Science';
+    if (!yearVal) yearVal = '2nd Year (Sem 3)';
+    safeSetStorage(KEY_TIMETABLE_CHOICE, 'aids');
+    const existingCustom = safeGetStorage(KEY_CUSTOM_TIMETABLE, null);
+    if (!existingCustom) {
+      safeSetStorage(KEY_CUSTOM_TIMETABLE, TIMETABLE);
+    }
+  } else {
+    safeSetStorage(KEY_TIMETABLE_CHOICE, 'clean');
+    const existingCustom = safeGetStorage(KEY_CUSTOM_TIMETABLE, null);
+    if (!existingCustom) {
+      safeSetStorage(KEY_CUSTOM_TIMETABLE, getEmptyTimetable());
+    }
+  }
+
   const profile = {
     name: nameVal,
     rollNo: (document.getElementById('ob-roll')?.value || '').trim(),
     college: collegeVal,
-    branch: (document.getElementById('ob-branch')?.value || '').trim(),
-    year: (document.getElementById('ob-year')?.value || '').trim(),
+    branch: branchVal,
+    year: yearVal,
     examDate: liveProfile.examDate || '',
   };
 
@@ -3158,6 +3230,7 @@ window.finishOnboarding = function() {
   Object.assign(liveProfile, profile);
   localStorage.setItem('cos_onboarding_dismissed', 'true');
 
+  syncToCloud();
   updateTopbarProfile();
   document.getElementById('onboarding-backdrop')?.remove();
   renderPage(state.currentPage);
@@ -3716,11 +3789,12 @@ function renderTimetable() {
     content = `
       <div class="empty-state-card" style="margin-top:8px">
         <span class="empty-state-icon">🏖️</span>
-        <div class="empty-state-title">Free Day on ${DAY_NAMES[day]}</div>
-        <div class="empty-state-desc">No classes scheduled for today. Relax, study, or add a custom class entry to your weekly schedule.</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:4px">
+        <div class="empty-state-title">No Classes on ${DAY_NAMES[day]}</div>
+        <div class="empty-state-desc">No classes scheduled for this day. You can add class slots manually, scan your college timetable photo, or load the SY AI-DS template if you belong to that department.</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:6px">
           <button class="btn-primary" onclick="showTimetableEntryModal(${day}, null)" style="font-size:0.82rem;padding:6px 14px">+ Add Class Entry</button>
           <button class="btn-secondary" onclick="triggerTimetableImport()" style="font-size:0.82rem;padding:6px 14px">📷 Scan Photo</button>
+          <button class="btn-secondary" onclick="loadOfficialAidsTimetable()" style="font-size:0.82rem;padding:6px 14px">⚡ Load SY AI-DS Template</button>
         </div>
       </div>`;
   } else {
@@ -3799,9 +3873,12 @@ function renderTimetable() {
         <button class="btn-secondary" onclick="triggerTimetableImport()" style="display:flex;align-items:center;gap:6px;font-size:0.8rem;padding:7px 14px">
           📷 Scan Timetable
         </button>
+        <button class="btn-secondary" onclick="loadOfficialAidsTimetable()" style="display:flex;align-items:center;gap:6px;font-size:0.8rem;padding:7px 14px" title="Load official SY AI-DS schedule template">
+          ⚡ Load SY AI-DS
+        </button>
         ${isCustom ? `
           <button class="btn-secondary" onclick="resetTimetableToDefault()" style="font-size:0.8rem;padding:7px 12px;color:var(--text-muted)">
-            Reset Timetable
+            Clear Schedule
           </button>` : ''}
       </div>
     </div>
@@ -5714,6 +5791,21 @@ function renderSettings() {
       </div>
     </div>
 
+    <div class="section-heading">${icons.timetable()} Timetable Schedule Template</div>
+    <div class="card" style="padding:20px;margin-bottom:20px">
+      <div style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:12px;line-height:1.5">
+        Clarity Desk can start with a clean schedule or load the pre-configured official Sem 3 SY AI-DS timetable template if you belong to that department.
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn-secondary" onclick="loadOfficialAidsTimetable()" style="display:inline-flex;align-items:center;gap:6px;font-size:0.84rem;padding:7px 14px">
+          ⚡ Load Official SY AI-DS Template
+        </button>
+        <button class="btn-secondary" onclick="resetTimetableToDefault()" style="display:inline-flex;align-items:center;gap:6px;font-size:0.84rem;padding:7px 14px;color:var(--red);border-color:rgba(239,68,68,0.3)">
+          Clear Timetable (Start Clean)
+        </button>
+      </div>
+    </div>
+
     <div class="section-heading">${icons.timetable()} Mid-Semester Attendance Baseline</div>
     <div class="card" style="padding:20px;margin-bottom:20px">
       <div style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:12px;line-height:1.5">
@@ -6898,6 +6990,7 @@ window.loginWithGoogleRedirect = loginWithGoogleRedirect;
 window.logoutUser       = logoutUser;
 window.triggerTimetableImport  = triggerTimetableImport;
 window.resetTimetableToDefault = resetTimetableToDefault;
+window.loadOfficialAidsTimetable = loadOfficialAidsTimetable;
 window.showTimetableEntryModal = showTimetableEntryModal;
 window.saveTimetableEntry      = saveTimetableEntry;
 window.deleteTimetableEntry    = deleteTimetableEntry;

@@ -13,6 +13,16 @@ export const STUDENT = {
 };
 
 // ── Timetable ─────────────────────────────────────────────────
+export const EMPTY_TIMETABLE = {
+  0: [],
+  1: [],
+  2: [],
+  3: [],
+  4: [],
+  5: [],
+  6: []
+};
+
 // Official SY-AIDS Timetable (W.E.F 30/07/2026) — Lecture Hall SF-31
 // Days: 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
 export const TIMETABLE = {
