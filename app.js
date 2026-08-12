@@ -3336,6 +3336,7 @@ function renderDashboard() {
   const dayClasses = (liveTT[dayIdx] || []).filter(isTeachingClass);
 
   // Attendance calculation & risk assessment (incorporates baseline + live tracking)
+  const attendanceData = safeGetStorage(KEY_ATTENDANCE, {}) || {};
   const overallAtt = getOverallAttendance();
   const totalAttended = overallAtt.attended;
   const totalSkipped = overallAtt.skipped;
