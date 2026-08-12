@@ -3524,43 +3524,77 @@ function renderDashboard() {
   const greeting = greetingWord();
   const needsSetup = !displayName;
 
-  // 1. Contextual Temporal Anchor — answers what is happening now or what matters next
-  let temporalHeading = '';
-  if (activeClass) {
-    temporalHeading = `In session: ${activeClass.subject} (${activeClass.room || 'Classroom'}) until ${activeClass.end || 'slot end'}`;
-  } else if (nextClass) {
-    temporalHeading = `Next class: ${nextClass.subject} at ${nextClass.time}${nextClass.room ? ` · ${nextClass.room}` : ''}`;
-  } else if (dayClasses.length > 0) {
-    temporalHeading = `All classes finished for today.`;
-  } else {
-    temporalHeading = `No classes scheduled today.`;
-  }
-
-  const fullGreetingText = firstName ? `${greeting}, ${firstName}. ${temporalHeading}` : `${greeting}. ${temporalHeading}`;
-
-  // 2. Compact contextual meta line in natural language (replaces disconnected stat chips)
-  const metaParts = [];
-  metaParts.push(`<span class="anchor-meta-item">${icons.calendar()}&nbsp;${DAY_NAMES[dayIdx]}, ${now.getDate()} ${MONTH_NAMES[now.getMonth()]}</span>`);
-
+  // Masthead ticker items in monospace ledger strip
+  const formattedDay = `${DAY_NAMES[dayIdx]}, ${now.getDate()} ${MONTH_NAMES[now.getMonth()]}`;
+  const tickerItems = [];
+  tickerItems.push(`<span class="desk-ticker-item">${icons.calendar()} ${formattedDay}</span>`);
   if (dayClasses.length > 0) {
-    metaParts.push(`<span class="anchor-meta-item">${classesLeftCount} of ${dayClasses.length} class${dayClasses.length !== 1 ? 'es' : ''} left</span>`);
+    tickerItems.push(`<span class="desk-ticker-item">${classesLeftCount}/${dayClasses.length} classes remaining</span>`);
   }
-
-  if (pending > 0) {
-    metaParts.push(`<span class="anchor-meta-item" style="color:${overdue > 0 ? 'var(--red)' : 'inherit'}">${pending} task${pending !== 1 ? 's' : ''} pending${overdue > 0 ? ` (${overdue} overdue)` : ''}</span>`);
-  } else {
-    metaParts.push(`<span class="anchor-meta-item" style="color:var(--green)">All tasks submitted</span>`);
-  }
-
+  tickerItems.push(`<span class="desk-ticker-item" style="color:${overdue > 0 ? 'var(--red)' : 'inherit'}">${pending} pending task${pending !== 1 ? 's' : ''}${overdue > 0 ? ` (${overdue} overdue)` : ''}</span>`);
   if (attendancePct !== null) {
-    metaParts.push(`<span class="anchor-meta-item" style="color:${isAttendanceAtRisk ? 'var(--red)' : 'var(--green)'}">Attendance: ${attendancePct}% (${dashGuidance.isSafe ? 'Safe' : 'Action needed'})</span>`);
+    tickerItems.push(`<span class="desk-ticker-item" style="color:${isAttendanceAtRisk ? 'var(--red)' : 'var(--green)'}">Attendance: ${attendancePct}% (${dashGuidance.isSafe ? 'Safe' : 'Action needed'})</span>`);
   }
-
   if (countdownText) {
-    metaParts.push(`<span class="anchor-meta-item">🎯 ${countdownText}</span>`);
+    tickerItems.push(`<span class="desk-ticker-item">🎯 ${countdownText}</span>`);
   }
+  const tickerHTML = tickerItems.join('<span class="desk-ticker-sep">/</span>');
 
-  const metaLineHTML = metaParts.join('<span class="anchor-meta-dot">·</span>');
+  // Signature Chrono Beacon (Active lecture or next slot)
+  let beaconHTML = '';
+  if (activeClass) {
+    const classKey = `${activeClass.code || activeClass.subject}_${activeClass.time}`.replace(/[^a-zA-Z0-9_]/g, '');
+    const status = attendanceData[dateStr]?.[classKey] || 'unset';
+    beaconHTML = `
+      <div class="chrono-beacon is-live">
+        <div style="flex:1;min-width:180px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+            <span class="chrono-beacon-badge">
+              <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green)"></span>
+              In Session
+            </span>
+            <span class="chrono-beacon-time">${activeClass.time} → ${activeClass.end || 'end'}</span>
+          </div>
+          <div class="chrono-beacon-title" onclick="openSubjectHub('${activeClass.subject}')" style="cursor:pointer" title="Open Subject Hub">
+            ${activeClass.subject}
+          </div>
+          <div class="chrono-beacon-meta">
+            ${activeClass.room ? `<span>📍 ${activeClass.room}</span>` : ''}
+            ${activeClass.teacher ? `<span>👤 Prof. ${activeClass.teacher}</span>` : ''}
+            <span class="type-badge type-${activeClass.type || 'lecture'}" style="font-size:0.62rem">${activeClass.type || 'lecture'}</span>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+          <button class="btn btn-sm ${status==='attended'?'btn-primary':'btn-secondary'}" onclick="event.stopPropagation(); setAttendance('${dateStr}', '${classKey}', 'attended')" style="padding:5px 11px;font-size:0.76rem;font-weight:600;${status==='attended'?'background:var(--green);border-color:var(--green);color:white;':''}">
+            ${status==='attended'?'Attended ✓':'Mark Attended'}
+          </button>
+          <button class="btn btn-sm ${status==='skipped'?'btn-primary':'btn-secondary'}" onclick="event.stopPropagation(); setAttendance('${dateStr}', '${classKey}', 'skipped')" style="padding:5px 11px;font-size:0.76rem;font-weight:600;${status==='skipped'?'background:var(--red);border-color:var(--red);color:white;':''}">
+            ${status==='skipped'?'Skipped':'Skip'}
+          </button>
+        </div>
+      </div>`;
+  } else if (nextClass) {
+    beaconHTML = `
+      <div class="chrono-beacon">
+        <div style="flex:1;min-width:180px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+            <span class="chrono-beacon-badge">⏳ Next Up</span>
+            <span class="chrono-beacon-time">${nextClass.time} → ${nextClass.end || 'end'}</span>
+          </div>
+          <div class="chrono-beacon-title" onclick="openSubjectHub('${nextClass.subject}')" style="cursor:pointer" title="Open Subject Hub">
+            ${nextClass.subject}
+          </div>
+          <div class="chrono-beacon-meta">
+            ${nextClass.room ? `<span>📍 ${nextClass.room}</span>` : ''}
+            ${nextClass.teacher ? `<span>👤 Prof. ${nextClass.teacher}</span>` : ''}
+            <span class="type-badge type-${nextClass.type || 'lecture'}" style="font-size:0.62rem">${nextClass.type || 'lecture'}</span>
+          </div>
+        </div>
+        <button class="btn btn-sm btn-secondary" onclick="openSubjectHub('${nextClass.subject}')" style="font-size:0.75rem;padding:6px 12px">
+          Subject Hub →
+        </button>
+      </div>`;
+  }
 
   const setupBanner = needsSetup ? `
     <div class="card" style="margin-bottom:18px;display:flex;align-items:center;gap:14px;background:var(--accent-dim);border-color:color-mix(in srgb, var(--accent) 35%, var(--border));padding:14px 18px">
@@ -3596,62 +3630,58 @@ function renderDashboard() {
   const quickLinksPreview = loadCustomLinks().slice(0, 4);
 
   el.innerHTML = `
-    <!-- 1. CALM TEXT-FIRST TEMPORAL ANCHOR -->
-    <div class="dashboard-anchor">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
+    <!-- 1. ARCHITECTURAL MASTHEAD -->
+    <div class="desk-masthead">
+      <div class="desk-masthead-top">
         <div>
-          <div class="anchor-greeting">${fullGreetingText}</div>
-          <div class="anchor-meta" style="margin-top:6px">${metaLineHTML}</div>
+          <div class="desk-greeting">${greeting}${firstName ? `, ${firstName}` : ''}.</div>
+          <div class="desk-greeting-sub">${dayClasses.length > 0 ? `${classesLeftCount} class${classesLeftCount !== 1 ? 'es' : ''} left on your desk today.` : 'No classes scheduled today. A good day for focus or rest.'}</div>
         </div>
         <button class="btn btn-sm btn-secondary" onclick="navigateTo('review')" title="Weekly reflection & guidance" style="font-size:0.76rem;padding:5px 12px;align-self:flex-start">
           Weekly Review →
         </button>
       </div>
+      <div class="desk-ticker-strip">${tickerHTML}</div>
     </div>
 
+    ${beaconHTML}
     ${setupBanner}
 
-    <!-- 2. DESKTOP WORKSPACE LAYOUT (PRIMARY LEFT + SECONDARY RIGHT) -->
+    <!-- 2. WORKBENCH & AMBIENT PANEL -->
     <div class="dashboard-layout">
 
-      <!-- LEFT COLUMN: PRIMARY WORKBENCH -->
+      <!-- LEFT COLUMN: WORKBENCH -->
       <div class="dashboard-left">
-        <!-- TODAY'S SCHEDULE -->
+        <!-- SCHEDULE LEDGER -->
         <div class="dashboard-panel">
           <div class="panel-header">
-            <div class="panel-title">Today's Class Schedule</div>
-            <button class="panel-action" onclick="navigateTo('timetable')">Open Timetable →</button>
+            <div class="panel-title">${icons.timetable()} Today's Schedule</div>
+            <button class="panel-action" onclick="navigateTo('timetable')">Full Timetable →</button>
           </div>
 
           <div class="card" style="padding:14px">
             ${dayClasses.length > 0 ? `
-              <div style="display:flex;flex-direction:column;gap:8px">
+              <div class="schedule-ledger">
                 ${dayClasses.map(c => {
                   const classKey = `${c.code || c.subject}_${c.time}`.replace(/[^a-zA-Z0-9_]/g, '');
                   const status = attendanceData[dateStr]?.[classKey] || 'unset';
                   const isNow = (currentMin >= timeToMinutes(c.time || '00:00') && currentMin < timeToMinutes(c.end || '23:59'));
                   const isPast = (currentMin >= timeToMinutes(c.end || '23:59'));
                   return `
-                    <div class="timeline-row ${isNow ? 'current-active' : ''} ${isPast ? 'past-completed' : ''}">
-                      <div style="flex:1;min-width:120px;cursor:pointer" onclick="openSubjectHub('${c.subject}')" title="Open ${c.subject} Notes &amp; Resources">
-                        <div style="font-weight:700;font-size:0.88rem;display:flex;align-items:center;gap:6px">
-                          <span>${c.subject}</span>
-                          ${isNow ? '<span class="type-badge" style="background:var(--accent);color:white;font-size:0.6rem;padding:1px 5px">NOW</span>' : ''}
-                          <span class="type-badge type-${c.type || 'lecture'}" style="font-size:0.62rem">${c.type || 'lecture'}</span>
-                        </div>
-                        <div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px">
-                          ${c.time}${c.end ? '–' + c.end : ''} ${c.room ? '· ' + c.room : ''} ${c.teacher ? '· Prof. ' + c.teacher : ''}
+                    <div class="schedule-slot ${isNow ? 'is-now' : ''} ${isPast ? 'is-past' : ''}">
+                      <div class="schedule-slot-time">${c.time}${c.end ? '–' + c.end : ''}</div>
+                      <div style="flex:1;min-width:120px;cursor:pointer" onclick="openSubjectHub('${c.subject}')">
+                        <div class="schedule-slot-title">${c.subject}</div>
+                        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:1px">
+                          ${c.room ? c.room + ' · ' : ''}${c.teacher ? 'Prof. ' + c.teacher + ' · ' : ''}${c.type || 'lecture'}
                         </div>
                       </div>
                       <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
-                        <button class="btn btn-sm ${status==='attended'?'btn-primary':'btn-secondary'}" onclick="event.stopPropagation(); setAttendance('${dateStr}', '${classKey}', 'attended')" aria-label="Mark ${c.subject} as attended" style="padding:4px 9px;font-size:0.72rem;font-weight:600;${status==='attended'?'background:var(--green);border-color:var(--green);color:white;':''}">
-                          ${status==='attended'?'Attended ✓':'Attended'}
+                        <button class="btn btn-xs ${status==='attended'?'btn-primary':'btn-secondary'}" onclick="event.stopPropagation(); setAttendance('${dateStr}', '${classKey}', 'attended')" style="padding:3px 8px;font-size:0.7rem;font-weight:600;${status==='attended'?'background:var(--green);border-color:var(--green);color:white;':''}">
+                          ${status==='attended'?'Attended ✓':'Present'}
                         </button>
-                        <button class="btn btn-sm ${status==='skipped'?'btn-primary':'btn-secondary'}" onclick="event.stopPropagation(); setAttendance('${dateStr}', '${classKey}', 'skipped')" aria-label="Mark ${c.subject} as skipped" style="padding:4px 9px;font-size:0.72rem;font-weight:600;${status==='skipped'?'background:var(--red);border-color:var(--red);color:white;':''}">
-                          ${status==='skipped'?'Skipped':'Skipped'}
-                        </button>
-                        <button class="btn btn-xs btn-secondary" onclick="event.stopPropagation(); openSubjectHub('${c.subject}')" title="Open ${c.subject} Hub" style="font-size:0.7rem;padding:2px 6px">
-                          Hub →
+                        <button class="btn btn-xs ${status==='skipped'?'btn-primary':'btn-secondary'}" onclick="event.stopPropagation(); setAttendance('${dateStr}', '${classKey}', 'skipped')" style="padding:3px 8px;font-size:0.7rem;font-weight:600;${status==='skipped'?'background:var(--red);border-color:var(--red);color:white;':''}">
+                          ${status==='skipped'?'Skipped':'Missed'}
                         </button>
                       </div>
                     </div>`;
@@ -3659,81 +3689,82 @@ function renderDashboard() {
               </div>
             ` : `
               <div style="padding:24px 12px;text-align:center;color:var(--text-muted);font-size:0.85rem">
-                No classes scheduled for today. Take time to study or rest!
+                🏖️ No classes scheduled for today. Take time to study or rest!
               </div>
             `}
           </div>
         </div>
 
-        <!-- TASKS & DEADLINES -->
+        <!-- TASKS & MISSIONS LEDGER -->
         <div class="dashboard-panel">
           <div class="panel-header">
-            <div class="panel-title">Tasks &amp; Deadlines</div>
+            <div class="panel-title">${icons.assignments()} Tasks &amp; Deadlines</div>
             <button class="panel-action" onclick="navigateTo('assignments')">Open Tasks (${pending}) →</button>
           </div>
 
           <div class="card" style="padding:14px">
-            <!-- WORKLOAD PROGRESS -->
-            <div style="margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border)">
+            <!-- WORKLOAD PROGRESS BAR -->
+            <div style="margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border-light, var(--border))">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-                <span class="text-xs font-semibold">Completed ${submittedCount} of ${total} tasks</span>
-                <span class="text-xs text-muted font-semibold">${progress}%</span>
+                <span class="text-xs font-semibold" style="color:var(--text-secondary)">Completed ${submittedCount} of ${total} tasks</span>
+                <span class="text-xs text-muted font-semibold" style="font-family:var(--font-mono)">${progress}%</span>
               </div>
               <div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:${progress}%"></div></div>
             </div>
 
-            <!-- URGENT TASKS LIST WITH RELATIVE DUE DATES -->
+            <!-- TASK LEDGER ITEMS -->
             ${urgentTasks.length > 0 ? `
-              <div style="display:flex;flex-direction:column;gap:6px">
+              <div style="display:flex;flex-direction:column;gap:4px">
                 ${urgentTasks.map(a => {
                   const isOngoing = !!a.noDeadline || (a.taskType === 'mission' && !a.dueDate);
                   const rel = isOngoing ? { label: 'Ongoing', cls: 'ongoing' } : formatRelativeDueDate(a.dueDate);
                   const done = a.status === 'submitted';
-                  const dateMeta = isOngoing ? 'Standing Mission' : formatDate(a.dueDate);
+                  const pCls = a.priority === 'high' ? 'priority-high' : a.priority === 'medium' ? 'priority-medium' : 'priority-low';
                   return `
-                    <div class="card card-sm assignment-card" style="margin-bottom:0;display:flex;align-items:center;gap:10px;padding:9px 12px">
-                      <div onclick="toggleAssignment('${a.id}')" title="Click to mark done" style="width:18px;height:18px;border-radius:4px;border:2px solid ${done ? 'var(--green)' : a.priority==='high' ? 'var(--red)' : a.priority==='medium' ? 'var(--yellow)' : 'var(--border)'};background:${done ? 'var(--green)' : 'transparent'};display:grid;place-items:center;flex-shrink:0;color:white;cursor:pointer;transition:all 0.15s">
+                    <div class="task-ledger-item ${pCls}">
+                      <div class="task-checkbox ${done ? 'checked' : ''}" onclick="toggleAssignment('${a.id}')" title="Click to mark completed">
                         ${done ? icons.check() : ''}
                       </div>
                       <div style="flex:1;min-width:0;cursor:pointer" onclick="navigateTo('assignments')">
-                        <div class="font-semibold" style="font-size:0.86rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${done?'text-decoration:line-through;opacity:0.5':''}">${a.title}</div>
-                        <div class="text-xs text-muted" style="display:flex;align-items:center;gap:6px;margin-top:2px">
-                          <span onclick="event.stopPropagation(); openSubjectHub('${a.subject}')" style="color:var(--accent);font-weight:600;cursor:pointer" title="Open ${a.subject} Hub">${a.subject || 'Academic'}</span>
-                          <span>· ${dateMeta}</span>
+                        <div style="font-weight:600;font-size:0.86rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${done?'text-decoration:line-through;opacity:0.5':''}">${a.title}</div>
+                        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px;display:flex;align-items:center;gap:6px">
+                          <span onclick="event.stopPropagation(); openSubjectHub('${a.subject}')" style="color:var(--accent);font-weight:600;cursor:pointer" title="Open ${a.subject} Hub">${a.subject || 'General'}</span>
+                          <span>· ${isOngoing ? 'Standing Mission' : formatDate(a.dueDate)}</span>
                         </div>
                       </div>
-                      <span class="due-badge ${rel.cls}" style="font-size:0.7rem;padding:2px 7px">${rel.label}</span>
+                      <span class="due-badge ${rel.cls}" style="font-size:0.7rem;padding:2px 7px;font-family:var(--font-mono)">${rel.label}</span>
                     </div>`;
                 }).join('')}
               </div>
             ` : `
               <div style="padding:16px;text-align:center;color:var(--text-muted);font-size:0.84rem">
-                All caught up! No urgent tasks due today.
+                🌿 All caught up! No urgent tasks due today.
               </div>
             `}
           </div>
         </div>
 
-        <!-- QUICK ACTION TOOLS -->
-        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:8px">
-          <div class="card card-sm" style="display:flex;align-items:center;gap:8px;padding:8px 12px">
-            <div style="color:var(--accent);opacity:0.8;flex-shrink:0">${icons.plus()}</div>
-            <input type="text" id="quick-add-input" placeholder="Quick add task — e.g. 'DS lab report due Friday'" style="flex:1;border:none;background:transparent;outline:none;font-size:0.85rem;color:var(--text-primary);font-family:var(--font)" onkeypress="if(event.key==='Enter') handleQuickAdd()">
-            <button class="btn btn-xs btn-primary" onclick="handleQuickAdd()">Add</button>
+        <!-- DESK COMMAND DOCK (DUAL INPUT) -->
+        <div class="desk-command-dock">
+          <div class="command-dock-field">
+            <span style="color:var(--accent);opacity:0.8;font-size:0.8rem">${icons.plus()}</span>
+            <input type="text" id="quick-add-input" placeholder="Add task… e.g. 'Lab report due Friday'" onkeypress="if(event.key==='Enter') handleQuickAdd()">
+            <span class="command-dock-kbd">↵ Enter</span>
           </div>
 
-          <div class="card card-sm" style="display:flex;align-items:center;gap:8px;padding:8px 12px">
-            <div style="color:var(--accent);opacity:0.8;flex-shrink:0">✨</div>
-            <input type="text" id="assistant-input" placeholder="Ask Desk — e.g. 'What classes do I have today?'" style="flex:1;border:none;background:transparent;outline:none;font-size:0.85rem;color:var(--text-primary);font-family:var(--font)" onkeypress="if(event.key==='Enter') handleAssistantQuestion()">
+          <div class="command-dock-field">
+            <span style="color:var(--accent);opacity:0.8;font-size:0.8rem">✨</span>
+            <input type="text" id="assistant-input" placeholder="Ask Desk… e.g. 'Classes today?'" onkeypress="if(event.key==='Enter') handleAssistantQuestion()">
+            <span class="command-dock-kbd">Ask</span>
           </div>
         </div>
         <div id="assistant-answer-container"></div>
       </div>
 
-      <!-- RIGHT COLUMN: AMBIENT & HEALTH CONTEXT (Sticky on Desktop) -->
+      <!-- RIGHT COLUMN: AMBIENT CONTEXT (Sticky on Desktop) -->
       <div class="dashboard-right-panel">
 
-        <!-- ATTENDANCE HEALTH CARD -->
+        <!-- ATTENDANCE HEALTH -->
         <div class="dashboard-panel">
           <div class="panel-header">
             <div class="panel-title">Attendance Health</div>
@@ -3741,10 +3772,10 @@ function renderDashboard() {
           </div>
           <div class="card card-sm" style="padding:14px;border-left:3px solid ${isAttendanceAtRisk ? 'var(--red)' : attendancePct !== null ? 'var(--green)' : 'var(--accent)'};background:${isAttendanceAtRisk ? 'rgba(239,68,68,0.04)' : 'var(--surface)'}">
             <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">
-              <div style="font-weight:700;font-size:0.88rem;color:${isAttendanceAtRisk ? 'var(--red)' : 'var(--text-primary)'}">
+              <div style="font-family:var(--font-mono);font-weight:700;font-size:0.92rem;color:${isAttendanceAtRisk ? 'var(--red)' : 'var(--text-primary)'}">
                 ${attendancePct !== null ? `${attendancePct}% Overall` : 'Attendance Health'}
               </div>
-              <span class="type-badge" style="font-size:0.66rem;padding:2px 6px;background:${isAttendanceAtRisk ? 'rgba(239,68,68,0.12)' : 'rgba(16,185,129,0.12)'};color:${isAttendanceAtRisk ? 'var(--red)' : 'var(--green)'}">
+              <span class="type-badge" style="font-family:var(--font-mono);font-size:0.66rem;padding:2px 6px;background:${isAttendanceAtRisk ? 'rgba(239,68,68,0.12)' : 'rgba(16,185,129,0.12)'};color:${isAttendanceAtRisk ? 'var(--red)' : 'var(--green)'}">
                 ${attendancePct !== null ? (dashGuidance.isSafe ? 'Safe (≥75%)' : 'Recovery needed') : 'Not configured'}
               </span>
             </div>
@@ -3785,7 +3816,7 @@ function renderDashboard() {
           </div>
         ` : ''}
 
-        <!-- STUDY VAULT SHORTCUTS -->
+        <!-- STUDY SHORTCUTS -->
         ${quickLinksPreview.length > 0 ? `
           <div class="dashboard-panel">
             <div class="panel-header">

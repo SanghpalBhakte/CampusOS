@@ -8,19 +8,23 @@
    6. Misty Mint      (Soft, airy, light eucalyptus sage mist)
    ============================================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
 
 /* ── 1) Paper Slate — Default (Clean, Neutral, Academic Slate) ── */
 :root,
 [data-theme="paper-slate"],
 [data-theme="paper"] {
-  --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-sans:     'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-display:  'Plus Jakarta Sans', var(--font-sans);
+  --font-mono:     'JetBrains Mono', 'SF Mono', Consolas, Monaco, monospace;
+  --font:          var(--font-sans);
 
-  /* Surfaces — Crisp, Neutral Slate Paper */
+  /* Surfaces — Crisp, Neutral Slate Paper with Layered Depth */
   --bg:            #f8fafc;
   --surface:       #ffffff;
   --surface-2:     #f1f5f9;
   --surface-3:     #e2e8f0;
+  --surface-well:  #eef2f6;
   --border:        #cbd5e1;
   --border-light:  #e2e8f0;
   --border-btn:    #94a3b8;
@@ -691,189 +695,324 @@ a.card:hover,
   border-radius: var(--radius-sm);
 }
 
-/* ── Dashboard Hierarchy & Layout System ──────────────────────── */
-.dashboard-anchor {
-  padding: 4px 0 20px;
+/* ── Architectural Masthead & Temporal Identity ─────────────── */
+.desk-masthead {
+  padding: 8px 0 20px;
   border-bottom: 1px solid var(--border-light, var(--border));
   margin-bottom: 20px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 12px;
 }
 
-.anchor-greeting {
-  font-size: 1.25rem;
+.desk-masthead-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.desk-greeting {
+  font-family: var(--font-display);
+  font-size: 1.65rem;
   font-weight: 700;
   color: var(--text-primary);
-  letter-spacing: -0.025em;
-  line-height: 1.3;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
 }
 
-.anchor-meta {
-  font-size: 0.82rem;
-  color: var(--text-muted);
-  line-height: 1.45;
+.desk-greeting-sub {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+.desk-ticker-strip {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  background: var(--surface-well, var(--surface-2));
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-light, var(--border));
+  width: fit-content;
 }
 
-.anchor-meta-item {
+.desk-ticker-item {
   display: inline-flex;
   align-items: center;
   gap: 5px;
 }
 
-.anchor-meta-dot {
+.desk-ticker-sep {
   color: var(--border-btn, var(--border));
-  font-size: 0.7rem;
+  opacity: 0.6;
 }
 
-.dashboard-hero-header {
-  margin-bottom: 20px;
-}
-
-.today-hero-surface {
-  background: var(--banner-bg);
-  border-radius: var(--radius);
-  padding: 22px 24px;
-  color: var(--banner-text);
-  position: relative;
-  overflow: hidden;
-  box-shadow: var(--shadow-md);
-  border: 1px solid transparent;
-}
-
-.today-hero-surface::before {
-  content: '';
-  position: absolute;
-  top: -40px; right: -40px;
-  width: 200px; height: 200px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.12) 0%, transparent 70%);
-  pointer-events: none;
-}
-
-.today-hero-surface::after {
-  content: '';
-  position: absolute;
-  bottom: -30px; left: -20px;
-  width: 140px; height: 140px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.06) 0%, transparent 70%);
-  pointer-events: none;
-}
-
-.greeting-text {
-  font-size: 1.45rem;
-  font-weight: 700;
-  letter-spacing: -0.025em;
-  line-height: 1.25;
-}
-
-.greeting-focus-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(255, 255, 255, 0.16);
-  padding: 5px 12px;
-  border-radius: 999px;
-  font-size: 0.82rem;
-  font-weight: 500;
-  margin-top: 10px;
-  backdrop-filter: blur(4px);
-  border: 1px solid rgba(255, 255, 255, 0.22);
-}
-
-.greeting-date {
-  font-size: 0.8rem;
-  opacity: 0.82;
-  margin-top: 6px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.today-hero-surface .btn-review {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 14px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  border-radius: var(--radius-xs, 6px);
-  background: rgba(255, 255, 255, 0.16);
-  color: inherit;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  transition: background 0.18s ease, transform 0.14s ease;
-  white-space: nowrap;
-  cursor: pointer;
-  backdrop-filter: blur(4px);
-}
-
-.today-hero-surface .btn-review:hover {
-  background: rgba(255, 255, 255, 0.25);
-  transform: translateY(-1px);
-}
-
-/* ── Desk Vitals Pulse Strip (Integrated Metrics) ─────────────── */
-.vitals-strip {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
-  margin-bottom: 22px;
-}
-
-.vital-item {
+/* ── Signature Layout Moment: The Chrono Beacon ──────────── */
+.chrono-beacon {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm, 8px);
-  padding: 14px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  cursor: pointer;
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 16px 20px;
   box-shadow: var(--shadow);
-  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
-}
-
-.vital-item:hover {
-  transform: translateY(-2px);
-  border-color: var(--border-btn, var(--border));
-  box-shadow: var(--shadow-md);
-}
-
-.vital-item:active { transform: scale(0.98); }
-
-.vital-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 6px;
+  gap: 16px;
+  margin-bottom: 20px;
+  transition: all 0.18s ease;
+  position: relative;
+  overflow: hidden;
 }
 
-.vital-label {
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: var(--text-muted);
+.chrono-beacon.is-live {
+  border-left-color: var(--green);
+  background: color-mix(in srgb, var(--green) 3%, var(--surface));
+  box-shadow: 0 4px 16px -2px rgba(16, 185, 129, 0.12);
+}
+
+.chrono-beacon-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: var(--accent-dim);
+  color: var(--accent);
 }
 
-.vital-num {
-  font-size: 1.55rem;
-  font-weight: 800;
-  line-height: 1.1;
+.chrono-beacon.is-live .chrono-beacon-badge {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--green);
+}
+
+.chrono-beacon-time {
+  font-family: var(--font-mono);
+  font-size: 1.1rem;
+  font-weight: 700;
   color: var(--text-primary);
-  letter-spacing: -0.3px;
+  letter-spacing: -0.02em;
 }
 
-.vital-hint {
-  font-size: 0.74rem;
-  color: var(--text-secondary);
-  white-space: nowrap;
-  overflow: hidden;
+.chrono-beacon-title {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+
+.chrono-beacon-meta {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+/* ── Open Schedule Timeline Ledger ───────────────────────── */
+.schedule-ledger {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  position: relative;
+  padding-left: 18px;
+}
+
+.schedule-ledger::before {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 14px;
+  bottom: 14px;
+  width: 2px;
+  background: var(--border-light, var(--border));
+  border-radius: 999px;
+}
+
+.schedule-slot {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  transition: background 0.15s ease;
+}
+
+.schedule-slot:hover {
+  background: var(--surface-2);
+}
+
+.schedule-slot::before {
+  content: '';
+  position: absolute;
+  left: -18px;
+  top: 50%;
+  transform: translate(3px, -50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--border);
+  border: 2px solid var(--bg);
+  transition: all 0.18s ease;
+}
+
+.schedule-slot.is-now {
+  background: var(--accent-dim);
+  border-radius: var(--radius-sm);
+}
+
+.schedule-slot.is-now::before {
+  background: var(--green);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.25);
+  transform: translate(2px, -50%) scale(1.2);
+}
+
+.schedule-slot.is-past {
+  opacity: 0.5;
+}
+
+.schedule-slot-time {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  width: 85px;
+  flex-shrink: 0;
+}
+
+.schedule-slot.is-now .schedule-slot-time {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.schedule-slot-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.88rem;
+  color: var(--text-primary);
+}
+
+/* ── Task Ledger Items ───────────────────────────────────── */
+.task-ledger-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  border-left: 3px solid transparent;
+  background: var(--surface);
+  border: 1px solid var(--border-light, var(--border));
+  margin-bottom: 4px;
+  transition: border-color 0.15s ease, transform 0.15s ease, background 0.15s ease;
+}
+
+.task-ledger-item:hover {
+  border-color: var(--border-btn, var(--border));
+  transform: translateX(2px);
+}
+
+.task-ledger-item.priority-high {
+  border-left: 3px solid var(--red);
+}
+
+.task-ledger-item.priority-medium {
+  border-left: 3px solid var(--yellow);
+}
+
+.task-ledger-item.priority-low {
+  border-left: 3px solid var(--border-btn, var(--border));
+}
+
+.task-checkbox {
+  width: 17px;
+  height: 17px;
+  border-radius: 4px;
+  border: 2px solid var(--border-btn, var(--border));
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+  background: transparent;
+}
+
+.task-checkbox.checked {
+  background: var(--green);
+  border-color: var(--green);
+  color: white;
+}
+
+/* ── Desk Command Dock ───────────────────────────────────── */
+.desk-command-dock {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 8px;
+  background: var(--surface-well, var(--surface-2));
+  border: 1px solid var(--border);
+  padding: 8px;
+  border-radius: var(--radius);
+  margin-top: 10px;
+}
+
+@media (max-width: 680px) {
+  .desk-command-dock {
+    grid-template-columns: 1fr;
+  }
+}
+
+.command-dock-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border-light, var(--border));
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.command-dock-field:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+
+.command-dock-field input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-family: var(--font-sans);
+  font-size: 0.84rem;
+  color: var(--text-primary);
+}
+
+.command-dock-kbd {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 4px;
+  color: var(--text-muted);
+}
   text-overflow: ellipsis;
 }
 
