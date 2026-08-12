@@ -10,11 +10,12 @@ const KEY_ASSIGNMENTS      = 'cos_assignments';
 const KEY_CUSTOM_TASKS     = 'cos_custom_tasks';
 const KEY_CUSTOM_TIMETABLE = 'cos_custom_timetable';
 const KEY_CUSTOM_LINKS     = 'cos_custom_links';
-const KEY_ATTENDANCE       = 'cos_attendance';
-const KEY_GEMINI_KEY       = 'cos_gemini_key';
-const KEY_THEME            = 'cos_theme';
-const KEY_NOTIF_PREFS      = 'cos_notif_prefs';
-const KEY_NOTICE_CHANNELS  = 'cos_notice_channels';
+const KEY_ATTENDANCE          = 'cos_attendance';
+const KEY_ATTENDANCE_BASELINE = 'cos_attendance_baseline';
+const KEY_GEMINI_KEY          = 'cos_gemini_key';
+const KEY_THEME               = 'cos_theme';
+const KEY_NOTIF_PREFS         = 'cos_notif_prefs';
+const KEY_NOTICE_CHANNELS     = 'cos_notice_channels';
 
 // ── Safe Storage Helpers ─────────────────────────────────────
 function safeGetStorage(key, fallback = null) {
@@ -1474,6 +1475,9 @@ function applyCloudDataToLocalState(data) {
   if (data.attendance && typeof data.attendance === 'object') {
     safeSetStorage(KEY_ATTENDANCE, data.attendance);
   }
+  if (data.attendanceBaseline && typeof data.attendanceBaseline === 'object') {
+    safeSetStorage(KEY_ATTENDANCE_BASELINE, data.attendanceBaseline);
+  }
   if (data.theme && typeof data.theme === 'string') {
     let cloudTheme = data.theme;
     if (LEGACY_THEME_MAP[cloudTheme]) cloudTheme = LEGACY_THEME_MAP[cloudTheme];
@@ -1516,6 +1520,7 @@ function pushLocalDataToCloud(uid) {
     customLinks:        safeGetStorage(KEY_CUSTOM_LINKS, null),
     assignmentStatuses: safeGetStorage(KEY_ASSIGNMENTS, {}),
     attendance:         safeGetStorage(KEY_ATTENDANCE, {}),
+    attendanceBaseline: safeGetStorage(KEY_ATTENDANCE_BASELINE, {}),
     theme:              localStorage.getItem(KEY_THEME) || 'paper-slate',
     notificationPrefs:  safeGetStorage(KEY_NOTIF_PREFS, null),
     noticeChannels:     safeGetStorage(KEY_NOTICE_CHANNELS, null),
@@ -3330,20 +3335,12 @@ function renderDashboard() {
   const liveTT     = loadTimetable();
   const dayClasses = (liveTT[dayIdx] || []).filter(isTeachingClass);
 
-  // Attendance calculation & risk assessment
-  const attendanceData = safeGetStorage(KEY_ATTENDANCE, {}) || {};
-  let totalAttended = 0;
-  let totalSkipped = 0;
-  Object.values(attendanceData).forEach(dayObj => {
-    if (dayObj && typeof dayObj === 'object') {
-      Object.values(dayObj).forEach(st => {
-        if (st === 'attended') totalAttended++;
-        else if (st === 'skipped') totalSkipped++;
-      });
-    }
-  });
-  const totalMarked = totalAttended + totalSkipped;
-  const attendancePct = totalMarked > 0 ? Math.round((totalAttended / totalMarked) * 100) : null;
+  // Attendance calculation & risk assessment (incorporates baseline + live tracking)
+  const overallAtt = getOverallAttendance();
+  const totalAttended = overallAtt.attended;
+  const totalSkipped = overallAtt.skipped;
+  const totalMarked = overallAtt.total;
+  const attendancePct = overallAtt.pct;
   const isAttendanceAtRisk = attendancePct !== null && attendancePct < 75;
   const dashGuidance = calculateSmartAttendanceGuidance(totalAttended, totalSkipped, 75);
 
@@ -3890,10 +3887,67 @@ function getSubjectList() {
   return Array.from(map.values());
 }
 
+// ── Mid-Semester Attendance Baseline System ─────────────────────
+
+function loadAttendanceBaselines() {
+  return safeGetStorage(KEY_ATTENDANCE_BASELINE, {}) || {};
+}
+
+function saveAttendanceBaselines(baselines) {
+  safeSetStorage(KEY_ATTENDANCE_BASELINE, baselines);
+  syncToCloud();
+}
+
+function getSubjectBaseline(subjItem) {
+  const baselines = loadAttendanceBaselines();
+  if (!subjItem) {
+    return { present: 0, absent: 0, leave: 0, notEntered: 0, totalSessions: 0, totalCount: 0, hasBaseline: false };
+  }
+
+  const codeKey = (subjItem.code || '').trim();
+  const nameKey = (subjItem.name || '').trim();
+  const cleanCode = codeKey.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const cleanName = nameKey.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  let match = null;
+  if (codeKey && baselines[codeKey]) match = baselines[codeKey];
+  else if (nameKey && baselines[nameKey]) match = baselines[nameKey];
+  else {
+    for (const [k, v] of Object.entries(baselines)) {
+      const cleanK = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if ((cleanCode && cleanK === cleanCode) || (cleanName && cleanK === cleanName)) {
+        match = v;
+        break;
+      }
+    }
+  }
+
+  if (!match || typeof match !== 'object') {
+    return { present: 0, absent: 0, leave: 0, notEntered: 0, totalSessions: 0, totalCount: 0, hasBaseline: false };
+  }
+
+  const present = Math.max(0, parseInt(match.present) || 0);
+  const absent = Math.max(0, parseInt(match.absent) || 0);
+  const leave = Math.max(0, parseInt(match.leave) || 0);
+  const notEntered = Math.max(0, parseInt(match.notEntered) || 0);
+  const totalSessions = Math.max(0, parseInt(match.totalSessions) || 0);
+  const totalCount = present + absent + leave + notEntered;
+
+  return {
+    present,
+    absent,
+    leave,
+    notEntered,
+    totalSessions,
+    totalCount,
+    hasBaseline: totalCount > 0 || totalSessions > 0 || (match.present !== undefined && match.present !== '')
+  };
+}
+
 function getSubjectAttendance(subjItem) {
   const attendanceData = safeGetStorage(KEY_ATTENDANCE, {}) || {};
-  let attended = 0;
-  let skipped = 0;
+  let dailyAttended = 0;
+  let dailySkipped = 0;
 
   const targetCode = (subjItem.code || '').toLowerCase().replace(/[^a-zA-Z0-9]/g, '');
   const targetName = (subjItem.name || '').toLowerCase().replace(/[^a-zA-Z0-9]/g, '');
@@ -3905,16 +3959,283 @@ function getSubjectAttendance(subjItem) {
         const matchesCode = targetCode && cleanKey.startsWith(targetCode + '_');
         const matchesName = targetName && cleanKey.startsWith(targetName + '_');
         if (matchesCode || matchesName) {
-          if (status === 'attended') attended++;
-          else if (status === 'skipped') skipped++;
+          if (status === 'attended') dailyAttended++;
+          else if (status === 'skipped') dailySkipped++;
         }
       });
     }
   });
 
-  const total = attended + skipped;
+  const baseline = getSubjectBaseline(subjItem);
+  const attended = baseline.present + dailyAttended;
+  const skipped = (baseline.absent + baseline.leave + baseline.notEntered) + dailySkipped;
+  const total = baseline.totalCount + dailyAttended + dailySkipped;
   const pct = total > 0 ? Math.round((attended / total) * 100) : null;
-  return { attended, skipped, total, pct };
+  const exactPct = total > 0 ? parseFloat(((attended / total) * 100).toFixed(2)) : null;
+
+  return {
+    attended,
+    skipped,
+    total,
+    pct,
+    exactPct,
+    baseline,
+    dailyAttended,
+    dailySkipped,
+    hasBaseline: baseline.hasBaseline
+  };
+}
+
+function getOverallAttendance() {
+  const subjects = getSubjectList();
+  let totalAttended = 0;
+  let totalCount = 0;
+  let hasAnyData = false;
+
+  subjects.forEach(s => {
+    const att = getSubjectAttendance(s);
+    if (att.total > 0) {
+      totalAttended += att.attended;
+      totalCount += att.total;
+      hasAnyData = true;
+    }
+  });
+
+  const pct = totalCount > 0 ? Math.round((totalAttended / totalCount) * 100) : null;
+  const exactPct = totalCount > 0 ? parseFloat(((totalAttended / totalCount) * 100).toFixed(2)) : null;
+  const totalSkipped = totalCount - totalAttended;
+
+  return {
+    attended: totalAttended,
+    skipped: totalSkipped,
+    total: totalCount,
+    pct,
+    exactPct,
+    hasAnyData
+  };
+}
+
+function showBaselineModal(preselectedSubject = null) {
+  const subjects = getSubjectList();
+  if (!subjects.length) {
+    showToast('Set up your weekly timetable or add tasks first to configure subjects.', 'info');
+    return;
+  }
+
+  const existingBackdrop = document.getElementById('baseline-modal-backdrop');
+  if (existingBackdrop) existingBackdrop.remove();
+
+  let activeSubj = subjects[0];
+  if (preselectedSubject) {
+    const found = subjects.find(s =>
+      s.code.toLowerCase() === preselectedSubject.toLowerCase() ||
+      s.name.toLowerCase() === preselectedSubject.toLowerCase()
+    );
+    if (found) activeSubj = found;
+  }
+
+  const optionsHTML = subjects.map(s => {
+    const isSel = (s.code === activeSubj.code || s.name === activeSubj.name);
+    return `<option value="${s.code || s.name}" ${isSel ? 'selected' : ''}>${s.name} (${s.code || 'No Code'})</option>`;
+  }).join('');
+
+  const baseline = getSubjectBaseline(activeSubj);
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  backdrop.id = 'baseline-modal-backdrop';
+  backdrop.innerHTML = `
+    <div class="modal baseline-dialog" onclick="event.stopPropagation()" style="max-width:520px;padding:26px 24px">
+      <div class="modal-header" style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px">
+        <div>
+          <h2 class="modal-title" style="margin:0;font-size:1.25rem;font-weight:700">Set Current Attendance</h2>
+          <div style="font-size:0.8rem;color:var(--text-muted);margin-top:3px">Enter your real college portal / ERP attendance counts as a baseline</div>
+        </div>
+        <button class="modal-close" onclick="document.getElementById('baseline-modal-backdrop')?.remove()">${icons.x()}</button>
+      </div>
+
+      <div class="form-group" style="margin-bottom:16px">
+        <label class="form-label" style="font-weight:600">Subject</label>
+        <select id="ab-subject-select" class="form-select" onchange="onBaselineSubjectChange(this.value)">
+          ${optionsHTML}
+        </select>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label" style="display:flex;align-items:center;gap:6px">
+            <span style="color:var(--green)">●</span> Present Count <span style="color:var(--red)">*</span>
+          </label>
+          <input type="number" id="ab-present" min="0" class="form-input" value="${baseline.hasBaseline ? baseline.present : ''}" placeholder="e.g. 9" oninput="updateBaselinePreview()">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label" style="display:flex;align-items:center;gap:6px">
+            <span style="color:var(--red)">●</span> Absent Count <span style="color:var(--red)">*</span>
+          </label>
+          <input type="number" id="ab-absent" min="0" class="form-input" value="${baseline.hasBaseline ? baseline.absent : ''}" placeholder="e.g. 8" oninput="updateBaselinePreview()">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label" style="display:flex;align-items:center;gap:6px">
+            <span style="color:var(--yellow)">●</span> Leaves Applied <span style="color:var(--text-muted);font-weight:normal">(optional)</span>
+          </label>
+          <input type="number" id="ab-leave" min="0" class="form-input" value="${baseline.hasBaseline ? baseline.leave : ''}" placeholder="0" oninput="updateBaselinePreview()">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label" style="display:flex;align-items:center;gap:6px">
+            <span style="color:var(--text-muted)">●</span> Attendance Not Entered <span style="color:var(--text-muted);font-weight:normal">(optional)</span>
+          </label>
+          <input type="number" id="ab-not-entered" min="0" class="form-input" value="${baseline.hasBaseline ? baseline.notEntered : ''}" placeholder="0" oninput="updateBaselinePreview()">
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom:16px">
+        <label class="form-label">Total Planned Sessions <span style="color:var(--text-muted);font-weight:normal">(semester total, e.g. 60 or 30)</span></label>
+        <input type="number" id="ab-total-sessions" min="0" class="form-input" value="${baseline.hasBaseline && baseline.totalSessions ? baseline.totalSessions : ''}" placeholder="e.g. 60" oninput="updateBaselinePreview()">
+      </div>
+
+      <div id="ab-preview-card" style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:18px"></div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+        <button type="button" class="btn-secondary" id="ab-clear-btn" onclick="clearSubjectBaseline()" style="color:var(--red);border-color:rgba(239,68,68,0.3);font-size:0.82rem;${baseline.hasBaseline ? '' : 'display:none'}">
+          Clear Baseline
+        </button>
+        <div style="display:flex;align-items:center;gap:10px;margin-left:auto">
+          <button type="button" class="btn-secondary" onclick="document.getElementById('baseline-modal-backdrop')?.remove()" style="font-size:0.84rem">Cancel</button>
+          <button type="button" class="btn-primary" onclick="saveSubjectBaselineFromModal()" style="padding:8px 18px;font-size:0.85rem;font-weight:600">Save Baseline ✓</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(backdrop);
+  updateBaselinePreview();
+}
+
+function onBaselineSubjectChange(subjectKey) {
+  const subjects = getSubjectList();
+  const subj = subjects.find(s => (s.code || s.name) === subjectKey) || subjects[0];
+  if (!subj) return;
+
+  const baseline = getSubjectBaseline(subj);
+  const presentEl = document.getElementById('ab-present');
+  const absentEl = document.getElementById('ab-absent');
+  const leaveEl = document.getElementById('ab-leave');
+  const notEnteredEl = document.getElementById('ab-not-entered');
+  const totalSessionsEl = document.getElementById('ab-total-sessions');
+  const clearBtn = document.getElementById('ab-clear-btn');
+
+  if (presentEl) presentEl.value = baseline.hasBaseline ? baseline.present : '';
+  if (absentEl) absentEl.value = baseline.hasBaseline ? baseline.absent : '';
+  if (leaveEl) leaveEl.value = baseline.hasBaseline ? baseline.leave : '';
+  if (notEnteredEl) notEnteredEl.value = baseline.hasBaseline ? baseline.notEntered : '';
+  if (totalSessionsEl) totalSessionsEl.value = (baseline.hasBaseline && baseline.totalSessions) ? baseline.totalSessions : '';
+
+  if (clearBtn) {
+    clearBtn.style.display = baseline.hasBaseline ? 'inline-block' : 'none';
+  }
+
+  updateBaselinePreview();
+}
+
+function updateBaselinePreview() {
+  const previewEl = document.getElementById('ab-preview-card');
+  if (!previewEl) return;
+
+  const presentVal = parseInt(document.getElementById('ab-present')?.value) || 0;
+  const absentVal = parseInt(document.getElementById('ab-absent')?.value) || 0;
+  const leaveVal = parseInt(document.getElementById('ab-leave')?.value) || 0;
+  const notEnteredVal = parseInt(document.getElementById('ab-not-entered')?.value) || 0;
+  const totalSessionsVal = parseInt(document.getElementById('ab-total-sessions')?.value) || 0;
+
+  const totalCount = presentVal + absentVal + leaveVal + notEnteredVal;
+  const pct = totalCount > 0 ? ((presentVal / totalCount) * 100) : 0;
+  const pctFormatted = pct.toFixed(2);
+  const isSafe = pct >= 75;
+
+  if (totalCount === 0) {
+    previewEl.innerHTML = `
+      <div style="font-size:0.8rem;color:var(--text-muted);text-align:center;padding:4px 0">
+        Enter your present and absent counts from your portal to view instant percentage and recovery guidance.
+      </div>
+    `;
+    return;
+  }
+
+  const guidance = calculateSmartAttendanceGuidance(presentVal, absentVal + leaveVal + notEnteredVal, 75);
+
+  previewEl.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px">
+      <div style="font-size:0.82rem;font-weight:600;color:var(--text-primary)">
+        Conducted: <strong>${totalCount}</strong> sessions (${presentVal} attended)
+      </div>
+      <span class="type-badge" style="font-size:0.75rem;padding:2px 8px;background:${isSafe ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)'};color:${isSafe ? 'var(--green)' : 'var(--red)'}">
+        ${isSafe ? 'Safe Zone' : 'Risk Zone'} · ${pctFormatted}%
+      </span>
+    </div>
+    <div style="font-size:0.78rem;color:var(--text-secondary);line-height:1.45">
+      💡 ${guidance.message}
+    </div>
+    ${totalSessionsVal > 0 ? `
+      <div style="font-size:0.74rem;color:var(--text-muted);margin-top:6px;border-top:1px dashed var(--border);padding-top:6px">
+        Semester Progress: <strong>${totalCount}</strong> of <strong>${totalSessionsVal}</strong> total planned sessions (${Math.round((totalCount / totalSessionsVal) * 100)}% conducted).
+      </div>
+    ` : ''}
+  `;
+}
+
+function saveSubjectBaselineFromModal() {
+  const selectEl = document.getElementById('ab-subject-select');
+  const subjectKey = selectEl ? selectEl.value : null;
+  if (!subjectKey) return;
+
+  const subjects = getSubjectList();
+  const subj = subjects.find(s => (s.code || s.name) === subjectKey) || { name: subjectKey, code: subjectKey };
+
+  const present = Math.max(0, parseInt(document.getElementById('ab-present')?.value) || 0);
+  const absent = Math.max(0, parseInt(document.getElementById('ab-absent')?.value) || 0);
+  const leave = Math.max(0, parseInt(document.getElementById('ab-leave')?.value) || 0);
+  const notEntered = Math.max(0, parseInt(document.getElementById('ab-not-entered')?.value) || 0);
+  const totalSessions = Math.max(0, parseInt(document.getElementById('ab-total-sessions')?.value) || 0);
+
+  const totalCount = present + absent + leave + notEntered;
+  const pct = totalCount > 0 ? ((present / totalCount) * 100).toFixed(1) : '0.0';
+
+  const baselines = loadAttendanceBaselines();
+  const storageKey = (subj.code || subj.name).trim();
+
+  baselines[storageKey] = {
+    subjectCode: subj.code || '',
+    subjectName: subj.name || '',
+    present,
+    absent,
+    leave,
+    notEntered,
+    totalSessions,
+    updatedAt: new Date().toISOString()
+  };
+
+  saveAttendanceBaselines(baselines);
+  document.getElementById('baseline-modal-backdrop')?.remove();
+  showToast(`Baseline saved for ${subj.name} (${pct}%) ✓`, 'success');
+  renderPage(state.currentPage);
+}
+
+function clearSubjectBaseline() {
+  const selectEl = document.getElementById('ab-subject-select');
+  const subjectKey = selectEl ? selectEl.value : null;
+  if (!subjectKey) return;
+
+  const baselines = loadAttendanceBaselines();
+  const subjects = getSubjectList();
+  const subj = subjects.find(s => (s.code || s.name) === subjectKey) || { name: subjectKey, code: subjectKey };
+
+  const storageKey = (subj.code || subj.name).trim();
+  delete baselines[storageKey];
+
+  saveAttendanceBaselines(baselines);
+  document.getElementById('baseline-modal-backdrop')?.remove();
+  showToast(`Attendance baseline cleared for ${subj.name}`, 'info');
+  renderPage(state.currentPage);
 }
 
 function renderSubjects() {
@@ -3938,7 +4259,7 @@ function renderSubjectsOverview(el, subjects) {
       <div class="page-header">
         <div>
           <div class="page-title">Subject Hubs</div>
-          <div class="page-subtitle">Course schedules, tasks, attendance &amp; study resources organized per subject</div>
+          <div class="page-subtitle">Course schedules, attendance baselines, tasks &amp; study resources organized per subject</div>
         </div>
       </div>
       <div class="card" style="padding:40px;text-align:center;color:var(--text-muted);border-style:dashed">
@@ -3955,7 +4276,7 @@ function renderSubjectsOverview(el, subjects) {
     const links = loadCustomLinks().filter(l => (l.subject || '').toLowerCase() === s.name.toLowerCase() || (l.subject || '').toLowerCase() === s.code.toLowerCase());
 
     const attStatusClass = att.pct === null ? 'muted' : att.pct >= 75 ? 'green' : 'red';
-    const attLabel = att.pct !== null ? `${att.pct}% Attendance` : 'No Classes Marked';
+    const attLabel = att.pct !== null ? `${att.exactPct !== null ? att.exactPct : att.pct}% Attendance` : 'No Baseline Set';
 
     return `
       <div class="card" style="padding:16px;cursor:pointer;transition:transform 0.15s, border-color 0.15s;border-left:4px solid ${s.color || 'var(--accent)'}" onclick="openSubjectHub('${s.name}')">
@@ -3964,9 +4285,11 @@ function renderSubjectsOverview(el, subjects) {
             <div style="font-weight:700;font-size:1rem;color:var(--text-primary)">${s.name}</div>
             <div style="font-size:0.78rem;color:var(--text-muted);margin-top:2px">${s.code} ${s.teacher ? '· Prof. ' + s.teacher : ''} ${s.room ? '· ' + s.room : ''}</div>
           </div>
-          <span class="type-badge" style="font-size:0.7rem;padding:3px 8px;background:${attStatusClass==='green'?'rgba(16,185,129,0.15)':attStatusClass==='red'?'rgba(239,68,68,0.15)':'var(--surface-2)'};color:${attStatusClass==='green'?'var(--green)':attStatusClass==='red'?'var(--red)':'var(--text-muted)'}">
-            ${attLabel}
-          </span>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+            <span class="type-badge" style="font-size:0.7rem;padding:3px 8px;background:${attStatusClass==='green'?'rgba(16,185,129,0.15)':attStatusClass==='red'?'rgba(239,68,68,0.15)':'var(--surface-2)'};color:${attStatusClass==='green'?'var(--green)':attStatusClass==='red'?'var(--red)':'var(--text-muted)'}">
+              ${attLabel}
+            </span>
+          </div>
         </div>
 
         <div style="display:flex;gap:12px;font-size:0.78rem;color:var(--text-secondary);margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
@@ -3979,11 +4302,14 @@ function renderSubjectsOverview(el, subjects) {
   }).join('');
 
   el.innerHTML = `
-    <div class="page-header">
+    <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
       <div>
         <div class="page-title">Subject Hubs</div>
-        <div class="page-subtitle">Course schedules, attendance, tasks &amp; study resources organized per subject</div>
+        <div class="page-subtitle">Course schedules, attendance baselines, tasks &amp; study resources organized per subject</div>
       </div>
+      <button class="btn btn-secondary" onclick="showBaselineModal()" style="display:inline-flex;align-items:center;gap:6px;font-size:0.84rem;padding:7px 14px">
+        📊 Set Attendance Baseline
+      </button>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(280px, 1fr));gap:14px">
       ${cardsHTML}
@@ -4058,10 +4384,22 @@ function renderSingleSubjectHub(el, subj, allSubjects) {
               ${subj.room ? 'Room: <strong>' + subj.room + '</strong>' : ''}
             </div>
           </div>
-          <span class="type-badge" style="font-size:0.8rem;padding:4px 10px;background:${att.pct===null?'var(--surface-2)':att.pct>=75?'rgba(16,185,129,0.15)':'rgba(239,68,68,0.15)'};color:${att.pct===null?'var(--text-muted)':att.pct>=75?'var(--green)':'var(--red)'}">
-            ${att.pct !== null ? `${att.pct}% Attendance (${att.attended}/${att.total})` : 'No Attendance Marked'}
-          </span>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span class="type-badge" style="font-size:0.8rem;padding:5px 12px;background:${att.pct===null?'var(--surface-2)':att.pct>=75?'rgba(16,185,129,0.15)':'rgba(239,68,68,0.15)'};color:${att.pct===null?'var(--text-muted)':att.pct>=75?'var(--green)':'var(--red)'}">
+              ${att.pct !== null ? `${att.exactPct !== null ? att.exactPct : att.pct}% Attendance (${att.attended}/${att.total})` : 'No Attendance Set'}
+            </span>
+            <button class="btn btn-sm ${att.hasBaseline ? 'btn-secondary' : 'btn-primary'}" onclick="showBaselineModal('${subj.code || subj.name}')" style="display:inline-flex;align-items:center;gap:6px;font-size:0.78rem;padding:5px 11px">
+              📊 ${att.hasBaseline ? 'Edit Baseline' : 'Set Baseline'}
+            </button>
+          </div>
         </div>
+
+        ${att.hasBaseline ? `
+          <div style="font-size:0.78rem;color:var(--text-secondary);margin-top:12px;padding:8px 12px;background:var(--surface-2);border-radius:6px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
+            <div>📌 ERP Baseline: <strong>${att.baseline.present} / ${att.baseline.totalCount}</strong> (${att.baseline.totalCount > 0 ? ((att.baseline.present/att.baseline.totalCount)*100).toFixed(2) : 0}%)</div>
+            <div>${att.dailyAttended > 0 || att.dailySkipped > 0 ? `Live marked: <strong>+${att.dailyAttended}</strong> attended, <strong>+${att.dailySkipped}</strong> missed` : 'Live tracking active from baseline'}</div>
+          </div>
+        ` : ''}
 
         <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:10px;margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
           <div style="background:var(--surface-2);padding:10px 12px;border-radius:8px">
@@ -5359,6 +5697,16 @@ function renderSettings() {
       </div>
     </div>
 
+    <div class="section-heading">${icons.timetable()} Mid-Semester Attendance Baseline</div>
+    <div class="card" style="padding:20px;margin-bottom:20px">
+      <div style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:12px;line-height:1.5">
+        Started using Clarity Desk mid-semester? Manually enter your current college portal / ERP attendance counts per subject. Future attendance marked in your timetable will calculate continuously from this baseline.
+      </div>
+      <button class="btn-secondary" onclick="showBaselineModal()" style="display:inline-flex;align-items:center;gap:6px;font-size:0.84rem;padding:7px 14px">
+        📊 Configure Attendance Baselines →
+      </button>
+    </div>
+
     <div class="section-heading">${icons.clock()} Academic Countdown</div>
     <div class="card" style="padding:20px;margin-bottom:20px">
       <div class="form-group" style="margin-bottom:0">
@@ -6095,17 +6443,7 @@ const ClarityAssistant = (() => {
   // ── Data Readers ──────────────────────────────────────────────
 
   function getAttendanceSummary() {
-    const data = safeGetStorage(KEY_ATTENDANCE, {}) || {};
-    let attended = 0, skipped = 0;
-    Object.values(data).forEach(dayObj => {
-      if (dayObj && typeof dayObj === 'object') {
-        Object.values(dayObj).forEach(st => {
-          if (st === 'attended') attended++;
-          else if (st === 'skipped') skipped++;
-        });
-      }
-    });
-    return { attended, skipped, total: attended + skipped };
+    return getOverallAttendance();
   }
 
   function getTodayClasses() {
@@ -6555,6 +6893,13 @@ window.submitNoticeChannelModal = submitNoticeChannelModal;
 window.handleNoticeSourceClick = handleNoticeSourceClick;
 window.showDevNotesModal      = showDevNotesModal;
 window.saveNoticeChannelsFromSettings = saveNoticeChannelsFromSettings;
+
+// Attendance Baseline
+window.showBaselineModal           = showBaselineModal;
+window.onBaselineSubjectChange     = onBaselineSubjectChange;
+window.updateBaselinePreview       = updateBaselinePreview;
+window.saveSubjectBaselineFromModal = saveSubjectBaselineFromModal;
+window.clearSubjectBaseline        = clearSubjectBaseline;
 
 // Desk Assistant
 window.toggleAssistant       = toggleAssistant;

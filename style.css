@@ -1519,6 +1519,17 @@ a.card:hover,
   overflow: hidden;
 }
 
+/* ── Mid-Semester Attendance Baseline Dialog ────────────────── */
+.baseline-dialog {
+  max-width: 520px;
+  width: 94vw;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 14px);
+  padding: 26px 24px;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.22);
+}
+
 /* ── Dev Notes & Changelog Dedicated Dialog ─────────────────── */
 .dev-notes-dialog {
   max-width: 620px;
