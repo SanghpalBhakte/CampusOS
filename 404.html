@@ -91,26 +91,17 @@
     </div>
 
     <div class="topbar-actions">
-      <button class="btn-icon" id="sync-status-btn" onclick="navigateTo('settings')" title="Cloud Sync Status" aria-label="Cloud sync status" style="font-size:0.75rem;width:auto;padding:0 8px;gap:4px">
+      <button class="btn-icon" id="sync-status-btn" onclick="navigateTo('settings')" title="Cloud Sync Status" aria-label="Cloud sync status" style="font-size:1rem;">
         <span id="sync-icon">☁️</span>
-        <span id="sync-label" class="text-xs text-muted">Local</span>
       </button>
       <button class="btn-assistant-toggle" id="assistant-toggle-btn" onclick="toggleAssistant()" title="Ask Desk Assistant (Ctrl+/)" aria-label="Open Desk Assistant" aria-expanded="false">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <circle cx="12" cy="12" r="3.6" fill="currentColor"/>
           <line x1="12" y1="15.8" x2="12" y2="20.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity="0.75"/>
-          <line x1="6.5" y1="21.5" x2="25.5" y2="21.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <line x1="6.5" y1="21.5" x2="17.5" y2="21.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
         </svg>
         <span>Ask Desk</span>
       </button>
-      <select id="theme-selector" class="theme-selector-topbar" aria-label="Select visual theme" title="Select visual theme" onchange="setTheme(this.value)">
-        <option value="paper-slate">📄 Paper Slate</option>
-        <option value="midnight-ink">🌌 Midnight Ink</option>
-        <option value="espresso-desk">☕ Espresso Desk</option>
-        <option value="sandstone-notes">📜 Sandstone Notes</option>
-        <option value="nordic-frost">❄️ Nordic Frost</option>
-        <option value="misty-mint">🍃 Misty Mint</option>
-      </select>
       <div class="avatar" id="topbar-avatar" onclick="navigateTo('settings')" title="Your Profile" style="cursor:pointer">?</div>
     </div>
   </header>
@@ -154,7 +145,7 @@
           <line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/>
         </svg>
         Tasks & Deadlines
-        <span class="nav-badge" id="assign-badge-sidebar">0</span>
+        <span class="nav-alert-dot" id="assign-dot-sidebar"></span>
       </div>
 
       <div class="nav-item" data-nav="notices" onclick="navigateTo('notices')" id="sidebar-notices">
@@ -191,6 +182,14 @@
           <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
         </svg>
         Desk Settings
+      </div>
+
+      <!-- Sidebar footer: semester context + theme dot -->
+      <div class="sidebar-footer">
+        <span class="sidebar-semester" id="sidebar-semester-label"></span>
+        <div class="sidebar-theme-dot" id="sidebar-theme-dot"
+             title="Change theme — go to Settings"
+             onclick="navigateTo('settings')"></div>
       </div>
     </nav>
 
@@ -371,8 +370,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
 <!-- Firebase Config & App Script -->
-<script src="firebase-config.js?v=85"></script>
-<script type="module" src="app.js?v=85"></script>
+<script src="firebase-config.js?v=86"></script>
+<script type="module" src="app.js?v=86"></script>
 
 </body>
 </html>

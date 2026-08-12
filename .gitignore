@@ -15,3 +15,6 @@ Desktop.ini
 .env.test.local
 .env.production.local
 firebase-config.local.js
+
+# Dependencies
+node_modules/

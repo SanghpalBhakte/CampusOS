@@ -106,6 +106,13 @@ function updateTopbarProfile() {
       av.title       = 'Set up your profile';
     }
   }
+  // Sidebar semester label
+  const semLabel = document.getElementById('sidebar-semester-label');
+  if (semLabel) {
+    const parts = [liveProfile.branch, liveProfile.year].filter(Boolean);
+    semLabel.textContent = parts.length ? parts.join(' · ') : 'Clarity Desk';
+    semLabel.title = semLabel.textContent;
+  }
 }
 
 // ── Assignments (status overrides from localStorage) ──────────
@@ -217,18 +224,8 @@ function initFirebase() {
   }
 }
 
-function triggerConfetti() {
-  try {
-    if (typeof confetti === 'function') {
-      confetti({
-        particleCount: 38,
-        spread: 55,
-        origin: { y: 0.82 },
-        colors: ['#6366f1', '#10b981', '#f59e0b', '#ec4899']
-      });
-    }
-  } catch (_) {}
-}
+// triggerConfetti removed — calm confirmation used instead
+
 
 function showToast(msg, type = 'info') {
   let toastContainer = document.getElementById('toast-container');
@@ -263,22 +260,19 @@ function showToast(msg, type = 'info') {
 }
 
 function updateSyncUI(status = null) {
-  const label = document.getElementById('sync-label');
-  const icon  = document.getElementById('sync-icon');
-  if (!label || !icon) return;
+  const icon = document.getElementById('sync-icon');
+  const btn  = document.getElementById('sync-status-btn');
+  if (!icon) return;
 
   if (status === 'denied') {
-    icon.textContent  = '🔒';
-    label.textContent = 'Access Denied';
-    label.style.color = 'var(--red)';
+    icon.textContent = '🔒';
+    if (btn) btn.title = 'Access Denied — check Firestore rules';
   } else if (currentUser) {
-    icon.textContent  = '⚡';
-    label.textContent = 'Synced';
-    label.style.color = 'var(--green)';
+    icon.textContent = '⚡';
+    if (btn) btn.title = 'Synced to cloud';
   } else {
-    icon.textContent  = '☁️';
-    label.textContent = 'Local';
-    label.style.color = 'var(--text-muted)';
+    icon.textContent = '☁️';
+    if (btn) btn.title = 'Local only — sign in to sync';
   }
 }
 
@@ -2113,10 +2107,8 @@ function setTheme(theme) {
 }
 
 function updateThemeSelector(theme) {
-  const selector = document.getElementById('theme-selector');
-  if (selector && selector.value !== theme) {
-    selector.value = theme;
-  }
+  // Theme selector moved from topbar to Settings page — no DOM element to update here.
+  // The Settings page re-renders on setTheme() so active state is always current.
 }
 
 // ── Routing ───────────────────────────────────────────────────
@@ -2258,6 +2250,16 @@ function dueDaysLeft(dateStr) {
   const due = new Date(dateStr + 'T00:00:00');
   if (isNaN(due.getTime())) return null;
   return Math.round((due - now) / 86400000);
+}
+
+function formatRelativeDueDate(dateStr) {
+  const days = dueDaysLeft(dateStr);
+  if (days === null) return { label: 'No deadline', cls: 'ongoing' };
+  if (days < 0) return { label: `${Math.abs(days)}d overdue`, cls: 'overdue' };
+  if (days === 0) return { label: 'Due Today', cls: 'today' };
+  if (days === 1) return { label: 'Due Tomorrow', cls: 'soon' };
+  if (days <= 7) return { label: `Due in ${days}d`, cls: 'soon' };
+  return { label: formatDate(dateStr), cls: '' };
 }
 
 function isTaskOverdue(task) {
@@ -2928,11 +2930,10 @@ window.setAttendance = function(dateStr, classKey, status) {
   } else {
     data[dateStr][classKey] = status;
     if (status === 'attended') {
-      triggerConfetti();
       const streak = calculateAttendanceStreak();
-      showToast(streak >= 3 ? `Attendance logged ✓ · Streak: ${streak} classes! 🔥` : 'Attendance logged: Attended ✓', 'success');
+      showToast(streak >= 3 ? `Attendance logged: Attended ✓ (Streak: ${streak})` : 'Attendance logged: Attended ✓', 'success');
     } else {
-      showToast('Attendance logged: Bunked ✕', 'info');
+      showToast('Attendance logged: Skipped', 'info');
     }
   }
   
@@ -3512,40 +3513,54 @@ function renderDashboard() {
     const examDay  = new Date(liveProfile.examDate + 'T00:00:00');
     const daysLeft = Math.ceil((examDay - today) / 86400000);
     if (daysLeft > 0) {
-      countdownText = `${daysLeft} days to End-Sem Exams (${formatDate(liveProfile.examDate)})`;
+      countdownText = `${daysLeft} days to End-Sem (${formatDate(liveProfile.examDate)})`;
     } else if (daysLeft === 0) {
-      countdownText = `🎯 Exam is today — all the best!`;
+      countdownText = `End-Sem Exam is today`;
     }
   }
 
   const displayName = getDisplayName();
+  const firstName = displayName ? displayName.split(' ')[0] : '';
+  const greeting = greetingWord();
   const needsSetup = !displayName;
-  const greetingHeading = displayName ? `${greetingWord()}, ${displayName.split(' ')[0]}! 👋` : `${greetingWord()}! 👋`;
 
-  // Focus status pill for the hero
-  let focusStatusHTML = '';
+  // 1. Contextual Temporal Anchor — answers what is happening now or what matters next
+  let temporalHeading = '';
   if (activeClass) {
-    focusStatusHTML = `
-      <div class="greeting-focus-pill">
-        <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green)"></span>
-        <span>In Session: <strong>${activeClass.subject}</strong> · ${activeClass.room || 'Classroom'} (${activeClass.time}–${activeClass.end})</span>
-      </div>`;
+    temporalHeading = `In session: ${activeClass.subject} (${activeClass.room || 'Classroom'}) until ${activeClass.end || 'slot end'}`;
   } else if (nextClass) {
-    focusStatusHTML = `
-      <div class="greeting-focus-pill">
-        <span>⏳ Next Class: <strong>${nextClass.subject}</strong> at ${nextClass.time} · ${nextClass.room || 'Classroom'}</span>
-      </div>`;
+    temporalHeading = `Next class: ${nextClass.subject} at ${nextClass.time}${nextClass.room ? ` · ${nextClass.room}` : ''}`;
   } else if (dayClasses.length > 0) {
-    focusStatusHTML = `
-      <div class="greeting-focus-pill">
-        <span>✨ All classes wrapped up for today</span>
-      </div>`;
+    temporalHeading = `All classes finished for today.`;
   } else {
-    focusStatusHTML = `
-      <div class="greeting-focus-pill">
-        <span>🏖️ Free Day — No classes scheduled</span>
-      </div>`;
+    temporalHeading = `No classes scheduled today.`;
   }
+
+  const fullGreetingText = firstName ? `${greeting}, ${firstName}. ${temporalHeading}` : `${greeting}. ${temporalHeading}`;
+
+  // 2. Compact contextual meta line in natural language (replaces disconnected stat chips)
+  const metaParts = [];
+  metaParts.push(`<span class="anchor-meta-item">${icons.calendar()}&nbsp;${DAY_NAMES[dayIdx]}, ${now.getDate()} ${MONTH_NAMES[now.getMonth()]}</span>`);
+
+  if (dayClasses.length > 0) {
+    metaParts.push(`<span class="anchor-meta-item">${classesLeftCount} of ${dayClasses.length} class${dayClasses.length !== 1 ? 'es' : ''} left</span>`);
+  }
+
+  if (pending > 0) {
+    metaParts.push(`<span class="anchor-meta-item" style="color:${overdue > 0 ? 'var(--red)' : 'inherit'}">${pending} task${pending !== 1 ? 's' : ''} pending${overdue > 0 ? ` (${overdue} overdue)` : ''}</span>`);
+  } else {
+    metaParts.push(`<span class="anchor-meta-item" style="color:var(--green)">All tasks submitted</span>`);
+  }
+
+  if (attendancePct !== null) {
+    metaParts.push(`<span class="anchor-meta-item" style="color:${isAttendanceAtRisk ? 'var(--red)' : 'var(--green)'}">Attendance: ${attendancePct}% (${dashGuidance.isSafe ? 'Safe' : 'Action needed'})</span>`);
+  }
+
+  if (countdownText) {
+    metaParts.push(`<span class="anchor-meta-item">🎯 ${countdownText}</span>`);
+  }
+
+  const metaLineHTML = metaParts.join('<span class="anchor-meta-dot">·</span>');
 
   const setupBanner = needsSetup ? `
     <div class="card" style="margin-bottom:18px;display:flex;align-items:center;gap:14px;background:var(--accent-dim);border-color:color-mix(in srgb, var(--accent) 35%, var(--border));padding:14px 18px">
@@ -3557,7 +3572,7 @@ function renderDashboard() {
       <button class="btn-primary" onclick="navigateTo('settings')" style="flex-shrink:0;padding:7px 16px;font-size:0.82rem;font-weight:600">Set Up Profile →</button>
     </div>` : '';
 
-  // Urgent & Active tasks: Overdue or Due Today first, then due soon, then standing ongoing missions
+  // Urgent & Active tasks
   const urgentTasks = allTasks()
     .filter(a => a.status === 'pending')
     .sort((a,b) => {
@@ -3581,240 +3596,214 @@ function renderDashboard() {
   const quickLinksPreview = loadCustomLinks().slice(0, 4);
 
   el.innerHTML = `
-    <!-- 1. DOMINANT TODAY DESK HERO -->
-    <div class="dashboard-hero-header">
-      <div class="today-hero-surface">
-        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
-          <div>
-            <div class="greeting-text">${greetingHeading}</div>
-            <div class="greeting-date">
-              ${icons.calendar()}
-              <span>${DAY_NAMES[now.getDay()]}, ${now.getDate()} ${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}</span>
-            </div>
-            ${focusStatusHTML}
-          </div>
-          <button class="btn btn-sm btn-review" onclick="navigateTo('review')" title="Weekly reset & reflection">
-            📋 Weekly Review
-          </button>
+    <!-- 1. CALM TEXT-FIRST TEMPORAL ANCHOR -->
+    <div class="dashboard-anchor">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div>
+          <div class="anchor-greeting">${fullGreetingText}</div>
+          <div class="anchor-meta" style="margin-top:6px">${metaLineHTML}</div>
         </div>
-        ${countdownText ? `
-          <div style="margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.18);font-size:0.8rem;opacity:0.92;display:flex;align-items:center;gap:6px">
-            <span>🎯</span> <strong>${countdownText}</strong>
-          </div>` : ''}
-      </div>
-    </div>
-
-    <!-- 2. STREAMLINED DESK VITALS PULSE STRIP -->
-    <div class="vitals-strip">
-      <div class="vital-item" onclick="navigateTo('timetable')" title="View today's timetable">
-        <div class="vital-top">
-          <span class="vital-label">Classes</span>
-          <span style="color:var(--accent)">${icons.timetable()}</span>
-        </div>
-        <div class="vital-num">${classesLeftCount}</div>
-        <div class="vital-hint">${dayClasses.length} scheduled today</div>
-      </div>
-
-      <div class="vital-item" onclick="navigateTo('assignments')" title="View pending tasks">
-        <div class="vital-top">
-          <span class="vital-label">Pending</span>
-          <span style="color:${pending>0?'var(--red)':'var(--accent)'}">${icons.assignments()}</span>
-        </div>
-        <div class="vital-num" style="color:${pending>0?'var(--red)':'inherit'}">${pending}</div>
-        <div class="vital-hint">${submittedCount} completed</div>
-      </div>
-
-      <div class="vital-item" onclick="navigateTo('assignments')" title="View overdue tasks">
-        <div class="vital-top">
-          <span class="vital-label">Overdue</span>
-          <span style="color:${overdue>0?'var(--red)':'var(--yellow)'}">${icons.alert()}</span>
-        </div>
-        <div class="vital-num" style="color:${overdue>0?'var(--red)':'var(--text-primary)'}">${overdue}</div>
-        <div class="vital-hint">${overdue>0?'Needs attention':'All clear ✓'}</div>
-      </div>
-
-      <div class="vital-item" onclick="navigateTo('review')" title="View attendance guidance">
-        <div class="vital-top">
-          <span class="vital-label">Attendance</span>
-          <span style="color:${isAttendanceAtRisk?'var(--red)':'var(--green)'}">${isAttendanceAtRisk?'⚠️':'📊'}</span>
-        </div>
-        <div class="vital-hint">${attendancePct !== null ? (dashGuidance.isSafe ? 'Safe zone (≥75%)' : 'Needs recovery (<75%)') : 'Attendance not set'}</div>
+        <button class="btn btn-sm btn-secondary" onclick="navigateTo('review')" title="Weekly reflection & guidance" style="font-size:0.76rem;padding:5px 12px;align-self:flex-start">
+          Weekly Review →
+        </button>
       </div>
     </div>
 
     ${setupBanner}
 
-    <!-- 3. MAIN DESK GRID (SCHEDULE & WORKLOAD) -->
-    <div class="dashboard-grid-2col">
-      <!-- LEFT COLUMN: TODAY'S SCHEDULE & ATTENDANCE INSIGHT -->
-      <div class="dashboard-panel">
-        <div class="panel-header">
-          <div class="panel-title">Today's Class Schedule</div>
-          <button class="panel-action" onclick="navigateTo('timetable')">Open Timetable →</button>
-        </div>
+    <!-- 2. DESKTOP WORKSPACE LAYOUT (PRIMARY LEFT + SECONDARY RIGHT) -->
+    <div class="dashboard-layout">
 
-        <div class="card" style="padding:14px">
-          ${dayClasses.length > 0 ? `
-            <div style="display:flex;flex-direction:column;gap:8px">
-              ${dayClasses.map(c => {
-                const classKey = `${c.code || c.subject}_${c.time}`.replace(/[^a-zA-Z0-9_]/g, '');
-                const status = attendanceData[dateStr]?.[classKey] || 'unset';
-                const isNow = (currentMin >= timeToMinutes(c.time || '00:00') && currentMin < timeToMinutes(c.end || '23:59'));
-                const isPast = (currentMin >= timeToMinutes(c.end || '23:59'));
-                return `
-                  <div class="timeline-row ${isNow ? 'current-active' : ''} ${isPast ? 'past-completed' : ''}">
-                    <div style="flex:1;min-width:120px;cursor:pointer" onclick="openSubjectHub('${c.subject}')" title="Open ${c.subject} Notes &amp; Resources">
-                      <div style="font-weight:700;font-size:0.88rem;display:flex;align-items:center;gap:6px">
-                        <span>${c.subject}</span>
-                        ${isNow ? '<span class="type-badge" style="background:var(--accent);color:white;font-size:0.6rem;padding:1px 5px">NOW</span>' : ''}
-                        <span class="type-badge type-${c.type || 'lecture'}" style="font-size:0.62rem">${c.type || 'lecture'}</span>
-                      </div>
-                      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px">
-                        ${c.time}${c.end ? '–' + c.end : ''} ${c.room ? '· ' + c.room : ''} ${c.teacher ? '· Prof. ' + c.teacher : ''}
-                      </div>
-                    </div>
-                    <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
-                      <button class="btn btn-sm ${status==='attended'?'btn-primary':'btn-secondary'}" onclick="event.stopPropagation(); setAttendance('${dateStr}', '${classKey}', 'attended')" aria-label="Mark ${c.subject} as attended" style="padding:3px 8px;font-size:0.72rem;font-weight:600;${status==='attended'?'background:var(--green);border-color:var(--green);color:white;':''}">
-                        ${status==='attended'?'✓ Attended':'Attended'}
-                      </button>
-                      <button class="btn btn-sm ${status==='skipped'?'btn-primary':'btn-secondary'}" onclick="event.stopPropagation(); setAttendance('${dateStr}', '${classKey}', 'skipped')" aria-label="Mark ${c.subject} as skipped" style="padding:3px 8px;font-size:0.72rem;font-weight:600;${status==='skipped'?'background:var(--red);border-color:var(--red);color:white;':''}">
-                        ${status==='skipped'?'✕ Skipped':'Skipped'}
-                      </button>
-                      <button class="btn btn-xs btn-secondary" onclick="event.stopPropagation(); openSubjectHub('${c.subject}')" title="Open ${c.subject} Hub" style="font-size:0.7rem;padding:2px 6px">
-                        Hub →
-                      </button>
-                    </div>
-                  </div>`;
-              }).join('')}
-            </div>
-          ` : `
-            <div style="padding:24px 12px;text-align:center;color:var(--text-muted);font-size:0.85rem">
-              🏖️ No classes scheduled for today. Take time to study or rest!
-            </div>
-          `}
-        </div>
+      <!-- LEFT COLUMN: PRIMARY WORKBENCH -->
+      <div class="dashboard-left">
+        <!-- TODAY'S SCHEDULE -->
+        <div class="dashboard-panel">
+          <div class="panel-header">
+            <div class="panel-title">Today's Class Schedule</div>
+            <button class="panel-action" onclick="navigateTo('timetable')">Open Timetable →</button>
+          </div>
 
-        <!-- ATTENDANCE GUIDANCE CARD -->
-        <div class="card card-sm" style="padding:12px 14px;border-left:3px solid ${isAttendanceAtRisk ? 'var(--red)' : attendancePct !== null ? 'var(--green)' : 'var(--accent)'};background:${isAttendanceAtRisk ? 'rgba(239,68,68,0.06)' : 'var(--surface)'}">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
-            <div style="flex:1;min-width:180px">
-              <div style="font-weight:700;font-size:0.84rem;color:${isAttendanceAtRisk ? 'var(--red)' : 'var(--text-primary)'}">
-                ${isAttendanceAtRisk ? `Attendance Alert (${attendancePct}%)` : attendancePct !== null ? `Attendance Health (${attendancePct}%)` : 'Attendance Health Tracker'}
+          <div class="card" style="padding:14px">
+            ${dayClasses.length > 0 ? `
+              <div style="display:flex;flex-direction:column;gap:8px">
+                ${dayClasses.map(c => {
+                  const classKey = `${c.code || c.subject}_${c.time}`.replace(/[^a-zA-Z0-9_]/g, '');
+                  const status = attendanceData[dateStr]?.[classKey] || 'unset';
+                  const isNow = (currentMin >= timeToMinutes(c.time || '00:00') && currentMin < timeToMinutes(c.end || '23:59'));
+                  const isPast = (currentMin >= timeToMinutes(c.end || '23:59'));
+                  return `
+                    <div class="timeline-row ${isNow ? 'current-active' : ''} ${isPast ? 'past-completed' : ''}">
+                      <div style="flex:1;min-width:120px;cursor:pointer" onclick="openSubjectHub('${c.subject}')" title="Open ${c.subject} Notes &amp; Resources">
+                        <div style="font-weight:700;font-size:0.88rem;display:flex;align-items:center;gap:6px">
+                          <span>${c.subject}</span>
+                          ${isNow ? '<span class="type-badge" style="background:var(--accent);color:white;font-size:0.6rem;padding:1px 5px">NOW</span>' : ''}
+                          <span class="type-badge type-${c.type || 'lecture'}" style="font-size:0.62rem">${c.type || 'lecture'}</span>
+                        </div>
+                        <div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px">
+                          ${c.time}${c.end ? '–' + c.end : ''} ${c.room ? '· ' + c.room : ''} ${c.teacher ? '· Prof. ' + c.teacher : ''}
+                        </div>
+                      </div>
+                      <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+                        <button class="btn btn-sm ${status==='attended'?'btn-primary':'btn-secondary'}" onclick="event.stopPropagation(); setAttendance('${dateStr}', '${classKey}', 'attended')" aria-label="Mark ${c.subject} as attended" style="padding:4px 9px;font-size:0.72rem;font-weight:600;${status==='attended'?'background:var(--green);border-color:var(--green);color:white;':''}">
+                          ${status==='attended'?'Attended ✓':'Attended'}
+                        </button>
+                        <button class="btn btn-sm ${status==='skipped'?'btn-primary':'btn-secondary'}" onclick="event.stopPropagation(); setAttendance('${dateStr}', '${classKey}', 'skipped')" aria-label="Mark ${c.subject} as skipped" style="padding:4px 9px;font-size:0.72rem;font-weight:600;${status==='skipped'?'background:var(--red);border-color:var(--red);color:white;':''}">
+                          ${status==='skipped'?'Skipped':'Skipped'}
+                        </button>
+                        <button class="btn btn-xs btn-secondary" onclick="event.stopPropagation(); openSubjectHub('${c.subject}')" title="Open ${c.subject} Hub" style="font-size:0.7rem;padding:2px 6px">
+                          Hub →
+                        </button>
+                      </div>
+                    </div>`;
+                }).join('')}
               </div>
-              <div style="font-size:0.76rem;color:var(--text-muted);margin-top:2px">
-                ${dashGuidance.message}
+            ` : `
+              <div style="padding:24px 12px;text-align:center;color:var(--text-muted);font-size:0.85rem">
+                No classes scheduled for today. Take time to study or rest!
               </div>
-            </div>
-            <button class="btn btn-sm btn-secondary" onclick="navigateTo('review')" style="font-size:0.72rem;padding:3px 8px">
-              Review Guidance →
-            </button>
+            `}
           </div>
         </div>
+
+        <!-- TASKS & DEADLINES -->
+        <div class="dashboard-panel">
+          <div class="panel-header">
+            <div class="panel-title">Tasks &amp; Deadlines</div>
+            <button class="panel-action" onclick="navigateTo('assignments')">Open Tasks (${pending}) →</button>
+          </div>
+
+          <div class="card" style="padding:14px">
+            <!-- WORKLOAD PROGRESS -->
+            <div style="margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border)">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                <span class="text-xs font-semibold">Completed ${submittedCount} of ${total} tasks</span>
+                <span class="text-xs text-muted font-semibold">${progress}%</span>
+              </div>
+              <div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:${progress}%"></div></div>
+            </div>
+
+            <!-- URGENT TASKS LIST WITH RELATIVE DUE DATES -->
+            ${urgentTasks.length > 0 ? `
+              <div style="display:flex;flex-direction:column;gap:6px">
+                ${urgentTasks.map(a => {
+                  const isOngoing = !!a.noDeadline || (a.taskType === 'mission' && !a.dueDate);
+                  const rel = isOngoing ? { label: 'Ongoing', cls: 'ongoing' } : formatRelativeDueDate(a.dueDate);
+                  const done = a.status === 'submitted';
+                  const dateMeta = isOngoing ? 'Standing Mission' : formatDate(a.dueDate);
+                  return `
+                    <div class="card card-sm assignment-card" style="margin-bottom:0;display:flex;align-items:center;gap:10px;padding:9px 12px">
+                      <div onclick="toggleAssignment('${a.id}')" title="Click to mark done" style="width:18px;height:18px;border-radius:4px;border:2px solid ${done ? 'var(--green)' : a.priority==='high' ? 'var(--red)' : a.priority==='medium' ? 'var(--yellow)' : 'var(--border)'};background:${done ? 'var(--green)' : 'transparent'};display:grid;place-items:center;flex-shrink:0;color:white;cursor:pointer;transition:all 0.15s">
+                        ${done ? icons.check() : ''}
+                      </div>
+                      <div style="flex:1;min-width:0;cursor:pointer" onclick="navigateTo('assignments')">
+                        <div class="font-semibold" style="font-size:0.86rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${done?'text-decoration:line-through;opacity:0.5':''}">${a.title}</div>
+                        <div class="text-xs text-muted" style="display:flex;align-items:center;gap:6px;margin-top:2px">
+                          <span onclick="event.stopPropagation(); openSubjectHub('${a.subject}')" style="color:var(--accent);font-weight:600;cursor:pointer" title="Open ${a.subject} Hub">${a.subject || 'Academic'}</span>
+                          <span>· ${dateMeta}</span>
+                        </div>
+                      </div>
+                      <span class="due-badge ${rel.cls}" style="font-size:0.7rem;padding:2px 7px">${rel.label}</span>
+                    </div>`;
+                }).join('')}
+              </div>
+            ` : `
+              <div style="padding:16px;text-align:center;color:var(--text-muted);font-size:0.84rem">
+                All caught up! No urgent tasks due today.
+              </div>
+            `}
+          </div>
+        </div>
+
+        <!-- QUICK ACTION TOOLS -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:8px">
+          <div class="card card-sm" style="display:flex;align-items:center;gap:8px;padding:8px 12px">
+            <div style="color:var(--accent);opacity:0.8;flex-shrink:0">${icons.plus()}</div>
+            <input type="text" id="quick-add-input" placeholder="Quick add task — e.g. 'DS lab report due Friday'" style="flex:1;border:none;background:transparent;outline:none;font-size:0.85rem;color:var(--text-primary);font-family:var(--font)" onkeypress="if(event.key==='Enter') handleQuickAdd()">
+            <button class="btn btn-xs btn-primary" onclick="handleQuickAdd()">Add</button>
+          </div>
+
+          <div class="card card-sm" style="display:flex;align-items:center;gap:8px;padding:8px 12px">
+            <div style="color:var(--accent);opacity:0.8;flex-shrink:0">✨</div>
+            <input type="text" id="assistant-input" placeholder="Ask Desk — e.g. 'What classes do I have today?'" style="flex:1;border:none;background:transparent;outline:none;font-size:0.85rem;color:var(--text-primary);font-family:var(--font)" onkeypress="if(event.key==='Enter') handleAssistantQuestion()">
+          </div>
+        </div>
+        <div id="assistant-answer-container"></div>
       </div>
 
-      <!-- RIGHT COLUMN: URGENT TASKS & WORKLOAD -->
-      <div class="dashboard-panel">
-        <div class="panel-header">
-          <div class="panel-title">Urgent Tasks &amp; Workload</div>
-          <button class="panel-action" onclick="navigateTo('assignments')">Open Tasks (${pending}) →</button>
-        </div>
+      <!-- RIGHT COLUMN: AMBIENT & HEALTH CONTEXT (Sticky on Desktop) -->
+      <div class="dashboard-right-panel">
 
-        <div class="card" style="padding:14px">
-          <!-- WORKLOAD PROGRESS -->
-          <div style="margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-              <span class="text-xs font-semibold">Completed ${submittedCount} of ${total} tasks</span>
-              <span class="text-xs text-muted font-semibold">${progress}%</span>
-            </div>
-            <div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:${progress}%"></div></div>
+        <!-- ATTENDANCE HEALTH CARD -->
+        <div class="dashboard-panel">
+          <div class="panel-header">
+            <div class="panel-title">Attendance Health</div>
+            <button class="panel-action" onclick="navigateTo('review')">Guidance →</button>
           </div>
-
-          <!-- URGENT TASKS LIST -->
-          ${urgentTasks.length > 0 ? `
-            <div style="display:flex;flex-direction:column;gap:6px">
-              ${urgentTasks.map(a => {
-                const isOngoing = !!a.noDeadline || (a.taskType === 'mission' && !a.dueDate);
-                const days = isOngoing ? null : dueDaysLeft(a.dueDate);
-                let label = '';
-                let cls = '';
-                if (isOngoing) {
-                  label = '🚀 Ongoing';
-                  cls = 'ongoing';
-                } else if (days !== null) {
-                  label = days < 0 ? `${Math.abs(days)}d overdue` : days === 0 ? 'Due Today' : days === 1 ? 'Due Tomorrow' : `${days}d left`;
-                  cls = days < 0 ? 'overdue' : days === 0 ? 'today' : days <= 3 ? 'soon' : '';
-                }
-                const done = a.status === 'submitted';
-                const dateMeta = isOngoing ? 'Standing Mission' : formatDate(a.dueDate);
-                return `
-                  <div class="card card-sm assignment-card" style="margin-bottom:0;display:flex;align-items:center;gap:10px;padding:9px 12px">
-                    <div onclick="toggleAssignment('${a.id}')" title="Click to mark done" style="width:18px;height:18px;border-radius:4px;border:2px solid ${done ? 'var(--green)' : a.priority==='high' ? 'var(--red)' : a.priority==='medium' ? 'var(--yellow)' : 'var(--border)'};background:${done ? 'var(--green)' : 'transparent'};display:grid;place-items:center;flex-shrink:0;color:white;cursor:pointer;transition:all 0.15s">
-                      ${done ? icons.check() : ''}
-                    </div>
-                    <div style="flex:1;min-width:0;cursor:pointer" onclick="navigateTo('assignments')">
-                      <div class="font-semibold" style="font-size:0.86rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${done?'text-decoration:line-through;opacity:0.5':''}">${a.title}</div>
-                      <div class="text-xs text-muted" style="display:flex;align-items:center;gap:6px">
-                        <span onclick="event.stopPropagation(); openSubjectHub('${a.subject}')" style="color:var(--accent);font-weight:600;cursor:pointer" title="Open ${a.subject} Hub">${a.subject || 'Academic'}</span>
-                        <span>· ${dateMeta}</span>
-                      </div>
-                    </div>
-                    <span class="due-badge ${cls}" style="font-size:0.7rem;padding:2px 6px">${label}</span>
-                  </div>`;
-              }).join('')}
+          <div class="card card-sm" style="padding:14px;border-left:3px solid ${isAttendanceAtRisk ? 'var(--red)' : attendancePct !== null ? 'var(--green)' : 'var(--accent)'};background:${isAttendanceAtRisk ? 'rgba(239,68,68,0.04)' : 'var(--surface)'}">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">
+              <div style="font-weight:700;font-size:0.88rem;color:${isAttendanceAtRisk ? 'var(--red)' : 'var(--text-primary)'}">
+                ${attendancePct !== null ? `${attendancePct}% Overall` : 'Attendance Health'}
+              </div>
+              <span class="type-badge" style="font-size:0.66rem;padding:2px 6px;background:${isAttendanceAtRisk ? 'rgba(239,68,68,0.12)' : 'rgba(16,185,129,0.12)'};color:${isAttendanceAtRisk ? 'var(--red)' : 'var(--green)'}">
+                ${attendancePct !== null ? (dashGuidance.isSafe ? 'Safe (≥75%)' : 'Recovery needed') : 'Not configured'}
+              </span>
             </div>
-          ` : `
-            <div style="padding:16px;text-align:center;color:var(--text-muted);font-size:0.84rem">
-              🌿 All caught up! No urgent tasks due today.
+            <div style="font-size:0.78rem;color:var(--text-secondary);line-height:1.45">
+              ${dashGuidance.message}
             </div>
-          `}
+            ${attendancePct !== null ? `
+              <div style="margin-top:10px">
+                <div class="att-bar-wrap">
+                  <div class="att-bar-seg att-seg-present" style="width:${totalMarked > 0 ? Math.round((totalAttended/totalMarked)*100) : 0}%"></div>
+                  <div class="att-bar-seg att-seg-absent" style="width:${totalMarked > 0 ? Math.round((totalSkipped/totalMarked)*100) : 0}%"></div>
+                </div>
+              </div>
+            ` : ''}
+          </div>
         </div>
 
-        <!-- NOTICE HIGHLIGHT -->
+        <!-- LATEST NOTICE -->
         ${latestNotice ? `
-          <div class="card card-sm notice-card ${latestNotice.important ? 'important' : ''}" onclick="navigateTo('notices')" style="padding:12px 14px;cursor:pointer">
-            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
-              <div style="font-weight:700;font-size:0.86rem;color:var(--text-primary)">${latestNotice.title}</div>
-              <span class="cat-badge cat-${latestNotice.category}" style="font-size:0.65rem">${latestNotice.category}</span>
+          <div class="dashboard-panel">
+            <div class="panel-header">
+              <div class="panel-title">Notice Board</div>
+              <button class="panel-action" onclick="navigateTo('notices')">All Notices →</button>
             </div>
-            <div style="font-size:0.76rem;color:var(--text-secondary);margin-top:3px;line-height:1.4">
-              ${latestNotice.content.length > 95 ? latestNotice.content.slice(0, 92) + '…' : latestNotice.content}
-            </div>
-            <div style="font-size:0.72rem;color:var(--text-muted);margin-top:5px;display:flex;align-items:center;justify-content:space-between">
-              <span>${formatDate(latestNotice.date)}</span>
-              <span style="color:var(--accent);font-weight:600">Read Notice →</span>
+            <div class="card card-sm notice-card ${latestNotice.important ? 'important' : ''}" onclick="navigateTo('notices')" style="padding:12px 14px;cursor:pointer">
+              <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+                <div style="font-weight:700;font-size:0.86rem;color:var(--text-primary)">${latestNotice.title}</div>
+                <span class="cat-badge cat-${latestNotice.category}" style="font-size:0.65rem">${latestNotice.category}</span>
+              </div>
+              <div style="font-size:0.76rem;color:var(--text-secondary);margin-top:4px;line-height:1.4">
+                ${latestNotice.content.length > 95 ? latestNotice.content.slice(0, 92) + '…' : latestNotice.content}
+              </div>
+              <div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;display:flex;align-items:center;justify-content:space-between">
+                <span>${formatDate(latestNotice.date)}</span>
+                <span style="color:var(--accent);font-weight:600">Read Notice →</span>
+              </div>
             </div>
           </div>
         ` : ''}
-      </div>
-    </div>
 
-    <!-- 4. QUICK TOOLS & STUDY SHORTCUTS -->
-    <div style="margin-top:6px;margin-bottom:24px">
-      <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:8px;margin-bottom:12px">
-        <div class="card card-sm" style="display:flex;align-items:center;gap:8px;padding:8px 12px">
-          <div style="color:var(--accent);opacity:0.8;flex-shrink:0">${icons.plus()}</div>
-          <input type="text" id="quick-add-input" placeholder="Quick add task — e.g. 'DS lab report due Friday'" style="flex:1;border:none;background:transparent;outline:none;font-size:0.85rem;color:var(--text-primary);font-family:var(--font)" onkeypress="if(event.key==='Enter') handleQuickAdd()">
-          <button class="btn btn-xs btn-primary" onclick="handleQuickAdd()">Add</button>
-        </div>
-
-        <div class="card card-sm" style="display:flex;align-items:center;gap:8px;padding:8px 12px">
-          <div style="color:var(--accent);opacity:0.8;flex-shrink:0">✨</div>
-          <input type="text" id="assistant-input" placeholder="Ask Clarity — e.g. 'What classes do I have today?'" style="flex:1;border:none;background:transparent;outline:none;font-size:0.85rem;color:var(--text-primary);font-family:var(--font)" onkeypress="if(event.key==='Enter') handleAssistantQuestion()">
-        </div>
-      </div>
-      <div id="assistant-answer-container"></div>
-
-      ${quickLinksPreview.length > 0 ? `
-        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:10px">
-          <span style="font-size:0.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;margin-right:4px">Study Shortcuts:</span>
-          ${quickLinksPreview.map(s => `
-            <div class="filter-chip" style="font-size:0.74rem;padding:3px 10px;cursor:pointer;display:flex;align-items:center;gap:6px" onclick="openSubjectHub('${s.subject}')" title="Open ${s.subject} Subject Hub">
-              <span style="width:6px;height:6px;border-radius:50%;background:${s.color || 'var(--accent)'}"></span>
-              <span>${s.subject}</span>
+        <!-- STUDY VAULT SHORTCUTS -->
+        ${quickLinksPreview.length > 0 ? `
+          <div class="dashboard-panel">
+            <div class="panel-header">
+              <div class="panel-title">Study Shortcuts</div>
+              <button class="panel-action" onclick="navigateTo('links')">Vault →</button>
             </div>
-          `).join('')}
-        </div>
-      ` : ''}
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+              ${quickLinksPreview.map(s => `
+                <div class="filter-chip" style="font-size:0.74rem;padding:3px 10px;cursor:pointer;display:flex;align-items:center;gap:6px" onclick="openSubjectHub('${s.subject}')" title="Open ${s.subject} Subject Hub">
+                  <span style="width:6px;height:6px;border-radius:50%;background:${s.color || 'var(--accent)'}"></span>
+                  <span>${s.subject}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        ` : ''}
+
+      </div>
     </div>
   `;
 }
@@ -4145,7 +4134,6 @@ function logSubjectAttendanceAction(subjectKey, action) {
 
   if (action === 'present') {
     liveActions[storageKey].present = (liveActions[storageKey].present || 0) + 1;
-    triggerConfetti();
     showToast(`Logged Present (+1) for ${subj.name} ✓`, 'success');
   } else if (action === 'missed') {
     liveActions[storageKey].missed = (liveActions[storageKey].missed || 0) + 1;
@@ -5282,8 +5270,7 @@ function saveAllReviewedBaselines() {
 
   saveAttendanceBaselines(baselines);
   document.getElementById('ab-review-modal-backdrop')?.remove();
-  triggerConfetti();
-  showToast(`Attendance baselines saved for ${savedCount} subject${savedCount!==1?'s':''} ✓`, 'success');
+  showToast(`Attendance baseline saved for ${savedCount} subject${savedCount!==1?'s':''} ✓`, 'success');
   renderPage(state.currentPage);
 }
 
@@ -5530,16 +5517,16 @@ function renderSubjectsOverview(el, subjects) {
         <!-- Action Buttons: Present, Missed, Leave, Edit baseline -->
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
           <button class="btn btn-sm btn-secondary attendance-action-btn" onclick="event.stopPropagation(); logSubjectAttendanceAction('${s.code || s.name}', 'present')" title="Log 1 class attended" style="color:var(--green);border-color:rgba(16,185,129,0.3)">
-            ✓ Present
+            Present
           </button>
           <button class="btn btn-sm btn-secondary attendance-action-btn" onclick="event.stopPropagation(); logSubjectAttendanceAction('${s.code || s.name}', 'missed')" title="Log 1 class missed" style="color:var(--red);border-color:rgba(239,68,68,0.3)">
-            ✕ Missed
+            Missed
           </button>
           <button class="btn btn-sm btn-secondary attendance-action-btn" onclick="event.stopPropagation(); logSubjectAttendanceAction('${s.code || s.name}', 'leave')" title="Log 1 leave applied" style="color:var(--yellow);border-color:rgba(245,158,11,0.3)">
-            🏖️ Leave
+            Leave
           </button>
           <button class="btn btn-sm btn-secondary attendance-action-btn" onclick="event.stopPropagation(); showBaselineModal('${s.code || s.name}')" style="margin-left:auto;font-size:0.74rem">
-            ✏️ Edit Baseline
+            Edit Baseline
           </button>
         </div>
       </div>
@@ -5673,18 +5660,18 @@ function renderSingleSubjectHub(el, subj, allSubjects) {
 
         <!-- Quick Log Action Bar on Subject Hub -->
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
-          <span style="font-size:0.74rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em">Quick Action:</span>
+          <span style="font-size:0.74rem;font-weight:600;color:var(--text-muted);letter-spacing:-0.01em">Quick Log:</span>
           <button class="btn btn-sm btn-secondary attendance-action-btn" onclick="logSubjectAttendanceAction('${subj.code || subj.name}', 'present')" style="color:var(--green);border-color:rgba(16,185,129,0.35)">
-            ✓ Present (+1)
+            Present (+1)
           </button>
           <button class="btn btn-sm btn-secondary attendance-action-btn" onclick="logSubjectAttendanceAction('${subj.code || subj.name}', 'missed')" style="color:var(--red);border-color:rgba(239,68,68,0.35)">
-            ✕ Missed (+1)
+            Missed (+1)
           </button>
           <button class="btn btn-sm btn-secondary attendance-action-btn" onclick="logSubjectAttendanceAction('${subj.code || subj.name}', 'leave')" style="color:var(--yellow);border-color:rgba(245,158,11,0.35)">
-            🏖️ Leave (+1)
+            Leave (+1)
           </button>
           <button class="btn btn-sm btn-secondary attendance-action-btn" onclick="showBaselineModal('${subj.code || subj.name}')" style="margin-left:auto">
-            ✏️ Edit Baseline
+            Edit Baseline
           </button>
           ${(att.liveAdj.present > 0 || att.liveAdj.missed > 0 || att.liveAdj.leave > 0) ? `
             <button class="btn btn-xs btn-secondary" onclick="undoSubjectAttendanceAction('${subj.code || subj.name}')" title="Reset live manual adjustments" style="color:var(--text-muted);font-size:0.72rem;padding:3px 7px">
@@ -7028,32 +7015,56 @@ function renderSettings() {
     <div class="section-heading">${icons.layers()} Appearance</div>
     <div class="card" style="padding:20px;margin-bottom:20px">
       <div class="form-group" style="margin-bottom:0">
-        <label class="form-label" style="margin-bottom:6px">Choose a workspace environment</label>
-        <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:14px">Six curated palettes with distinct atmospheres. Saves automatically and restores on your next visit.</div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(154px, 1fr));gap:10px">
-          <button class="filter-chip ${(document.documentElement?.getAttribute('data-theme') || 'paper-slate') === 'paper-slate' ? 'active' : ''}" onclick="setTheme('paper-slate')" style="justify-content:flex-start">
-            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#2563eb;margin-right:6px"></span>
-            📄 Paper Slate
+        <label class="form-label" style="margin-bottom:6px">Workspace Environment &amp; Theme</label>
+        <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:14px">Six curated palettes with distinct atmospheres. Saves automatically and syncs to cloud.</div>
+        <div class="theme-swatch-grid">
+          <button class="theme-swatch ${(document.documentElement?.getAttribute('data-theme') || 'paper-slate') === 'paper-slate' ? 'active' : ''}" onclick="setTheme('paper-slate')">
+            <div class="swatch-preview">
+              <div class="swatch-bg" style="background:#f8fafc"></div>
+              <div class="swatch-surface" style="background:#ffffff"></div>
+              <div class="swatch-accent" style="background:#2563eb"></div>
+            </div>
+            <span class="swatch-name">Paper Slate</span>
           </button>
-          <button class="filter-chip ${document.documentElement?.getAttribute('data-theme') === 'midnight-ink' ? 'active' : ''}" onclick="setTheme('midnight-ink')" style="justify-content:flex-start">
-            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#6366f1;margin-right:6px"></span>
-            🌌 Midnight Ink
+          <button class="theme-swatch ${document.documentElement?.getAttribute('data-theme') === 'midnight-ink' ? 'active' : ''}" onclick="setTheme('midnight-ink')">
+            <div class="swatch-preview">
+              <div class="swatch-bg" style="background:#08090d"></div>
+              <div class="swatch-surface" style="background:#11131a"></div>
+              <div class="swatch-accent" style="background:#6366f1"></div>
+            </div>
+            <span class="swatch-name">Midnight Ink</span>
           </button>
-          <button class="filter-chip ${document.documentElement?.getAttribute('data-theme') === 'espresso-desk' ? 'active' : ''}" onclick="setTheme('espresso-desk')" style="justify-content:flex-start">
-            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#d97706;margin-right:6px"></span>
-            ☕ Espresso Desk
+          <button class="theme-swatch ${document.documentElement?.getAttribute('data-theme') === 'espresso-desk' ? 'active' : ''}" onclick="setTheme('espresso-desk')">
+            <div class="swatch-preview">
+              <div class="swatch-bg" style="background:#171310"></div>
+              <div class="swatch-surface" style="background:#221b16"></div>
+              <div class="swatch-accent" style="background:#d97706"></div>
+            </div>
+            <span class="swatch-name">Espresso Desk</span>
           </button>
-          <button class="filter-chip ${document.documentElement?.getAttribute('data-theme') === 'sandstone-notes' ? 'active' : ''}" onclick="setTheme('sandstone-notes')" style="justify-content:flex-start">
-            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#c25e2e;margin-right:6px"></span>
-            📜 Sandstone Notes
+          <button class="theme-swatch ${document.documentElement?.getAttribute('data-theme') === 'sandstone-notes' ? 'active' : ''}" onclick="setTheme('sandstone-notes')">
+            <div class="swatch-preview">
+              <div class="swatch-bg" style="background:#f5f0e6"></div>
+              <div class="swatch-surface" style="background:#fffdfa"></div>
+              <div class="swatch-accent" style="background:#c25e2e"></div>
+            </div>
+            <span class="swatch-name">Sandstone Notes</span>
           </button>
-          <button class="filter-chip ${document.documentElement?.getAttribute('data-theme') === 'nordic-frost' ? 'active' : ''}" onclick="setTheme('nordic-frost')" style="justify-content:flex-start">
-            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#0284c7;margin-right:6px"></span>
-            ❄️ Nordic Frost
+          <button class="theme-swatch ${document.documentElement?.getAttribute('data-theme') === 'nordic-frost' ? 'active' : ''}" onclick="setTheme('nordic-frost')">
+            <div class="swatch-preview">
+              <div class="swatch-bg" style="background:#eaf0f6"></div>
+              <div class="swatch-surface" style="background:#ffffff"></div>
+              <div class="swatch-accent" style="background:#0284c7"></div>
+            </div>
+            <span class="swatch-name">Nordic Frost</span>
           </button>
-          <button class="filter-chip ${document.documentElement?.getAttribute('data-theme') === 'misty-mint' ? 'active' : ''}" onclick="setTheme('misty-mint')" style="justify-content:flex-start">
-            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#1b7a6d;margin-right:6px"></span>
-            🍃 Misty Mint
+          <button class="theme-swatch ${document.documentElement?.getAttribute('data-theme') === 'misty-mint' ? 'active' : ''}" onclick="setTheme('misty-mint')">
+            <div class="swatch-preview">
+              <div class="swatch-bg" style="background:#f0f5f3"></div>
+              <div class="swatch-surface" style="background:#ffffff"></div>
+              <div class="swatch-accent" style="background:#1b7a6d"></div>
+            </div>
+            <span class="swatch-name">Misty Mint</span>
           </button>
         </div>
       </div>
@@ -8234,8 +8245,7 @@ window.toggleAssignment = (id) => {
     ct.status = isNowDone ? 'submitted' : 'pending';
     saveCustomTasks();
     if (isNowDone) {
-      triggerConfetti();
-      showToast('Task marked as completed! 🎯', 'success');
+      showToast('Task marked completed ✓', 'success');
     } else {
       showToast('Task moved back to pending', 'info');
     }
@@ -8250,8 +8260,7 @@ window.toggleAssignment = (id) => {
   a.status = isNowDone ? 'submitted' : 'pending';
   saveAssignments();
   if (isNowDone) {
-    triggerConfetti();
-    showToast('Task marked as completed! 🎯', 'success');
+    showToast('Task marked completed ✓', 'success');
   } else {
     showToast('Task moved back to pending', 'info');
   }
@@ -8283,11 +8292,13 @@ function updateNavBadges() {
   document.title = pending > 0 ? `(${pending}) Clarity Desk` : 'Clarity Desk';
 
   document.querySelectorAll('[data-nav="assignments"]').forEach(el => {
-    const badge = el.querySelector('.nav-badge');
-    if (badge) { badge.textContent = pending; badge.style.display = pending ? '' : 'none'; }
-    el.classList.toggle('has-badge', pending > 0);
-    const dot = el.querySelector('.bnav-dot');
+    // Sidebar: dot indicator (no badge number)
+    const dot = el.querySelector('.nav-alert-dot');
     if (dot) dot.style.display = pending > 0 ? 'block' : 'none';
+    el.classList.toggle('has-overdue', pending > 0);
+    // Bottom nav: keep the dot behavior
+    const bnavDot = el.querySelector('.bnav-dot');
+    if (bnavDot) bnavDot.style.display = pending > 0 ? 'block' : 'none';
   });
 }
 window.updateNavBadges = updateNavBadges;
