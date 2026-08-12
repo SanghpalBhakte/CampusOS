@@ -3601,8 +3601,7 @@ function renderDashboard() {
           <span class="vital-label">Attendance</span>
           <span style="color:${isAttendanceAtRisk?'var(--red)':'var(--green)'}">${isAttendanceAtRisk?'⚠️':'📊'}</span>
         </div>
-        <div class="vital-num" style="color:${isAttendanceAtRisk?'var(--red)':attendancePct!==null?'var(--green)':'inherit'}">${attendancePct !== null ? attendancePct + '%' : '—'}</div>
-        <div class="vital-hint">${dashGuidance.isSafe ? 'Safe zone (≥75%)' : 'Below target (<75%)'}</div>
+        <div class="vital-hint">${attendancePct !== null ? (dashGuidance.isSafe ? 'Safe zone (≥75%)' : 'Needs recovery (<75%)') : 'Attendance not set'}</div>
       </div>
     </div>
 
