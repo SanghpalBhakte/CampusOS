@@ -484,35 +484,72 @@ function showTimetableLoadingModal(msg = "Analyzing photo...") {
   document.body.appendChild(backdrop);
 }
 
-let tesseractWorker = null;
-let tesseractLoading = false;
+// ── Lazy-Loaded OCR Engine & Worker Cache ─────────────────────
+let _tesseractWorker = null;
+let _tesseractWorkerPromise = null;
+let _tesseractScriptPromise = null;
+let _isOcrBusy = false;
 
-async function getTesseractWorker() {
-  if (tesseractWorker) return tesseractWorker;
-  if (tesseractLoading) {
-    while(tesseractLoading) await new Promise(r => setTimeout(r, 100));
-    return tesseractWorker;
+function loadTesseractScriptOnDemand() {
+  if (typeof window !== 'undefined' && window.Tesseract) {
+    return Promise.resolve(window.Tesseract);
   }
-  tesseractLoading = true;
-  updateTimetableLoadingModal("Loading local OCR engine (first time may take longer)...");
-  try {
-    console.log("[TesseractWorker] Initializing local OCR engine...");
-    const worker = await Tesseract.createWorker('eng', 1, {
-      logger: m => {
-        if (m.status === 'recognizing text' && m.progress % 0.2 < 0.05) {
-          console.log(`[TesseractWorker] OCR Progress: ${(m.progress * 100).toFixed(0)}%`);
+  if (_tesseractScriptPromise) return _tesseractScriptPromise;
+
+  _tesseractScriptPromise = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+    script.async = true;
+    script.onload = () => {
+      console.log('[TesseractLazy] Local OCR engine library loaded on-demand.');
+      resolve(window.Tesseract);
+    };
+    script.onerror = (err) => {
+      _tesseractScriptPromise = null;
+      console.error('[TesseractLazy] Failed to fetch Tesseract library:', err);
+      reject(new Error('Failed to load local OCR engine library. Check your network connection.'));
+    };
+    document.head.appendChild(script);
+  });
+
+  return _tesseractScriptPromise;
+}
+
+async function getTesseractWorker(onProgress = null) {
+  if (_tesseractWorker) return _tesseractWorker;
+  if (_tesseractWorkerPromise) return _tesseractWorkerPromise;
+
+  _tesseractWorkerPromise = (async () => {
+    try {
+      await loadTesseractScriptOnDemand();
+      console.log('[TesseractWorker] Initializing single reusable OCR worker (eng fast)...');
+      
+      const worker = await window.Tesseract.createWorker('eng', 1, {
+        logger: m => {
+          if (m.status === 'recognizing text') {
+            const pct = Math.round((m.progress || 0) * 100);
+            if (typeof onProgress === 'function') onProgress(pct);
+            if (typeof updateAttendanceScanLoadingProgress === 'function') {
+              updateAttendanceScanLoadingProgress(pct);
+            }
+            if (m.progress % 0.2 < 0.05) {
+              console.log(`[TesseractWorker] OCR Progress: ${pct}%`);
+            }
+          }
         }
-      }
-    });
-    tesseractWorker = worker;
-    console.log("[TesseractWorker] ✅ OCR engine initialized successfully.");
-  } catch (err) {
-    console.error("[TesseractWorker] ❌ Init Error:", err);
-    throw new Error("Failed to initialize local OCR engine.");
-  } finally {
-    tesseractLoading = false;
-  }
-  return tesseractWorker;
+      });
+      _tesseractWorker = worker;
+      console.log('[TesseractWorker] ✅ Single reusable OCR worker ready and cached.');
+      return _tesseractWorker;
+    } catch (err) {
+      _tesseractWorker = null;
+      _tesseractWorkerPromise = null;
+      console.error('[TesseractWorker] ❌ Worker init failed:', err);
+      throw err;
+    }
+  })();
+
+  return _tesseractWorkerPromise;
 }
 
 function preprocessImageForOCR(base64Data, mimeType) {
@@ -4402,6 +4439,9 @@ function switchBaselineModalTab(tab) {
 
 // ── Attendance Photo Scanning Engine ──────────────────────────
 
+let _currentAttendanceScanId = 0;
+let _isAttendanceScanCanceled = false;
+
 function triggerAttendancePhotoScan() {
   const input = document.createElement('input');
   input.type = 'file';
@@ -4418,10 +4458,13 @@ function showAttendanceScanLoadingModal(message = 'Scanning attendance…') {
   backdrop.className = 'modal-backdrop';
   backdrop.id = 'ab-scan-loading-backdrop';
   backdrop.innerHTML = `
-    <div class="modal" onclick="event.stopPropagation()" style="max-width:380px;text-align:center;padding:32px 24px">
+    <div class="modal" onclick="event.stopPropagation()" style="max-width:380px;text-align:center;padding:28px 24px">
       <div class="spinner" style="width:36px;height:36px;border-width:3px;margin:0 auto 16px auto"></div>
       <div id="ab-scan-loading-msg" style="font-weight:700;font-size:1rem;color:var(--text-primary);margin-bottom:6px">${message}</div>
-      <div style="font-size:0.8rem;color:var(--text-muted)">Extracting subject names and attendance counts from screenshot…</div>
+      <div id="ab-scan-loading-sub" style="font-size:0.8rem;color:var(--text-muted);margin-bottom:18px">Extracting subject names and attendance counts from screenshot…</div>
+      <button type="button" class="btn-secondary" onclick="cancelAttendancePhotoScan()" style="font-size:0.82rem;padding:6px 16px">
+        Cancel Scan
+      </button>
     </div>
   `;
   document.body.appendChild(backdrop);
@@ -4432,8 +4475,23 @@ function updateAttendanceScanLoadingMessage(msg) {
   if (el) el.textContent = msg;
 }
 
+function updateAttendanceScanLoadingProgress(pct) {
+  const subEl = document.getElementById('ab-scan-loading-sub');
+  if (subEl && pct > 0 && pct < 100) {
+    subEl.textContent = `Recognizing table text with local OCR (${pct}%)…`;
+  }
+}
+
 function hideAttendanceScanLoadingModal() {
   document.getElementById('ab-scan-loading-backdrop')?.remove();
+}
+
+function cancelAttendancePhotoScan() {
+  _isAttendanceScanCanceled = true;
+  _isOcrBusy = false;
+  hideAttendanceScanLoadingModal();
+  showToast('Scan canceled', 'info');
+  showBaselineModal(null, 'manual');
 }
 
 function preprocessAttendanceImageForOCR(base64Data, mimeType) {
@@ -4447,15 +4505,15 @@ function preprocessAttendanceImageForOCR(base64Data, mimeType) {
       let height = img.height;
 
       // 1. Upscale low-res screenshots for crisp digit recognition
-      const TARGET_MIN_WIDTH = 1400;
+      const TARGET_MIN_WIDTH = 1300;
       if (width < TARGET_MIN_WIDTH) {
-        const scale = Math.min(2.5, TARGET_MIN_WIDTH / width);
+        const scale = Math.min(2.0, TARGET_MIN_WIDTH / width);
         width = Math.round(width * scale);
         height = Math.round(height * scale);
       }
 
-      // Cap at reasonable max to keep local OCR fast
-      const MAX_DIM = 2400;
+      // Cap at reasonable max to keep memory low and local OCR responsive
+      const MAX_DIM = 1800;
       if (width > MAX_DIM || height > MAX_DIM) {
         const ratio = Math.min(MAX_DIM / width, MAX_DIM / height);
         width = Math.round(width * ratio);
@@ -4546,7 +4604,15 @@ function preprocessAttendanceImageForOCR(base64Data, mimeType) {
       const trimmedCtx = trimmedCanvas.getContext('2d');
       trimmedCtx.drawImage(canvas, left, top, trimW, trimH, 0, 0, trimW, trimH);
 
-      resolve(trimmedCanvas.toDataURL(mimeType, 0.95));
+      const resultDataUrl = trimmedCanvas.toDataURL(mimeType, 0.92);
+
+      // Release canvas buffers to keep memory low on mobile
+      canvas.width = 1;
+      canvas.height = 1;
+      trimmedCanvas.width = 1;
+      trimmedCanvas.height = 1;
+
+      resolve(resultDataUrl);
     };
     img.onerror = () => reject(new Error('Failed to load image for attendance preprocessing'));
     img.src = `data:${mimeType};base64,${base64Data}`;
@@ -4557,6 +4623,11 @@ async function handleAttendancePhotoUpload(event) {
   const file = event.target.files?.[0];
   if (!file) return;
 
+  if (_isOcrBusy) {
+    showToast('An OCR scan is already in progress. Please wait a moment.', 'info');
+    return;
+  }
+
   if (!file.type.startsWith('image/')) {
     alert('Please upload an image file (PNG, JPG, WEBP, etc.)');
     return;
@@ -4565,6 +4636,10 @@ async function handleAttendancePhotoUpload(event) {
     alert('Image is too large (max 12 MB). Please compress or crop it first.');
     return;
   }
+
+  _isOcrBusy = true;
+  _isAttendanceScanCanceled = false;
+  const currentScanId = ++_currentAttendanceScanId;
 
   showAttendanceScanLoadingModal('Scanning attendance…');
 
@@ -4576,24 +4651,34 @@ async function handleAttendancePhotoUpload(event) {
       mimeType = resultUrl.split(';')[0].split(':')[1] || 'image/jpeg';
       base64Data = resultUrl.split(',')[1];
     } catch {
+      _isOcrBusy = false;
       hideAttendanceScanLoadingModal();
       showAttendanceScanErrorModal('Could not read image file. Please try another photo.');
       return;
     }
 
     try {
+      if (_isAttendanceScanCanceled || currentScanId !== _currentAttendanceScanId) return;
+
       updateAttendanceScanLoadingMessage('Preprocessing image (upscaling, binarization, table crop)…');
       const preprocessedDataUrl = await preprocessAttendanceImageForOCR(base64Data, mimeType);
+
+      if (_isAttendanceScanCanceled || currentScanId !== _currentAttendanceScanId) return;
 
       updateAttendanceScanLoadingMessage('Running local OCR in background worker…');
       const worker = await getTesseractWorker();
       const ocrResult = await worker.recognize(preprocessedDataUrl);
 
+      if (_isAttendanceScanCanceled || currentScanId !== _currentAttendanceScanId) return;
+
       updateAttendanceScanLoadingMessage('Reconstructing table rows and validating attendance numbers…');
       const extractedRows = await extractAttendanceRowsFromOCR(ocrResult?.data, base64Data, mimeType);
 
+      _isOcrBusy = false;
       hideAttendanceScanLoadingModal();
       document.getElementById('baseline-modal-backdrop')?.remove();
+
+      if (_isAttendanceScanCanceled || currentScanId !== _currentAttendanceScanId) return;
 
       if (!extractedRows || extractedRows.length === 0) {
         showAttendanceScanErrorModal('We couldn’t read this screenshot clearly. You can still enter your counts manually.');
@@ -4602,9 +4687,12 @@ async function handleAttendancePhotoUpload(event) {
 
       showAttendanceScanReviewModal(extractedRows);
     } catch (err) {
+      _isOcrBusy = false;
       console.error('[AttendancePhotoScan] Scan error:', err);
       hideAttendanceScanLoadingModal();
-      showAttendanceScanErrorModal('We couldn’t read this screenshot clearly. You can still enter your counts manually.');
+      if (!_isAttendanceScanCanceled) {
+        showAttendanceScanErrorModal('We couldn’t read this screenshot clearly. You can still enter your counts manually.');
+      }
     }
   };
   reader.readAsDataURL(file);
@@ -8119,6 +8207,7 @@ window.showBaselineModal           = showBaselineModal;
 window.switchBaselineModalTab      = switchBaselineModalTab;
 window.triggerAttendancePhotoScan  = triggerAttendancePhotoScan;
 window.handleAttendancePhotoUpload = handleAttendancePhotoUpload;
+window.cancelAttendancePhotoScan   = cancelAttendancePhotoScan;
 window.onBaselineSubjectChange     = onBaselineSubjectChange;
 window.updateBaselinePreview       = updateBaselinePreview;
 window.saveSubjectBaselineFromModal = saveSubjectBaselineFromModal;
