@@ -1404,6 +1404,19 @@ a.card:hover,
   transform: translateY(-1px);
 }
 
+/* Accessible keyboard focus treatment (WCAG 2.2 SC 2.4.11 & 2.4.13 compliant) */
+.theme-swatch:focus {
+  outline: none;
+}
+
+.theme-swatch:focus-visible {
+  outline: 2px solid var(--accent-light, var(--accent)) !important;
+  outline-offset: 3px !important;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--bg), 0 0 0 4px var(--accent-dim) !important;
+  transform: translateY(-2px);
+}
+
 .swatch-preview {
   display: flex;
   width: 56px;

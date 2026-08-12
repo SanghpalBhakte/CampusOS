@@ -7017,49 +7017,49 @@ function renderSettings() {
       <div class="form-group" style="margin-bottom:0">
         <label class="form-label" style="margin-bottom:6px">Workspace Environment &amp; Theme</label>
         <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:14px">Six curated palettes with distinct atmospheres. Saves automatically and syncs to cloud.</div>
-        <div class="theme-swatch-grid">
-          <button class="theme-swatch ${(document.documentElement?.getAttribute('data-theme') || 'paper-slate') === 'paper-slate' ? 'active' : ''}" onclick="setTheme('paper-slate')">
-            <div class="swatch-preview">
+        <div class="theme-swatch-grid" role="group" aria-label="Theme selection options">
+          <button type="button" class="theme-swatch ${(document.documentElement?.getAttribute('data-theme') || 'paper-slate') === 'paper-slate' ? 'active' : ''}" onclick="setTheme('paper-slate')" aria-pressed="${(document.documentElement?.getAttribute('data-theme') || 'paper-slate') === 'paper-slate'}" aria-label="Paper Slate theme: Clean neutral academic palette">
+            <div class="swatch-preview" aria-hidden="true">
               <div class="swatch-bg" style="background:#f8fafc"></div>
               <div class="swatch-surface" style="background:#ffffff"></div>
               <div class="swatch-accent" style="background:#2563eb"></div>
             </div>
             <span class="swatch-name">Paper Slate</span>
           </button>
-          <button class="theme-swatch ${document.documentElement?.getAttribute('data-theme') === 'midnight-ink' ? 'active' : ''}" onclick="setTheme('midnight-ink')">
-            <div class="swatch-preview">
+          <button type="button" class="theme-swatch ${document.documentElement?.getAttribute('data-theme') === 'midnight-ink' ? 'active' : ''}" onclick="setTheme('midnight-ink')" aria-pressed="${document.documentElement?.getAttribute('data-theme') === 'midnight-ink'}" aria-label="Midnight Ink theme: Obsidian dark with electric indigo">
+            <div class="swatch-preview" aria-hidden="true">
               <div class="swatch-bg" style="background:#08090d"></div>
               <div class="swatch-surface" style="background:#11131a"></div>
               <div class="swatch-accent" style="background:#6366f1"></div>
             </div>
             <span class="swatch-name">Midnight Ink</span>
           </button>
-          <button class="theme-swatch ${document.documentElement?.getAttribute('data-theme') === 'espresso-desk' ? 'active' : ''}" onclick="setTheme('espresso-desk')">
-            <div class="swatch-preview">
+          <button type="button" class="theme-swatch ${document.documentElement?.getAttribute('data-theme') === 'espresso-desk' ? 'active' : ''}" onclick="setTheme('espresso-desk')" aria-pressed="${document.documentElement?.getAttribute('data-theme') === 'espresso-desk'}" aria-label="Espresso Desk theme: Cozy café dark mahogany and caramel">
+            <div class="swatch-preview" aria-hidden="true">
               <div class="swatch-bg" style="background:#171310"></div>
               <div class="swatch-surface" style="background:#221b16"></div>
               <div class="swatch-accent" style="background:#d97706"></div>
             </div>
             <span class="swatch-name">Espresso Desk</span>
           </button>
-          <button class="theme-swatch ${document.documentElement?.getAttribute('data-theme') === 'sandstone-notes' ? 'active' : ''}" onclick="setTheme('sandstone-notes')">
-            <div class="swatch-preview">
+          <button type="button" class="theme-swatch ${document.documentElement?.getAttribute('data-theme') === 'sandstone-notes' ? 'active' : ''}" onclick="setTheme('sandstone-notes')" aria-pressed="${document.documentElement?.getAttribute('data-theme') === 'sandstone-notes'}" aria-label="Sandstone Notes theme: Warm parchment and terracotta">
+            <div class="swatch-preview" aria-hidden="true">
               <div class="swatch-bg" style="background:#f5f0e6"></div>
               <div class="swatch-surface" style="background:#fffdfa"></div>
               <div class="swatch-accent" style="background:#c25e2e"></div>
             </div>
             <span class="swatch-name">Sandstone Notes</span>
           </button>
-          <button class="theme-swatch ${document.documentElement?.getAttribute('data-theme') === 'nordic-frost' ? 'active' : ''}" onclick="setTheme('nordic-frost')">
-            <div class="swatch-preview">
+          <button type="button" class="theme-swatch ${document.documentElement?.getAttribute('data-theme') === 'nordic-frost' ? 'active' : ''}" onclick="setTheme('nordic-frost')" aria-pressed="${document.documentElement?.getAttribute('data-theme') === 'nordic-frost'}" aria-label="Nordic Frost theme: Crisp glacial ice and azure">
+            <div class="swatch-preview" aria-hidden="true">
               <div class="swatch-bg" style="background:#eaf0f6"></div>
               <div class="swatch-surface" style="background:#ffffff"></div>
               <div class="swatch-accent" style="background:#0284c7"></div>
             </div>
             <span class="swatch-name">Nordic Frost</span>
           </button>
-          <button class="theme-swatch ${document.documentElement?.getAttribute('data-theme') === 'misty-mint' ? 'active' : ''}" onclick="setTheme('misty-mint')">
-            <div class="swatch-preview">
+          <button type="button" class="theme-swatch ${document.documentElement?.getAttribute('data-theme') === 'misty-mint' ? 'active' : ''}" onclick="setTheme('misty-mint')" aria-pressed="${document.documentElement?.getAttribute('data-theme') === 'misty-mint'}" aria-label="Misty Mint theme: Light eucalyptus and sage">
+            <div class="swatch-preview" aria-hidden="true">
               <div class="swatch-bg" style="background:#f0f5f3"></div>
               <div class="swatch-surface" style="background:#ffffff"></div>
               <div class="swatch-accent" style="background:#1b7a6d"></div>
