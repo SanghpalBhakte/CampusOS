@@ -2323,6 +2323,7 @@ const icons = {
   save:        () => svg('<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>'),
   link:        () => svg('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>'),
   user:        () => svg('<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>'),
+  target:      () => svg('<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>'),
 };
 
 function sunSVG()  { return icons.sun(); }
@@ -3040,7 +3041,7 @@ window.showOnboardingModal = function() {
   const p = loadProfile();
 
   backdrop.innerHTML = `
-    <div class="modal-content" style="max-width:440px;padding:26px 24px" id="onboarding-modal-box">
+    <div class="modal onboarding-card" id="onboarding-modal-box">
       <div id="onboarding-step-1">
         <div style="width:44px;height:44px;border-radius:12px;background:var(--accent-dim);color:var(--accent);display:grid;place-items:center;margin-bottom:16px">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -3048,14 +3049,14 @@ window.showOnboardingModal = function() {
             <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
           </svg>
         </div>
-        <h2 style="margin:0 0 4px 0;font-size:1.35rem;font-weight:700;letter-spacing:-0.025em;color:var(--text-primary)">Welcome to Clarity Desk</h2>
-        <div style="font-size:0.82rem;font-weight:600;color:var(--accent);margin-bottom:12px;letter-spacing:0.01em">Your calm, unified student workspace</div>
-        <div style="font-size:0.88rem;color:var(--text-secondary);line-height:1.6;margin-bottom:20px">
+        <h2 style="margin:0 0 6px 0;font-size:1.35rem;font-weight:700;letter-spacing:-0.025em;color:var(--text-primary)">Welcome to Clarity Desk</h2>
+        <div style="font-size:0.84rem;font-weight:600;color:var(--accent);margin-bottom:12px;letter-spacing:0.01em">Your calm, unified student workspace</div>
+        <div style="font-size:0.88rem;color:var(--text-secondary);line-height:1.6;margin-bottom:24px">
           Manage your class schedule, monitor attendance safety, track assignments, and access coursework notes with zero clutter.
         </div>
         <div style="display:flex;flex-direction:column;gap:10px">
-          <button class="btn-primary" onclick="showOnboardingStep2()" style="width:100%;padding:10px;font-weight:600;justify-content:center;font-size:0.88rem">Set Up My Profile →</button>
-          <button class="btn-secondary" onclick="dismissOnboarding()" style="width:100%;padding:8px;font-size:0.82rem;justify-content:center">Explore First</button>
+          <button class="btn-primary" onclick="showOnboardingStep2()" style="width:100%;padding:11px;font-weight:600;justify-content:center;font-size:0.88rem">Set Up My Profile →</button>
+          <button class="btn-secondary" onclick="dismissOnboarding()" style="width:100%;padding:9px;font-size:0.84rem;justify-content:center">Explore First</button>
         </div>
       </div>
 
