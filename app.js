@@ -4436,6 +4436,123 @@ function hideAttendanceScanLoadingModal() {
   document.getElementById('ab-scan-loading-backdrop')?.remove();
 }
 
+function preprocessAttendanceImageForOCR(base64Data, mimeType) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      let width = img.width;
+      let height = img.height;
+
+      // 1. Upscale low-res screenshots for crisp digit recognition
+      const TARGET_MIN_WIDTH = 1400;
+      if (width < TARGET_MIN_WIDTH) {
+        const scale = Math.min(2.5, TARGET_MIN_WIDTH / width);
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+      }
+
+      // Cap at reasonable max to keep local OCR fast
+      const MAX_DIM = 2400;
+      if (width > MAX_DIM || height > MAX_DIM) {
+        const ratio = Math.min(MAX_DIM / width, MAX_DIM / height);
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, 0, 0, width, height);
+
+      // 2. Grayscale, adaptive contrast stretching, and Otsu-like binarization
+      const imageData = ctx.getImageData(0, 0, width, height);
+      const data = imageData.data;
+
+      // Calculate luminance histogram for optimal thresholding
+      let totalLuminance = 0;
+      const grayValues = new Uint8ClampedArray(data.length / 4);
+      for (let i = 0, j = 0; i < data.length; i += 4, j++) {
+        const r = data[i], g = data[i + 1], b = data[i + 2];
+        const gray = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
+        grayValues[j] = gray;
+        totalLuminance += gray;
+      }
+      const meanLuminance = totalLuminance / (width * height);
+      const threshold = Math.max(120, Math.min(210, Math.round(meanLuminance * 0.88)));
+
+      for (let i = 0, j = 0; i < data.length; i += 4, j++) {
+        const gray = grayValues[j];
+        // High contrast boost & clean binarization
+        const binVal = gray < threshold ? 0 : 255;
+        data[i] = binVal;
+        data[i + 1] = binVal;
+        data[i + 2] = binVal;
+      }
+
+      ctx.putImageData(imageData, 0, 0);
+
+      // 3. Margin & noise trimming (remove outer borders / OS status bars)
+      let top = 0, bottom = height - 1, left = 0, right = width - 1;
+      const darkPixelThreshold = 100;
+
+      for (let y = 0; y < height; y++) {
+        let darks = 0;
+        for (let x = 0; x < width; x++) {
+          if (data[(y * width + x) * 4] < darkPixelThreshold) darks++;
+        }
+        if (darks > width * 0.015) { top = y; break; }
+      }
+
+      for (let y = height - 1; y >= top; y--) {
+        let darks = 0;
+        for (let x = 0; x < width; x++) {
+          if (data[(y * width + x) * 4] < darkPixelThreshold) darks++;
+        }
+        if (darks > width * 0.015) { bottom = y; break; }
+      }
+
+      for (let x = 0; x < width; x++) {
+        let darks = 0;
+        for (let y = top; y <= bottom; y++) {
+          if (data[(y * width + x) * 4] < darkPixelThreshold) darks++;
+        }
+        if (darks > (bottom - top) * 0.015) { left = x; break; }
+      }
+
+      for (let x = width - 1; x >= left; x--) {
+        let darks = 0;
+        for (let y = top; y <= bottom; y++) {
+          if (data[(y * width + x) * 4] < darkPixelThreshold) darks++;
+        }
+        if (darks > (bottom - top) * 0.015) { right = x; break; }
+      }
+
+      const pad = 16;
+      top = Math.max(0, top - pad);
+      bottom = Math.min(height - 1, bottom + pad);
+      left = Math.max(0, left - pad);
+      right = Math.min(width - 1, right + pad);
+
+      const trimW = Math.max(10, right - left + 1);
+      const trimH = Math.max(10, bottom - top + 1);
+
+      const trimmedCanvas = document.createElement('canvas');
+      trimmedCanvas.width = trimW;
+      trimmedCanvas.height = trimH;
+      const trimmedCtx = trimmedCanvas.getContext('2d');
+      trimmedCtx.drawImage(canvas, left, top, trimW, trimH, 0, 0, trimW, trimH);
+
+      resolve(trimmedCanvas.toDataURL(mimeType, 0.95));
+    };
+    img.onerror = () => reject(new Error('Failed to load image for attendance preprocessing'));
+    img.src = `data:${mimeType};base64,${base64Data}`;
+  });
+}
+
 async function handleAttendancePhotoUpload(event) {
   const file = event.target.files?.[0];
   if (!file) return;
@@ -4465,16 +4582,15 @@ async function handleAttendancePhotoUpload(event) {
     }
 
     try {
-      updateAttendanceScanLoadingMessage('Preprocessing image for optimal clarity…');
-      const preprocessedDataUrl = await preprocessImageForOCR(base64Data, mimeType);
+      updateAttendanceScanLoadingMessage('Preprocessing image (upscaling, binarization, table crop)…');
+      const preprocessedDataUrl = await preprocessAttendanceImageForOCR(base64Data, mimeType);
 
-      updateAttendanceScanLoadingMessage('Recognizing table text with OCR…');
+      updateAttendanceScanLoadingMessage('Running local OCR in background worker…');
       const worker = await getTesseractWorker();
       const ocrResult = await worker.recognize(preprocessedDataUrl);
-      const rawOcrText = ocrResult?.data?.text || '';
 
-      updateAttendanceScanLoadingMessage('Matching subject rows and attendance counts…');
-      const extractedRows = await extractAttendanceRowsFromOCR(rawOcrText, base64Data, mimeType);
+      updateAttendanceScanLoadingMessage('Reconstructing table rows and validating attendance numbers…');
+      const extractedRows = await extractAttendanceRowsFromOCR(ocrResult?.data, base64Data, mimeType);
 
       hideAttendanceScanLoadingModal();
       document.getElementById('baseline-modal-backdrop')?.remove();
@@ -4494,10 +4610,29 @@ async function handleAttendancePhotoUpload(event) {
   reader.readAsDataURL(file);
 }
 
-async function extractAttendanceRowsFromOCR(rawOcrText, base64Data, mimeType) {
+async function extractAttendanceRowsFromOCR(ocrData, base64Data, mimeType) {
   const existingSubjects = getSubjectList();
+  const rawOcrText = typeof ocrData === 'string' ? ocrData : (ocrData?.text || '');
 
-  // 1. Try AI Structured Extraction if Groq/Gemini key is configured
+  // 1. First attempt: High-Precision Local Geometric Table Reconstruction
+  let geometricResult = [];
+  if (ocrData && typeof ocrData === 'object' && Array.isArray(ocrData.words) && ocrData.words.length > 0) {
+    try {
+      geometricResult = reconstructAttendanceTableFromGrid(ocrData, existingSubjects);
+      console.log(`[AttendanceGeometricOCR] Extracted ${geometricResult.length} rows via bounding-box geometry.`);
+    } catch (geoErr) {
+      console.warn('[AttendanceGeometricOCR] Geometric parse error, falling back to text regex:', geoErr);
+    }
+  }
+
+  if (geometricResult.length > 0) {
+    const highConfidenceCount = geometricResult.filter(r => !r.isUncertain).length;
+    if (highConfidenceCount >= 1 || geometricResult.length >= 2) {
+      return geometricResult;
+    }
+  }
+
+  // 2. Second attempt: AI-Assisted Structured Extraction (if API key available)
   const hasGroqKey = !!window.CAMPUS_OS_GROQ_KEY;
   const hasGeminiKey = !!window.CAMPUS_OS_GEMINI_KEY;
 
@@ -4521,7 +4656,8 @@ Return JSON with this exact structure:
 Rules:
 1. Extract present count, absent count, leave count, and attendance not entered.
 2. If subject name or numbers are slightly garbled by OCR, clean them up logically.
-3. If uncertain, set isUncertain: true.`;
+3. Validate total = present + absent + leave + notEntered.
+4. If uncertain, set isUncertain: true.`;
 
     try {
       const aiResult = await AIService.generateContentFromText(rawOcrText, schemaInstruction);
@@ -4533,8 +4669,195 @@ Rules:
     }
   }
 
-  // 2. Deterministic Rule-Based Table Parser (100% offline fallback)
-  return parseAttendanceFromText(rawOcrText, existingSubjects);
+  // 3. Third attempt: Deterministic Text Table Parser (100% offline fallback)
+  const textRows = parseAttendanceFromText(rawOcrText, existingSubjects);
+  return textRows.length > 0 ? textRows : geometricResult;
+}
+
+function reconstructAttendanceTableFromGrid(ocrData, existingSubjects = []) {
+  if (!ocrData || !Array.isArray(ocrData.words) || ocrData.words.length === 0) {
+    return [];
+  }
+
+  // 1. Sanitize OCR words and attach coordinate centers
+  const words = ocrData.words.map(w => ({
+    text: w.text.trim(),
+    bbox: w.bbox || { x0: 0, y0: 0, x1: 0, y1: 0 },
+    conf: w.confidence || 0,
+    cx: ((w.bbox?.x0 || 0) + (w.bbox?.x1 || 0)) / 2,
+    cy: ((w.bbox?.y0 || 0) + (w.bbox?.y1 || 0)) / 2
+  })).filter(w => w.text.length > 0);
+
+  // 2. Group into visual rows based on Y vertical overlap
+  words.sort((a, b) => a.bbox.y0 - b.bbox.y0);
+  const visualRows = [];
+
+  for (const word of words) {
+    let added = false;
+    for (const row of visualRows) {
+      const avgY0 = row.reduce((sum, w) => sum + w.bbox.y0, 0) / row.length;
+      const avgY1 = row.reduce((sum, w) => sum + w.bbox.y1, 0) / row.length;
+      const wordH = word.bbox.y1 - word.bbox.y0;
+
+      const overlap = Math.max(0, Math.min(word.bbox.y1, avgY1) - Math.max(word.bbox.y0, avgY0));
+      if (wordH > 0 && (overlap / wordH) > 0.42) {
+        row.push(word);
+        added = true;
+        break;
+      }
+    }
+    if (!added) {
+      visualRows.push([word]);
+    }
+  }
+
+  // Sort words inside each row horizontally (left to right)
+  visualRows.forEach(r => r.sort((a, b) => a.bbox.x0 - b.bbox.x0));
+
+  // 3. Identify header line or column anchors
+  const headerKeywords = ['course', 'subject', 'present', 'absent', 'leave', 'attended', 'total', 'percent', '%', 'entered', 'status'];
+  let headerRowIndex = -1;
+
+  for (let i = 0; i < visualRows.length; i++) {
+    const rowText = visualRows[i].map(w => w.text.toLowerCase()).join(' ');
+    const matchCount = headerKeywords.filter(kw => rowText.includes(kw)).length;
+    if (matchCount >= 2) {
+      headerRowIndex = i;
+      break;
+    }
+  }
+
+  // 4. Parse candidate data rows (rows below header, or rows with numbers + text)
+  const candidateRows = [];
+  const startIdx = headerRowIndex >= 0 ? headerRowIndex + 1 : 0;
+
+  for (let i = startIdx; i < visualRows.length; i++) {
+    const rowWords = visualRows[i];
+    const fullRowText = rowWords.map(w => w.text).join(' ');
+
+    // Separate text tokens from numeric tokens
+    const textTokens = [];
+    const numTokens = [];
+
+    rowWords.forEach(w => {
+      const cleaned = w.text.trim();
+      // Handle digit OCR fixes
+      const numCandidate = cleaned
+        .replace(/[%]/g, '')
+        .replace(/^[OoQD]$/, '0')
+        .replace(/^[lI|i]$/, '1')
+        .replace(/^[Ss]$/, '5')
+        .replace(/^[Bb]$/, '8');
+
+      if (/^\d+(\.\d+)?$/.test(numCandidate)) {
+        numTokens.push({
+          val: parseFloat(numCandidate),
+          intVal: Math.round(parseFloat(numCandidate)),
+          orig: cleaned,
+          bbox: w.bbox,
+          conf: w.conf
+        });
+      } else if (cleaned.length > 1 && !/^[.\-/,:;]+$/.test(cleaned)) {
+        textTokens.push(cleaned);
+      }
+    });
+
+    if (numTokens.length >= 2 && textTokens.length >= 1) {
+      const candidateTitle = textTokens.join(' ');
+      // Ignore pure metadata headers like 'Semester IV', 'Academic Year'
+      if (/academic\s*year|semester|roll\s*no|student\s*name/i.test(candidateTitle)) {
+        continue;
+      }
+
+      // Assign numbers based on column sequence (standard ERP order: Present, Absent, Leave, Not Entered, Total, Pct)
+      let present = numTokens[0]?.intVal || 0;
+      let absent = numTokens[1]?.intVal || 0;
+      let leave = 0;
+      let notEntered = 0;
+      let scannedTotal = 0;
+      let scannedPct = null;
+
+      if (numTokens.length === 2) {
+        // [present, absent]
+        scannedTotal = present + absent;
+      } else if (numTokens.length === 3) {
+        // [present, absent, total] OR [present, absent, leave]
+        if (numTokens[2].intVal === present + absent) {
+          scannedTotal = numTokens[2].intVal;
+        } else {
+          leave = numTokens[2].intVal;
+          scannedTotal = present + absent + leave;
+        }
+      } else if (numTokens.length === 4) {
+        // [present, absent, leave, total] or [present, absent, total, pct]
+        if (numTokens[2].intVal === present + absent || (numTokens[3].orig && numTokens[3].orig.includes('%'))) {
+          scannedTotal = numTokens[2].intVal;
+          scannedPct = numTokens[3].val;
+        } else {
+          leave = numTokens[2].intVal;
+          scannedTotal = numTokens[3].intVal;
+        }
+      } else if (numTokens.length === 5) {
+        // Typical: [present, absent, leave, total, pct]
+        if (numTokens[3].intVal === (present + absent + numTokens[2].intVal) || (numTokens[4].orig && numTokens[4].orig.includes('%'))) {
+          leave = numTokens[2].intVal;
+          scannedTotal = numTokens[3].intVal;
+          scannedPct = numTokens[4].val;
+        } else {
+          leave = numTokens[2].intVal;
+          notEntered = numTokens[3].intVal;
+          scannedTotal = numTokens[4].intVal;
+        }
+      } else if (numTokens.length >= 6) {
+        // [present, absent, leave, notEntered, total, pct]
+        leave = numTokens[2].intVal;
+        notEntered = numTokens[3].intVal;
+        scannedTotal = numTokens[4].intVal;
+        scannedPct = numTokens[5]?.val || null;
+      }
+
+      // Check if present was abnormally large (e.g. course code mistaken for number)
+      if (present > 100 && numTokens.length > 2) {
+        present = numTokens[1].intVal;
+        absent = numTokens[2].intVal;
+        leave = numTokens[3]?.intVal || 0;
+      }
+
+      const expectedTotal = present + absent + leave + notEntered;
+      let isUncertain = false;
+
+      if (scannedTotal > 0 && Math.abs(scannedTotal - expectedTotal) > 1) {
+        isUncertain = true;
+      }
+
+      const rawRow = {
+        subject: candidateTitle,
+        code: '',
+        present,
+        absent,
+        leave,
+        notEntered,
+        totalSessions: scannedTotal > expectedTotal ? scannedTotal : 0,
+        isUncertain: isUncertain || numTokens.length < 2
+      };
+
+      const matched = matchScannedRowToSubjects(rawRow, existingSubjects);
+      candidateRows.push(matched);
+    }
+  }
+
+  // Deduplicate matched rows by subject code/name
+  const seen = new Set();
+  const deduped = [];
+  for (const r of candidateRows) {
+    const key = (r.code || r.subject).toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (key && !seen.has(key)) {
+      seen.add(key);
+      deduped.push(r);
+    }
+  }
+
+  return deduped;
 }
 
 function parseAttendanceFromText(rawText, existingSubjects = []) {
@@ -4560,6 +4883,10 @@ function parseAttendanceFromText(rawText, existingSubjects = []) {
     }
 
     if (candidateName && candidateName.length >= 3) {
+      if (/academic\s*year|semester|roll\s*no|student\s*name/i.test(candidateName)) {
+        continue;
+      }
+
       const ints = numMatches.map(n => parseInt(n)).filter(n => !isNaN(n));
       if (ints.length >= 2) {
         let present = ints[0] || 0;
