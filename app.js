@@ -4245,7 +4245,7 @@ function getOverallAttendance() {
   };
 }
 
-function showBaselineModal(preselectedSubject = null) {
+function showBaselineModal(preselectedSubject = null, initialTab = 'manual') {
   const subjects = getSubjectList();
   if (!subjects.length) {
     showToast('Set up your weekly timetable or add tasks first to configure subjects.', 'info');
@@ -4275,67 +4275,103 @@ function showBaselineModal(preselectedSubject = null) {
   backdrop.className = 'modal-backdrop';
   backdrop.id = 'baseline-modal-backdrop';
   backdrop.innerHTML = `
-    <div class="modal baseline-dialog" onclick="event.stopPropagation()" style="max-width:520px;padding:26px 24px">
-      <div class="modal-header" style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px">
+    <div class="modal baseline-dialog" onclick="event.stopPropagation()" style="max-width:540px;padding:24px 22px">
+      <div class="modal-header" style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px">
         <div>
-          <h2 class="modal-title" style="margin:0;font-size:1.25rem;font-weight:700">Set your current attendance</h2>
+          <h2 class="modal-title" style="margin:0;font-size:1.22rem;font-weight:700">Set your current attendance</h2>
           <div style="font-size:0.8rem;color:var(--text-muted);margin-top:3px">Add your present and absent counts once. Clarity Desk will continue from there.</div>
         </div>
         <button class="modal-close" onclick="document.getElementById('baseline-modal-backdrop')?.remove()">${icons.x()}</button>
       </div>
 
-      <div style="background:var(--surface-2);border-left:3px solid var(--accent);border-radius:6px;padding:9px 12px;margin-bottom:16px;font-size:0.79rem;color:var(--text-secondary);line-height:1.45">
-        💡 Set your current attendance to calculate from the right starting point. Future attendance actions update automatically from this baseline.
-      </div>
-
-      <div class="form-group" style="margin-bottom:16px">
-        <label class="form-label" style="font-weight:600">Subject</label>
-        <select id="ab-subject-select" class="form-select" onchange="onBaselineSubjectChange(this.value)">
-          ${optionsHTML}
-        </select>
-      </div>
-
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
-        <div class="form-group" style="margin-bottom:0">
-          <label class="form-label" style="display:flex;align-items:center;gap:6px">
-            <span style="color:var(--green)">●</span> Present Count <span style="color:var(--red)">*</span>
-          </label>
-          <input type="number" id="ab-present" min="0" class="form-input" value="${baseline.hasBaseline ? baseline.present : ''}" placeholder="e.g. 9" oninput="updateBaselinePreview()">
-        </div>
-        <div class="form-group" style="margin-bottom:0">
-          <label class="form-label" style="display:flex;align-items:center;gap:6px">
-            <span style="color:var(--red)">●</span> Absent Count <span style="color:var(--red)">*</span>
-          </label>
-          <input type="number" id="ab-absent" min="0" class="form-input" value="${baseline.hasBaseline ? baseline.absent : ''}" placeholder="e.g. 8" oninput="updateBaselinePreview()">
-        </div>
-        <div class="form-group" style="margin-bottom:0">
-          <label class="form-label" style="display:flex;align-items:center;gap:6px">
-            <span style="color:var(--yellow)">●</span> Leave Count <span style="color:var(--text-muted);font-weight:normal">(optional)</span>
-          </label>
-          <input type="number" id="ab-leave" min="0" class="form-input" value="${baseline.hasBaseline ? baseline.leave : ''}" placeholder="0" oninput="updateBaselinePreview()">
-        </div>
-        <div class="form-group" style="margin-bottom:0">
-          <label class="form-label" style="display:flex;align-items:center;gap:6px">
-            <span style="color:var(--text-muted)">●</span> Attendance Not Entered <span style="color:var(--text-muted);font-weight:normal">(optional)</span>
-          </label>
-          <input type="number" id="ab-not-entered" min="0" class="form-input" value="${baseline.hasBaseline ? baseline.notEntered : ''}" placeholder="0" oninput="updateBaselinePreview()">
-        </div>
-      </div>
-
-      <div class="form-group" style="margin-bottom:16px">
-        <label class="form-label">Total Planned Sessions <span style="color:var(--text-muted);font-weight:normal">(semester total, e.g. 60 or 30)</span></label>
-        <input type="number" id="ab-total-sessions" min="0" class="form-input" value="${baseline.hasBaseline && baseline.totalSessions ? baseline.totalSessions : ''}" placeholder="e.g. 60" oninput="updateBaselinePreview()">
-      </div>
-
-      <div id="ab-preview-card" style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:18px"></div>
-
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
-        <button type="button" class="btn-secondary" id="ab-clear-btn" onclick="clearSubjectBaseline()" style="color:var(--red);border-color:rgba(239,68,68,0.3);font-size:0.82rem;${baseline.hasBaseline ? '' : 'display:none'}">
-          Clear Baseline
+      <!-- Mode Selector Tabs: Set Manually | Scan from Photo -->
+      <div style="display:flex;gap:8px;background:var(--surface-2);padding:4px;border-radius:8px;margin-bottom:16px">
+        <button type="button" id="ab-tab-manual-btn" class="btn btn-sm ${initialTab==='manual'?'btn-primary':'btn-secondary'}" onclick="switchBaselineModalTab('manual')" style="flex:1;font-size:0.8rem;padding:6px 12px;border:none">
+          ✍️ Set Manually
         </button>
-        <div style="display:flex;align-items:center;gap:10px;margin-left:auto">
-          <button type="button" class="btn-secondary" onclick="document.getElementById('baseline-modal-backdrop')?.remove()" style="font-size:0.84rem">Cancel</button>
-          <button type="button" class="btn-primary" onclick="saveSubjectBaselineFromModal()" style="padding:8px 18px;font-size:0.85rem;font-weight:600">Save Baseline ✓</button>
+        <button type="button" id="ab-tab-scan-btn" class="btn btn-sm ${initialTab==='scan'?'btn-primary':'btn-secondary'}" onclick="switchBaselineModalTab('scan')" style="flex:1;font-size:0.8rem;padding:6px 12px;border:none">
+          📷 Scan from Photo
+        </button>
+      </div>
+
+      <!-- TAB 1: MANUAL SETUP FORM -->
+      <div id="ab-manual-section" style="${initialTab==='manual'?'display:block':'display:none'}">
+        <div style="background:var(--surface-2);border-left:3px solid var(--accent);border-radius:6px;padding:9px 12px;margin-bottom:14px;font-size:0.79rem;color:var(--text-secondary);line-height:1.45">
+          💡 Set your current attendance to calculate from the right starting point. Future attendance actions update automatically from this baseline.
+        </div>
+
+        <div class="form-group" style="margin-bottom:14px">
+          <label class="form-label" style="font-weight:600">Subject</label>
+          <select id="ab-subject-select" class="form-select" onchange="onBaselineSubjectChange(this.value)">
+            ${optionsHTML}
+          </select>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label" style="display:flex;align-items:center;gap:6px">
+              <span style="color:var(--green)">●</span> Present Count <span style="color:var(--red)">*</span>
+            </label>
+            <input type="number" id="ab-present" min="0" class="form-input" value="${baseline.hasBaseline ? baseline.present : ''}" placeholder="e.g. 9" oninput="updateBaselinePreview()">
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label" style="display:flex;align-items:center;gap:6px">
+              <span style="color:var(--red)">●</span> Absent Count <span style="color:var(--red)">*</span>
+            </label>
+            <input type="number" id="ab-absent" min="0" class="form-input" value="${baseline.hasBaseline ? baseline.absent : ''}" placeholder="e.g. 8" oninput="updateBaselinePreview()">
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label" style="display:flex;align-items:center;gap:6px">
+              <span style="color:var(--yellow)">●</span> Leave Count <span style="color:var(--text-muted);font-weight:normal">(optional)</span>
+            </label>
+            <input type="number" id="ab-leave" min="0" class="form-input" value="${baseline.hasBaseline ? baseline.leave : ''}" placeholder="0" oninput="updateBaselinePreview()">
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label" style="display:flex;align-items:center;gap:6px">
+              <span style="color:var(--text-muted)">●</span> Attendance Not Entered <span style="color:var(--text-muted);font-weight:normal">(optional)</span>
+            </label>
+            <input type="number" id="ab-not-entered" min="0" class="form-input" value="${baseline.hasBaseline ? baseline.notEntered : ''}" placeholder="0" oninput="updateBaselinePreview()">
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:14px">
+          <label class="form-label">Total Planned Sessions <span style="color:var(--text-muted);font-weight:normal">(semester total, e.g. 60 or 30)</span></label>
+          <input type="number" id="ab-total-sessions" min="0" class="form-input" value="${baseline.hasBaseline && baseline.totalSessions ? baseline.totalSessions : ''}" placeholder="e.g. 60" oninput="updateBaselinePreview()">
+        </div>
+
+        <div id="ab-preview-card" style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:16px"></div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+          <button type="button" class="btn-secondary" id="ab-clear-btn" onclick="clearSubjectBaseline()" style="color:var(--red);border-color:rgba(239,68,68,0.3);font-size:0.82rem;${baseline.hasBaseline ? '' : 'display:none'}">
+            Clear Baseline
+          </button>
+          <div style="display:flex;align-items:center;gap:10px;margin-left:auto">
+            <button type="button" class="btn-secondary" onclick="document.getElementById('baseline-modal-backdrop')?.remove()" style="font-size:0.84rem">Cancel</button>
+            <button type="button" class="btn-primary" onclick="saveSubjectBaselineFromModal()" style="padding:8px 18px;font-size:0.85rem;font-weight:600">Save Baseline ✓</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 2: SCAN FROM PHOTO DROPZONE -->
+      <div id="ab-scan-section" style="${initialTab==='scan'?'display:block':'display:none'}">
+        <input type="file" id="ab-scan-file-input" accept="image/*" style="display:none" onchange="handleAttendancePhotoUpload(event)">
+        
+        <div class="attendance-scan-zone" onclick="document.getElementById('ab-scan-file-input')?.click()">
+          <div style="font-size:2.4rem;margin-bottom:8px">📷</div>
+          <div style="font-weight:700;font-size:1rem;color:var(--text-primary);margin-bottom:4px">
+            Upload your attendance screenshot and we’ll fill this in for you.
+          </div>
+          <div style="font-size:0.8rem;color:var(--text-secondary);max-width:380px;margin:0 auto 16px auto;line-height:1.4">
+            Supports portal screenshots, PDF exports, and camera photos from MGM JUNO ERP, ERP portals, or Excel sheets.
+          </div>
+          <button type="button" class="btn-primary" style="font-size:0.84rem;padding:8px 18px;display:inline-flex;align-items:center;gap:6px">
+            📁 Choose Photo / Screenshot
+          </button>
+        </div>
+
+        <div style="margin-top:16px;background:var(--surface-2);border-radius:8px;padding:10px 14px;font-size:0.78rem;color:var(--text-muted);display:flex;align-items:center;gap:8px">
+          <span>🔒</span>
+          <span>Photos are scanned locally in your browser. You can review and adjust every subject count before saving.</span>
         </div>
       </div>
     </div>
@@ -4343,6 +4379,524 @@ function showBaselineModal(preselectedSubject = null) {
 
   document.body.appendChild(backdrop);
   updateBaselinePreview();
+}
+
+function switchBaselineModalTab(tab) {
+  const manualSec = document.getElementById('ab-manual-section');
+  const scanSec = document.getElementById('ab-scan-section');
+  const manualBtn = document.getElementById('ab-tab-manual-btn');
+  const scanBtn = document.getElementById('ab-tab-scan-btn');
+
+  if (tab === 'manual') {
+    if (manualSec) manualSec.style.display = 'block';
+    if (scanSec) scanSec.style.display = 'none';
+    if (manualBtn) { manualBtn.className = 'btn btn-sm btn-primary'; }
+    if (scanBtn) { scanBtn.className = 'btn btn-sm btn-secondary'; }
+  } else {
+    if (manualSec) manualSec.style.display = 'none';
+    if (scanSec) scanSec.style.display = 'block';
+    if (manualBtn) { manualBtn.className = 'btn btn-sm btn-secondary'; }
+    if (scanBtn) { scanBtn.className = 'btn btn-sm btn-primary'; }
+  }
+}
+
+// ── Attendance Photo Scanning Engine ──────────────────────────
+
+function triggerAttendancePhotoScan() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.onchange = handleAttendancePhotoUpload;
+  input.click();
+}
+
+function showAttendanceScanLoadingModal(message = 'Scanning attendance…') {
+  const existing = document.getElementById('ab-scan-loading-backdrop');
+  if (existing) existing.remove();
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  backdrop.id = 'ab-scan-loading-backdrop';
+  backdrop.innerHTML = `
+    <div class="modal" onclick="event.stopPropagation()" style="max-width:380px;text-align:center;padding:32px 24px">
+      <div class="spinner" style="width:36px;height:36px;border-width:3px;margin:0 auto 16px auto"></div>
+      <div id="ab-scan-loading-msg" style="font-weight:700;font-size:1rem;color:var(--text-primary);margin-bottom:6px">${message}</div>
+      <div style="font-size:0.8rem;color:var(--text-muted)">Extracting subject names and attendance counts from screenshot…</div>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+}
+
+function updateAttendanceScanLoadingMessage(msg) {
+  const el = document.getElementById('ab-scan-loading-msg');
+  if (el) el.textContent = msg;
+}
+
+function hideAttendanceScanLoadingModal() {
+  document.getElementById('ab-scan-loading-backdrop')?.remove();
+}
+
+async function handleAttendancePhotoUpload(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  if (!file.type.startsWith('image/')) {
+    alert('Please upload an image file (PNG, JPG, WEBP, etc.)');
+    return;
+  }
+  if (file.size > 12 * 1024 * 1024) {
+    alert('Image is too large (max 12 MB). Please compress or crop it first.');
+    return;
+  }
+
+  showAttendanceScanLoadingModal('Scanning attendance…');
+
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    let mimeType, base64Data;
+    try {
+      const resultUrl = e.target.result;
+      mimeType = resultUrl.split(';')[0].split(':')[1] || 'image/jpeg';
+      base64Data = resultUrl.split(',')[1];
+    } catch {
+      hideAttendanceScanLoadingModal();
+      showAttendanceScanErrorModal('Could not read image file. Please try another photo.');
+      return;
+    }
+
+    try {
+      updateAttendanceScanLoadingMessage('Preprocessing image for optimal clarity…');
+      const preprocessedDataUrl = await preprocessImageForOCR(base64Data, mimeType);
+
+      updateAttendanceScanLoadingMessage('Recognizing table text with OCR…');
+      const worker = await getTesseractWorker();
+      const ocrResult = await worker.recognize(preprocessedDataUrl);
+      const rawOcrText = ocrResult?.data?.text || '';
+
+      updateAttendanceScanLoadingMessage('Matching subject rows and attendance counts…');
+      const extractedRows = await extractAttendanceRowsFromOCR(rawOcrText, base64Data, mimeType);
+
+      hideAttendanceScanLoadingModal();
+      document.getElementById('baseline-modal-backdrop')?.remove();
+
+      if (!extractedRows || extractedRows.length === 0) {
+        showAttendanceScanErrorModal('We couldn’t read this screenshot clearly. You can still enter your counts manually.');
+        return;
+      }
+
+      showAttendanceScanReviewModal(extractedRows);
+    } catch (err) {
+      console.error('[AttendancePhotoScan] Scan error:', err);
+      hideAttendanceScanLoadingModal();
+      showAttendanceScanErrorModal('We couldn’t read this screenshot clearly. You can still enter your counts manually.');
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+async function extractAttendanceRowsFromOCR(rawOcrText, base64Data, mimeType) {
+  const existingSubjects = getSubjectList();
+
+  // 1. Try AI Structured Extraction if Groq/Gemini key is configured
+  const hasGroqKey = !!window.CAMPUS_OS_GROQ_KEY;
+  const hasGeminiKey = !!window.CAMPUS_OS_GEMINI_KEY;
+
+  if (hasGroqKey || hasGeminiKey) {
+    const schemaInstruction = `Extract all course attendance records from this college ERP attendance report OCR text.
+Return JSON with this exact structure:
+{
+  "rows": [
+    {
+      "subject": "Data Structures",
+      "code": "AID21PCL202",
+      "present": 9,
+      "absent": 8,
+      "leave": 0,
+      "notEntered": 0,
+      "totalSessions": 60,
+      "isUncertain": false
+    }
+  ]
+}
+Rules:
+1. Extract present count, absent count, leave count, and attendance not entered.
+2. If subject name or numbers are slightly garbled by OCR, clean them up logically.
+3. If uncertain, set isUncertain: true.`;
+
+    try {
+      const aiResult = await AIService.generateContentFromText(rawOcrText, schemaInstruction);
+      if (aiResult && Array.isArray(aiResult.rows) && aiResult.rows.length > 0) {
+        return aiResult.rows.map(r => matchScannedRowToSubjects(r, existingSubjects));
+      }
+    } catch (aiErr) {
+      console.warn('[AttendancePhotoScan] AI extraction fallback to deterministic parser:', aiErr);
+    }
+  }
+
+  // 2. Deterministic Rule-Based Table Parser (100% offline fallback)
+  return parseAttendanceFromText(rawOcrText, existingSubjects);
+}
+
+function parseAttendanceFromText(rawText, existingSubjects = []) {
+  if (!rawText || typeof rawText !== 'string') return [];
+  const lines = rawText.split('\n').map(l => l.trim()).filter(Boolean);
+  const rows = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    // Look for lines that contain numbers (counts) and text
+    const numMatches = line.match(/\b\d+(\.\d+)?\b/g);
+    if (!numMatches || numMatches.length < 2) continue;
+
+    // Check if line contains a known subject or course code
+    const words = line.replace(/[^a-zA-Z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length > 1);
+    let candidateName = words.filter(w => !/^\d+$/.test(w)).join(' ');
+
+    if (!candidateName || candidateName.length < 3) {
+      // Check previous line for subject title
+      if (i > 0 && lines[i-1] && lines[i-1].length > 3 && !/\d{2,}/.test(lines[i-1])) {
+        candidateName = lines[i-1];
+      }
+    }
+
+    if (candidateName && candidateName.length >= 3) {
+      const ints = numMatches.map(n => parseInt(n)).filter(n => !isNaN(n));
+      if (ints.length >= 2) {
+        let present = ints[0] || 0;
+        let absent = ints[1] || 0;
+        let leave = ints[2] !== undefined && ints.length > 3 ? ints[2] : 0;
+        let notEntered = ints[3] !== undefined && ints.length > 4 ? ints[3] : 0;
+        let totalSessions = ints[ints.length - 1] > 20 ? ints[ints.length - 1] : 0;
+
+        // If present count appears unreasonably larger than total, adjust
+        if (present > 100 && ints.length > 2) {
+          present = ints[1] || 0;
+          absent = ints[2] || 0;
+        }
+
+        const rawRow = {
+          subject: candidateName,
+          code: '',
+          present,
+          absent,
+          leave,
+          notEntered,
+          totalSessions,
+          isUncertain: ints.length < 2
+        };
+
+        const matched = matchScannedRowToSubjects(rawRow, existingSubjects);
+        rows.push(matched);
+      }
+    }
+  }
+
+  // Deduplicate matched rows by subject code/name
+  const seen = new Set();
+  const deduped = [];
+  for (const r of rows) {
+    const key = (r.code || r.subject).toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (key && !seen.has(key)) {
+      seen.add(key);
+      deduped.push(r);
+    }
+  }
+
+  return deduped;
+}
+
+function matchScannedRowToSubjects(scannedRow, existingSubjects = []) {
+  const rawName = (scannedRow.subject || '').trim();
+  const rawCode = (scannedRow.code || '').trim();
+  const cleanRawName = rawName.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const cleanRawCode = rawCode.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  let bestMatch = null;
+  let isUncertain = !!scannedRow.isUncertain;
+
+  for (const s of existingSubjects) {
+    const sName = (s.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const sCode = (s.code || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    if (cleanRawCode && sCode && cleanRawCode === sCode) {
+      bestMatch = s;
+      isUncertain = false;
+      break;
+    }
+    if (cleanRawName && sName && (cleanRawName.includes(sName) || sName.includes(cleanRawName))) {
+      bestMatch = s;
+      isUncertain = false;
+      break;
+    }
+    if (cleanRawName && sCode && cleanRawName.includes(sCode)) {
+      bestMatch = s;
+      isUncertain = false;
+      break;
+    }
+  }
+
+  return {
+    subject: bestMatch ? bestMatch.name : rawName || 'General Subject',
+    code: bestMatch ? bestMatch.code : rawCode || '',
+    present: Math.max(0, parseInt(scannedRow.present) || 0),
+    absent: Math.max(0, parseInt(scannedRow.absent) || 0),
+    leave: Math.max(0, parseInt(scannedRow.leave) || 0),
+    notEntered: Math.max(0, parseInt(scannedRow.notEntered) || 0),
+    totalSessions: Math.max(0, parseInt(scannedRow.totalSessions) || 0),
+    isUncertain: !bestMatch || isUncertain
+  };
+}
+
+function showAttendanceScanReviewModal(rows = []) {
+  const existingBackdrop = document.getElementById('ab-review-modal-backdrop');
+  if (existingBackdrop) existingBackdrop.remove();
+
+  const subjects = getSubjectList();
+  const hasUncertain = rows.some(r => r.isUncertain);
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  backdrop.id = 'ab-review-modal-backdrop';
+  backdrop.innerHTML = `
+    <div class="modal attendance-review-dialog" onclick="event.stopPropagation()" style="max-width:680px;padding:24px 22px">
+      <div class="modal-header" style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px">
+        <div>
+          <h2 class="modal-title" style="margin:0;font-size:1.24rem;font-weight:700">We found your subject counts. Review once before saving.</h2>
+          <div style="font-size:0.8rem;color:var(--text-muted);margin-top:3px">Check the scanned numbers below and make any quick corrections.</div>
+        </div>
+        <button class="modal-close" onclick="document.getElementById('ab-review-modal-backdrop')?.remove()">${icons.x()}</button>
+      </div>
+
+      ${hasUncertain ? `
+        <div style="background:var(--surface-2);border-left:3px solid var(--yellow);border-radius:6px;padding:9px 12px;margin-bottom:14px;font-size:0.79rem;color:var(--text-secondary);display:flex;align-items:center;gap:8px">
+          <span>⚠️</span>
+          <span>Couldn’t read a few rows clearly. You can fix them below.</span>
+        </div>
+      ` : ''}
+
+      <div id="ab-review-rows-container" style="max-height:55vh;overflow-y:auto;padding-right:4px;margin-bottom:16px">
+        ${renderReviewRowsHTML(rows, subjects)}
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding-top:10px;border-top:1px solid var(--border)">
+        <button type="button" class="btn-secondary" onclick="addScanReviewRow()" style="display:inline-flex;align-items:center;gap:6px;font-size:0.82rem;padding:6px 12px">
+          ${icons.plus()} Add Subject Row
+        </button>
+        <div style="display:flex;align-items:center;gap:10px;margin-left:auto">
+          <button type="button" class="btn-secondary" onclick="document.getElementById('ab-review-modal-backdrop')?.remove(); showBaselineModal(null, 'manual');" style="font-size:0.84rem">
+            ← Enter Manually
+          </button>
+          <button type="button" class="btn-primary" onclick="saveAllReviewedBaselines()" style="padding:8px 20px;font-size:0.86rem;font-weight:600">
+            Save All Baselines ✓
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(backdrop);
+}
+
+function renderReviewRowsHTML(rows, subjects) {
+  if (!rows.length) {
+    return `<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:0.84rem">No rows found. Tap + Add Subject Row to add one.</div>`;
+  }
+
+  return rows.map((r, idx) => {
+    const total = (parseInt(r.present) || 0) + (parseInt(r.absent) || 0) + (parseInt(r.leave) || 0) + (parseInt(r.notEntered) || 0);
+    const pct = total > 0 ? (((parseInt(r.present) || 0) / total) * 100).toFixed(1) : '0.0';
+    const isSafe = parseFloat(pct) >= 75;
+
+    const subjectOptionsHTML = subjects.map(s => {
+      const isSel = (s.name.toLowerCase() === r.subject.toLowerCase() || (r.code && s.code.toLowerCase() === r.code.toLowerCase()));
+      return `<option value="${s.name}|||${s.code}" ${isSel ? 'selected' : ''}>${s.name} (${s.code || 'No Code'})</option>`;
+    }).join('');
+
+    return `
+      <div class="attendance-review-row ${r.isUncertain ? 'uncertain' : ''}" id="review-row-${idx}">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;flex-wrap:wrap">
+          <div style="flex:1;min-width:200px">
+            <label class="form-label" style="font-size:0.75rem;margin-bottom:3px">Subject</label>
+            <select class="form-select review-subject-select" style="font-size:0.84rem;padding:5px 8px" onchange="onReviewRowInputChange(${idx})">
+              ${subjectOptionsHTML}
+              <option value="${r.subject}|||${r.code}" ${!subjects.some(s=>s.name===r.subject)?'selected':''}>${r.subject} (Custom)</option>
+            </select>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="type-badge" id="row-badge-${idx}" style="font-size:0.72rem;padding:3px 8px;background:${isSafe ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)'};color:${isSafe ? 'var(--green)' : 'var(--red)'}">
+              ${total > 0 ? `${pct}% · ${isSafe ? 'Safe Zone' : 'Needs Recovery'}` : 'Attendance not set'}
+            </span>
+            <button type="button" onclick="deleteReviewRow(${idx})" class="btn-icon" style="color:var(--text-muted);font-size:0.9rem" title="Remove row">✕</button>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(80px, 1fr));gap:8px">
+          <div>
+            <label class="form-label" style="font-size:0.72rem;margin-bottom:2px;color:var(--green)">Present *</label>
+            <input type="number" min="0" class="form-input review-present" id="row-present-${idx}" value="${r.present}" style="font-size:0.84rem;padding:5px 8px" oninput="onReviewRowInputChange(${idx})">
+          </div>
+          <div>
+            <label class="form-label" style="font-size:0.72rem;margin-bottom:2px;color:var(--red)">Absent *</label>
+            <input type="number" min="0" class="form-input review-absent" id="row-absent-${idx}" value="${r.absent}" style="font-size:0.84rem;padding:5px 8px" oninput="onReviewRowInputChange(${idx})">
+          </div>
+          <div>
+            <label class="form-label" style="font-size:0.72rem;margin-bottom:2px;color:var(--yellow)">Leave</label>
+            <input type="number" min="0" class="form-input review-leave" id="row-leave-${idx}" value="${r.leave || 0}" style="font-size:0.84rem;padding:5px 8px" oninput="onReviewRowInputChange(${idx})">
+          </div>
+          <div>
+            <label class="form-label" style="font-size:0.72rem;margin-bottom:2px;color:var(--text-muted)">Not Entered</label>
+            <input type="number" min="0" class="form-input review-not-entered" id="row-not-entered-${idx}" value="${r.notEntered || 0}" style="font-size:0.84rem;padding:5px 8px" oninput="onReviewRowInputChange(${idx})">
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function onReviewRowInputChange(idx) {
+  const p = Math.max(0, parseInt(document.getElementById(`row-present-${idx}`)?.value) || 0);
+  const a = Math.max(0, parseInt(document.getElementById(`row-absent-${idx}`)?.value) || 0);
+  const l = Math.max(0, parseInt(document.getElementById(`row-leave-${idx}`)?.value) || 0);
+  const n = Math.max(0, parseInt(document.getElementById(`row-not-entered-${idx}`)?.value) || 0);
+
+  const total = p + a + l + n;
+  const pct = total > 0 ? ((p / total) * 100).toFixed(1) : '0.0';
+  const isSafe = parseFloat(pct) >= 75;
+
+  const badgeEl = document.getElementById(`row-badge-${idx}`);
+  if (badgeEl) {
+    badgeEl.textContent = total > 0 ? `${pct}% · ${isSafe ? 'Safe Zone' : 'Needs Recovery'}` : 'Attendance not set';
+    badgeEl.style.background = isSafe ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)';
+    badgeEl.style.color = isSafe ? 'var(--green)' : 'var(--red)';
+  }
+}
+
+function deleteReviewRow(idx) {
+  document.getElementById(`review-row-${idx}`)?.remove();
+}
+
+function addScanReviewRow() {
+  const container = document.getElementById('ab-review-rows-container');
+  if (!container) return;
+
+  const subjects = getSubjectList();
+  const newIdx = container.querySelectorAll('.attendance-review-row').length + Math.floor(Math.random()*1000);
+
+  const subjectOptionsHTML = subjects.map(s => `
+    <option value="${s.name}|||${s.code}">${s.name} (${s.code || 'No Code'})</option>
+  `).join('');
+
+  const rowDiv = document.createElement('div');
+  rowDiv.className = 'attendance-review-row';
+  rowDiv.id = `review-row-${newIdx}`;
+  rowDiv.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;flex-wrap:wrap">
+      <div style="flex:1;min-width:200px">
+        <label class="form-label" style="font-size:0.75rem;margin-bottom:3px">Subject</label>
+        <select class="form-select review-subject-select" style="font-size:0.84rem;padding:5px 8px" onchange="onReviewRowInputChange(${newIdx})">
+          ${subjectOptionsHTML}
+        </select>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="type-badge" id="row-badge-${newIdx}" style="font-size:0.72rem;padding:3px 8px;background:var(--surface-2);color:var(--text-muted)">
+          Attendance not set
+        </span>
+        <button type="button" onclick="deleteReviewRow(${newIdx})" class="btn-icon" style="color:var(--text-muted);font-size:0.9rem" title="Remove row">✕</button>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(80px, 1fr));gap:8px">
+      <div>
+        <label class="form-label" style="font-size:0.72rem;margin-bottom:2px;color:var(--green)">Present *</label>
+        <input type="number" min="0" class="form-input review-present" id="row-present-${newIdx}" value="0" style="font-size:0.84rem;padding:5px 8px" oninput="onReviewRowInputChange(${newIdx})">
+      </div>
+      <div>
+        <label class="form-label" style="font-size:0.72rem;margin-bottom:2px;color:var(--red)">Absent *</label>
+        <input type="number" min="0" class="form-input review-absent" id="row-absent-${newIdx}" value="0" style="font-size:0.84rem;padding:5px 8px" oninput="onReviewRowInputChange(${newIdx})">
+      </div>
+      <div>
+        <label class="form-label" style="font-size:0.72rem;margin-bottom:2px;color:var(--yellow)">Leave</label>
+        <input type="number" min="0" class="form-input review-leave" id="row-leave-${newIdx}" value="0" style="font-size:0.84rem;padding:5px 8px" oninput="onReviewRowInputChange(${newIdx})">
+      </div>
+      <div>
+        <label class="form-label" style="font-size:0.72rem;margin-bottom:2px;color:var(--text-muted)">Not Entered</label>
+        <input type="number" min="0" class="form-input review-not-entered" id="row-not-entered-${newIdx}" value="0" style="font-size:0.84rem;padding:5px 8px" oninput="onReviewRowInputChange(${newIdx})">
+      </div>
+    </div>
+  `;
+  container.appendChild(rowDiv);
+}
+
+function saveAllReviewedBaselines() {
+  const container = document.getElementById('ab-review-rows-container');
+  if (!container) return;
+
+  const rows = container.querySelectorAll('.attendance-review-row');
+  if (!rows.length) {
+    showToast('No subjects to save.', 'info');
+    document.getElementById('ab-review-modal-backdrop')?.remove();
+    return;
+  }
+
+  const baselines = loadAttendanceBaselines();
+  let savedCount = 0;
+
+  rows.forEach(row => {
+    const subjVal = row.querySelector('.review-subject-select')?.value || '';
+    const [subjName, subjCode] = subjVal.split('|||');
+    if (!subjName && !subjCode) return;
+
+    const present = Math.max(0, parseInt(row.querySelector('.review-present')?.value) || 0);
+    const absent = Math.max(0, parseInt(row.querySelector('.review-absent')?.value) || 0);
+    const leave = Math.max(0, parseInt(row.querySelector('.review-leave')?.value) || 0);
+    const notEntered = Math.max(0, parseInt(row.querySelector('.review-not-entered')?.value) || 0);
+
+    const storageKey = (subjCode || subjName).trim();
+    baselines[storageKey] = {
+      subjectCode: subjCode || '',
+      subjectName: subjName || '',
+      present,
+      absent,
+      leave,
+      notEntered,
+      totalSessions: 0,
+      updatedAt: new Date().toISOString()
+    };
+    savedCount++;
+  });
+
+  saveAttendanceBaselines(baselines);
+  document.getElementById('ab-review-modal-backdrop')?.remove();
+  triggerConfetti();
+  showToast(`Attendance baselines saved for ${savedCount} subject${savedCount!==1?'s':''} ✓`, 'success');
+  renderPage(state.currentPage);
+}
+
+function showAttendanceScanErrorModal(message) {
+  const existing = document.getElementById('ab-scan-error-backdrop');
+  if (existing) existing.remove();
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  backdrop.id = 'ab-scan-error-backdrop';
+  backdrop.innerHTML = `
+    <div class="modal" onclick="event.stopPropagation()" style="max-width:440px;padding:26px 22px;text-align:center">
+      <div style="font-size:2.2rem;margin-bottom:10px">📷</div>
+      <h3 style="margin:0 0 8px 0;font-size:1.15rem;font-weight:700;color:var(--text-primary)">We couldn’t read this screenshot clearly.</h3>
+      <div style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:20px;line-height:1.45">
+        ${message || 'The image may be blurry, low contrast, or not showing table columns. You can still enter your counts manually.'}
+      </div>
+      <div style="display:flex;gap:10px;justify-content:center">
+        <button type="button" class="btn-secondary" onclick="document.getElementById('ab-scan-error-backdrop')?.remove()" style="font-size:0.84rem">
+          Close
+        </button>
+        <button type="button" class="btn-primary" onclick="document.getElementById('ab-scan-error-backdrop')?.remove(); showBaselineModal(null, 'manual');" style="font-size:0.84rem;padding:7px 16px">
+          ✍️ Enter Counts Manually
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
 }
 
 function onBaselineSubjectChange(subjectKey) {
@@ -4583,9 +5137,14 @@ function renderSubjectsOverview(el, subjects) {
         <div class="page-title">Subject Hubs</div>
         <div class="page-subtitle">Course schedules, attendance baselines, tasks &amp; study resources organized per subject</div>
       </div>
-      <button class="btn btn-secondary" onclick="showBaselineModal()" style="display:inline-flex;align-items:center;gap:6px;font-size:0.84rem;padding:7px 14px">
-        📊 Set Attendance Baseline
-      </button>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-secondary" onclick="showBaselineModal(null, 'scan')" style="display:inline-flex;align-items:center;gap:6px;font-size:0.84rem;padding:7px 14px">
+          📷 Scan from Photo
+        </button>
+        <button class="btn btn-primary" onclick="showBaselineModal(null, 'manual')" style="display:inline-flex;align-items:center;gap:6px;font-size:0.84rem;padding:7px 14px">
+          📊 Set Baseline
+        </button>
+      </div>
     </div>
 
     ${anyMissingBaseline ? `
@@ -4596,9 +5155,14 @@ function renderSubjectsOverview(el, subjects) {
             Add your present and absent counts once. Clarity Desk will continue from there.
           </div>
         </div>
-        <button class="btn btn-sm btn-primary" onclick="showBaselineModal()" style="font-size:0.82rem;padding:6px 14px;white-space:nowrap">
-          📊 Set Current Attendance
-        </button>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-sm btn-secondary" onclick="showBaselineModal(null, 'scan')" style="font-size:0.82rem;padding:6px 12px;white-space:nowrap">
+            📷 Scan Photo
+          </button>
+          <button class="btn btn-sm btn-primary" onclick="showBaselineModal(null, 'manual')" style="font-size:0.82rem;padding:6px 14px;white-space:nowrap">
+            📊 Set Counts
+          </button>
+        </div>
       </div>
     ` : ''}
 
@@ -7225,12 +7789,19 @@ window.saveNoticeChannelsFromSettings = saveNoticeChannelsFromSettings;
 
 // Attendance Baseline & Live Actions
 window.showBaselineModal           = showBaselineModal;
+window.switchBaselineModalTab      = switchBaselineModalTab;
+window.triggerAttendancePhotoScan  = triggerAttendancePhotoScan;
+window.handleAttendancePhotoUpload = handleAttendancePhotoUpload;
 window.onBaselineSubjectChange     = onBaselineSubjectChange;
 window.updateBaselinePreview       = updateBaselinePreview;
 window.saveSubjectBaselineFromModal = saveSubjectBaselineFromModal;
 window.clearSubjectBaseline        = clearSubjectBaseline;
 window.logSubjectAttendanceAction  = logSubjectAttendanceAction;
 window.undoSubjectAttendanceAction = undoSubjectAttendanceAction;
+window.onReviewRowInputChange      = onReviewRowInputChange;
+window.deleteReviewRow             = deleteReviewRow;
+window.addScanReviewRow            = addScanReviewRow;
+window.saveAllReviewedBaselines    = saveAllReviewedBaselines;
 
 // Desk Assistant
 window.toggleAssistant       = toggleAssistant;
