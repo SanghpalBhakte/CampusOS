@@ -70,6 +70,7 @@ function loadProfile() {
     branch:   getCleanVal(saved.branch, STUDENT.branch, ['your branch', 'your major', 'your department']),
     year:     getCleanVal(saved.year, STUDENT.year, ['your year', 'your semester', 'your term']),
     rollNo:   getCleanVal(saved.rollNo, STUDENT.rollNo, ['your roll no.', 'your roll number', 'your student id']),
+    batch:    getCleanVal(saved.batch, '', ['your batch', 'batch']),
     examDate: (saved.examDate || '').trim(),
   };
 }
@@ -757,7 +758,7 @@ function standardizeTimetableDay(rawDay) {
   return '';
 }
 
-// ── Precision Timetable Cell Sanitizer ──────────────────────────
+// ── Precision Timetable Cell Sanitizer & Canonical Subject Normalizer ─
 const TIMETABLE_NON_CLASS_KEYWORDS = [
   'lunch', 'break', 'recess', 'tea break', 'interval',
   'free', 'library', 'sports', 'mentoring', 'assembly',
@@ -773,9 +774,222 @@ const TIMETABLE_JUNK_TOKENS = new Set([
   'sr', 'no', 'code', 'subject', 'faculty', 'room', 'venue', 'timing'
 ]);
 
+const BATCH_PATTERN = /\b(?:Batch(?:es)?|Sec(?:tion)?|Grp|Group)?\s*[:\-\s]*\b([A-D][1-4]|[A-D](?![a-z])|[1-4](?![0-9]))\b/gi;
+const BRACKETED_BATCH_PATTERN = /\((?:AI-)?([A-D][1-4](?:[\s,/-]+(?:AI-)?[A-D][1-4])*)\)/i;
+const SUBJECT_CODE_PATTERN = /\b([A-Z]{2,8}[0-9]{1,4}[A-Z]{1,4}[0-9]{1,4}[A-Z]?|[A-Z]{2,6}[-\s]?[0-9]{2,5}[A-Z]?|[0-9]{2}[A-Z]{2,6}[0-9]{2,4})\b/i;
+const FACULTY_TITLE_PATTERN = /\b(?:Prof\.?|Dr\.?|Mr\.?|Mrs\.?|Ms\.?|Shri|Smt\.?)\s*[A-Za-z]+(?:\s+[A-Za-z]+)*/gi;
+const ROOM_PATTERN = /\b(?:Room|LT|CR|LH|Lab|Hall|SF|FF|GF|Cabin|WS)[-.\s]*(?:\d+[A-Z]?|[A-D]\b)|\b(?:G|F|S|T)-\d{2,3}\b|\b[A-Z]{1,2}-\d{2,3}\b|\b\d{3}[A-Z]?\b/i;
+
+function extractBatchTags(rawText) {
+  if (!rawText || typeof rawText !== 'string') return [];
+  const batches = new Set();
+
+  // 1. Check all bracketed expressions e.g. (AI-A2, B2), (Sec B), (Batch D1)
+  const bracketMatches = rawText.match(/\(([^)]+)\)/g);
+  if (bracketMatches) {
+    bracketMatches.forEach(bracket => {
+      const inner = bracket.replace(/^\(|\)$/g, '').trim();
+      const parts = inner.split(/[\s,/-]+/).map(p => p.replace(/^AI-/i, '').replace(/^(?:Sec|Section|Batch|Grp|Group)[:\-\s]*/i, '').trim().toUpperCase());
+      parts.forEach(p => {
+        if (/^[A-D][1-4]$|^[A-D]$/.test(p)) batches.add(p);
+      });
+    });
+  }
+
+  // 2. Check standalone batch markers e.g. "Batch A2", "Sec B", "Batch D1"
+  let match;
+  const regex = new RegExp(BATCH_PATTERN.source, 'gi');
+  while ((match = regex.exec(rawText)) !== null) {
+    const tag = match[1].toUpperCase();
+    if (/^[A-D][1-4]$|^[A-D]$/.test(tag)) {
+      batches.add(tag);
+    }
+  }
+
+  return Array.from(batches);
+}
+
+function normalizeSubjectIdentity(rawText, existingSubjects = [], forceType = null) {
+  if (!rawText || typeof rawText !== 'string') {
+    return {
+      canonicalName: '',
+      canonicalCode: '',
+      classType: 'lecture',
+      batches: [],
+      room: '',
+      teacher: '',
+      isLab: false
+    };
+  }
+
+  let text = rawText.trim().replace(/\r\n|\r/g, '\n');
+
+  // 1. Extract Batch tags
+  const batches = extractBatchTags(text);
+
+  // 2. Extract Faculty
+  let teacher = '';
+  const teacherMatch = text.match(FACULTY_TITLE_PATTERN);
+  if (teacherMatch) {
+    teacher = teacherMatch[0].trim();
+    text = text.replace(teacherMatch[0], ' ');
+  }
+
+  // 3. Extract Room
+  let room = '';
+  const roomMatch = text.match(ROOM_PATTERN);
+  if (roomMatch && !/^(19|20)\d\d$/.test(roomMatch[0])) {
+    room = roomMatch[0].trim().replace(/\s+/g, '-');
+    text = text.replace(roomMatch[0], ' ');
+  }
+
+  // Strip all bracketed expressions e.g. (AI-A2, B2) or (CE) or (Batch 1)
+  text = text.replace(/\([^)]*\)/g, ' ');
+  text = text.replace(/\[[^\]]*\]/g, ' ');
+  text = text.replace(/\b(?:Batch(?:es)?|Sec(?:tion)?)\s*[:\-\s]*[A-D0-9,\s/-]+\b/gi, ' ');
+
+  // 4. Detect Class Type & Lab markers
+  let classType = forceType || 'lecture';
+  const isLabExplicit = /\b(?:lab|practical|workshop|hands-on|pr)\b/i.test(text) || /\b(?:lab|ws)\b/i.test(room);
+  const isTutorial = /\b(?:tutorial|tut)\b/i.test(text);
+  const isProject = /\b(?:project|seminar|viva)\b/i.test(text);
+
+  if (forceType) {
+    classType = forceType;
+  } else if (isLabExplicit) {
+    classType = 'lab';
+  } else if (isTutorial) {
+    classType = 'tutorial';
+  } else if (isProject) {
+    classType = 'project';
+  }
+
+  // Strip type keywords from title candidate
+  text = text
+    .replace(/\b(?:laboratory|lab|practical|tutorial|tut|lecture|theory|project|seminar|workshop)\b/gi, ' ')
+    .replace(/\b(?:credits?|hours?|hrs?|periods?|sem(?:ester)?\s*(?:[1-8]|i{1,3}|iv|v|vi{0,3})?)\b/gi, ' ');
+
+  // 5. Extract Course Code
+  let code = '';
+  const codeMatch = text.match(SUBJECT_CODE_PATTERN);
+  if (codeMatch && codeMatch[1].length >= 3) {
+    const candidateCode = codeMatch[1].replace(/\s+/g, '').toUpperCase();
+    if (/[0-9]/.test(candidateCode) || candidateCode.length <= 5) {
+      code = candidateCode;
+      text = text.replace(codeMatch[0], ' ');
+    }
+  }
+
+  // 6. Clean Subject Name words
+  let cleanName = text
+    .replace(/[^a-zA-Z0-9\s/&+-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const words = cleanName.split(' ').filter(w => {
+    const wLow = w.toLowerCase();
+    if (w.length <= 1 && !['c', 'r'].includes(wLow)) return false;
+    if (TIMETABLE_JUNK_TOKENS.has(wLow)) return false;
+    if (/^[A-D][1-4]$/i.test(w)) return false;
+    return true;
+  });
+
+  cleanName = words.join(' ').trim();
+
+  // Normalize common subject abbreviations / names
+  const CANONICAL_SUBJECT_MAP = {
+    'ds': 'Data Structures',
+    'data structure': 'Data Structures',
+    'demp': 'Digital Electronics and Microprocessors',
+    'digital electronics': 'Digital Electronics and Microprocessors',
+    'digital electronics and microprocessor': 'Digital Electronics and Microprocessors',
+    'pbst': 'Probability and Statistics',
+    'probability & statistics': 'Probability and Statistics',
+    'bmfa': 'Business Management and Financial Accounting',
+    'business management': 'Business Management and Financial Accounting',
+    'coi': 'Constitution of India',
+    'ce': 'Community Engagement',
+    'web dev': 'Web Development',
+    'web development': 'Web Development',
+    'os': 'Operating Systems',
+    'operating system': 'Operating Systems',
+    'dbms': 'Database Management Systems',
+    'database management': 'Database Management Systems',
+    'ai': 'Artificial Intelligence',
+    'ml': 'Machine Learning',
+    'cn': 'Computer Networks',
+    'computer network': 'Computer Networks'
+  };
+
+  const lowerClean = cleanName.toLowerCase();
+  if (CANONICAL_SUBJECT_MAP[lowerClean]) {
+    cleanName = CANONICAL_SUBJECT_MAP[lowerClean];
+  }
+
+  // If Lab variant, standardize name with 'Lab' suffix
+  if (classType === 'lab' && cleanName && !/\blab\b/i.test(cleanName)) {
+    cleanName = `${cleanName} Lab`;
+    if (code && !code.endsWith('-LAB') && !code.endsWith('LAB') && !code.endsWith('P')) {
+      code = `${code}-LAB`;
+    }
+  }
+
+  // Match against existing subjects
+  if (existingSubjects && existingSubjects.length > 0) {
+    const cleanNoSpaces = cleanName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const cleanCodeNoSpaces = code.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    for (const ex of existingSubjects) {
+      const exName = (ex.name || ex.subject || '').trim();
+      const exCode = (ex.code || '').trim();
+      const exNameClean = exName.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const exCodeClean = exCode.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+      const exIsLab = /\blab\b/i.test(exName) || (ex.type === 'lab');
+      if (exIsLab !== (classType === 'lab')) continue;
+
+      if (cleanCodeNoSpaces && exCodeClean && cleanCodeNoSpaces === exCodeClean) {
+        cleanName = exName;
+        code = exCode;
+        break;
+      }
+      if (cleanNoSpaces && exNameClean && cleanNoSpaces === exNameClean) {
+        cleanName = exName;
+        code = exCode || code;
+        break;
+      }
+    }
+  }
+
+  return {
+    canonicalName: cleanName || code || 'General Subject',
+    canonicalCode: code || '',
+    classType,
+    batches,
+    room,
+    teacher,
+    isLab: classType === 'lab'
+  };
+}
+
+function shouldKeepClassForUserBatch(classItem, userBatch = 'all') {
+  if (!userBatch || userBatch.toLowerCase() === 'all') return true;
+
+  const itemBatches = classItem.batches || extractBatchTags(classItem.subject || '');
+  if (!itemBatches || itemBatches.length === 0) return true;
+
+  const cleanUserBatch = userBatch.toUpperCase().trim();
+  if (itemBatches.includes(cleanUserBatch)) return true;
+
+  const userLetter = cleanUserBatch.charAt(0);
+  if (itemBatches.includes(userLetter)) return true;
+
+  return false;
+}
+
 function cleanupTimetableDomain(rawText, existingSubjects = []) {
   if (!rawText || typeof rawText !== 'string') {
-    return { subject: '', code: '', room: '', teacher: '', type: 'lecture', isOff: false, isUncertain: true };
+    return { subject: '', code: '', room: '', teacher: '', type: 'lecture', batches: [], isOff: false, isUncertain: true };
   }
 
   let text = rawText.trim().replace(/\r\n|\r/g, '\n');
@@ -790,117 +1004,30 @@ function cleanupTimetableDomain(rawText, existingSubjects = []) {
         room: '',
         teacher: '',
         type: 'off',
+        batches: [],
         isOff: true,
         isUncertain: false
       };
     }
   }
 
-  // 1. Strip time strings first so times never pollute room numbers or codes
+  // Strip time strings so times never pollute room numbers, batch tokens, or codes
   text = text
     .replace(/\b([0-1]?[0-9]|2[0-3])[:.]([0-5][0-9])\s*(?:am|pm)?\s*(?:-|to|~|–|—)\s*([0-1]?[0-9]|2[0-3])[:.]([0-5][0-9])\s*(?:am|pm)?\b/gi, ' ')
     .replace(/\b([0-1]?[0-9]|2[0-3])[:.]([0-5][0-9])\s*(?:am|pm)?\b/gi, ' ')
     .replace(/\b\d{1,2}\s*(?:am|pm)\b/gi, ' ');
 
-  // 2. Extract room (strict patterns to avoid false matches)
-  let room = '';
-  const roomRegex = /\b(?:Room|LT|CR|LH|Lab|Hall|SF|FF|GF|Cabin|WS)[-.\s]*(?:\d+[A-Z]?|[A-D]\b)|\b(?:G|F|S|T)-\d{2,3}\b|\b[A-Z]{1,2}-\d{2,3}\b|\b\d{3}[A-Z]?\b/i;
-  const roomMatch = text.match(roomRegex);
-  if (roomMatch && !/^(19|20)\d\d$/.test(roomMatch[0])) {
-    room = roomMatch[0].trim().replace(/\s+/g, '-');
-    text = text.replace(roomMatch[0], ' ');
-  }
-
-  // 3. Extract class type
-  let type = 'lecture';
-  if (/\b(?:lab|practical|workshop|hands-on)\b/i.test(text) || /\b(?:lab|ws)\b/i.test(room)) {
-    type = 'lab';
-    text = text.replace(/\b(?:lab|practical|workshop|hands-on)\b/gi, ' ');
-  } else if (/\b(?:tutorial|tut)\b/i.test(text)) {
-    type = 'tutorial';
-    text = text.replace(/\b(?:tutorial|tut)\b/gi, ' ');
-  } else if (/\b(?:project|seminar|viva)\b/i.test(text)) {
-    type = 'project';
-    text = text.replace(/\b(?:project|seminar|viva)\b/gi, ' ');
-  }
-
-  // 4. Extract faculty
-  let teacher = '';
-  const teacherRegex = /\b(?:Prof\.?|Dr\.?|Mr\.?|Mrs\.?|Ms\.?)\s+[A-Za-z]+(?:\s+[A-Za-z]+)?|\bFaculty[:\s]+[A-Za-z.]+/i;
-  const teacherMatch = text.match(teacherRegex);
-  if (teacherMatch) {
-    teacher = teacherMatch[0].replace(/^Faculty[:\s]+/i, '').trim();
-    text = text.replace(teacherMatch[0], ' ');
-  }
-
-  // 5. Extract course code (e.g. CS201, AID21PCL202, KCS-501, 21CS301, MATH-102)
-  let code = '';
-  const codeRegex = /\b[A-Z]{2,5}[-\s]?\d{2,4}[A-Z]?\b|\b\d{2}[A-Z]{2,4}\d{2,4}\b/i;
-  const codeMatch = text.match(codeRegex);
-  if (codeMatch) {
-    code = codeMatch[0].replace(/\s+/g, '').toUpperCase();
-    text = text.replace(codeMatch[0], ' ');
-  }
-
-  // 6. Clean remaining subject name
-  let subjectCandidate = text
-    .replace(/[^a-zA-Z0-9\s/&+-]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-  const words = subjectCandidate.split(' ').filter(w => {
-    const wLow = w.toLowerCase();
-    if (w.length <= 1 && !['c', 'r'].includes(wLow)) return false;
-    if (TIMETABLE_JUNK_TOKENS.has(wLow)) return false;
-    return true;
-  });
-
-  subjectCandidate = words.join(' ').trim();
-
-  // 7. Fuzzy match against existing subjects in student's profile
-  if (existingSubjects && existingSubjects.length > 0) {
-    const candidateClean = subjectCandidate.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const codeClean = code.toLowerCase().replace(/[^a-z0-9]/g, '');
-
-    for (const ex of existingSubjects) {
-      const exName = (ex.name || ex.subject || '').trim();
-      const exCode = (ex.code || '').trim();
-      const exNameClean = exName.toLowerCase().replace(/[^a-z0-9]/g, '');
-      const exCodeClean = exCode.toLowerCase().replace(/[^a-z0-9]/g, '');
-
-      if (codeClean && exCodeClean && codeClean === exCodeClean) {
-        subjectCandidate = exName || subjectCandidate;
-        if (!code) code = exCode;
-        break;
-      }
-      if (candidateClean && exNameClean && (candidateClean.includes(exNameClean) || exNameClean.includes(candidateClean))) {
-        subjectCandidate = exName;
-        if (!code && exCode) code = exCode;
-        break;
-      }
-    }
-  }
-
-  // Check uncertainty (reject pure numbers or non-alphanumeric noise)
-  let isUncertain = false;
-  if (!subjectCandidate || !/[a-zA-Z]/.test(subjectCandidate) || subjectCandidate.length < 2 || /^[^a-zA-Z0-9]+$/.test(subjectCandidate)) {
-    if (code) {
-      subjectCandidate = code;
-      isUncertain = false;
-    } else {
-      subjectCandidate = '';
-      isUncertain = true;
-    }
-  }
+  const norm = normalizeSubjectIdentity(text, existingSubjects);
 
   return {
-    subject: subjectCandidate,
-    code,
-    room,
-    teacher,
-    type,
+    subject: norm.canonicalName,
+    code: norm.canonicalCode,
+    room: norm.room,
+    teacher: norm.teacher,
+    type: norm.classType,
+    batches: norm.batches,
     isOff: false,
-    isUncertain: isUncertain || !subjectCandidate
+    isUncertain: !norm.canonicalName
   };
 }
 
@@ -973,6 +1100,7 @@ function parseTimetableFromGrid(ocrData, existingSubjects = []) {
           room: cell.room || '',
           teacher: cell.teacher || '',
           type: cell.type || 'lecture',
+          batches: cell.batches || [],
           isUncertain: cell.isUncertain
         });
         foundCount++;
@@ -1039,6 +1167,7 @@ function parseTimetableFromTextStream(rawText, existingSubjects = []) {
           room: cellInfo.room || '',
           teacher: cellInfo.teacher || '',
           type: cellInfo.type || 'lecture',
+          batches: cellInfo.batches || [],
           isUncertain: cellInfo.isUncertain
         });
       }
@@ -1280,9 +1409,40 @@ function showTimetableUploadErrorModal(reason, base64Data, mimeType) {
 }
 
 let pendingExtractedSchedule = [];
+let selectedTimetablePreviewBatch = 'all';
 
 function showTimetablePreviewModal(schedule) {
-  pendingExtractedSchedule = JSON.parse(JSON.stringify(schedule));
+  const currentProfileBatch = (liveProfile?.batch || '').trim().toUpperCase();
+
+  // Normalize each row through canonical normalization layer
+  pendingExtractedSchedule = (schedule || []).map(item => {
+    const norm = normalizeSubjectIdentity(item.subject || '', [], item.type);
+    const batches = (norm.batches && norm.batches.length > 0) ? norm.batches : (item.batches || []);
+    return {
+      day: standardizeTimetableDay(item.day) || 'Mon',
+      time: item.time || '10:00',
+      end: item.end || '11:00',
+      subject: norm.canonicalName || item.subject || '',
+      code: norm.canonicalCode || item.code || '',
+      room: norm.room || item.room || '',
+      teacher: norm.teacher || item.teacher || '',
+      type: norm.classType || item.type || 'lecture',
+      batches,
+      isUncertain: !norm.canonicalName || !!item.isUncertain
+    };
+  });
+
+  // Collect all discovered batches across schedule
+  const discoveredBatches = new Set();
+  pendingExtractedSchedule.forEach(item => {
+    (item.batches || []).forEach(b => discoveredBatches.add(b));
+  });
+
+  if (currentProfileBatch && (discoveredBatches.has(currentProfileBatch) || discoveredBatches.size > 0)) {
+    selectedTimetablePreviewBatch = currentProfileBatch;
+  } else {
+    selectedTimetablePreviewBatch = 'all';
+  }
 
   const backdrop = document.createElement('div');
   backdrop.className = 'modal-backdrop';
@@ -1293,38 +1453,43 @@ function showTimetablePreviewModal(schedule) {
 }
 
 function renderTimetablePreviewModalContent(backdrop) {
-  const uncertainCount = pendingExtractedSchedule.filter(x => x.isUncertain || !x.subject).length;
+  const discoveredBatches = new Set();
+  pendingExtractedSchedule.forEach(item => {
+    (item.batches || []).forEach(b => discoveredBatches.add(b));
+  });
+  const batchList = Array.from(discoveredBatches).sort();
 
-  const rowsHtml = pendingExtractedSchedule.map((item, idx) => {
+  const visibleSchedule = pendingExtractedSchedule
+    .map((item, originalIdx) => ({ item, originalIdx }))
+    .filter(({ item }) => shouldKeepClassForUserBatch(item, selectedTimetablePreviewBatch));
+
+  const uncertainCount = visibleSchedule.filter(({ item }) => item.isUncertain || !item.subject).length;
+
+  const rowsHtml = visibleSchedule.map(({ item, originalIdx }) => {
     const isRowUncertain = item.isUncertain || !item.subject;
+    const batchLabel = (item.batches && item.batches.length > 0)
+      ? `<span class="type-badge" style="font-size:0.7rem;padding:2px 6px;background:rgba(59,130,246,0.15);color:var(--accent)">${item.batches.join(', ')}</span>`
+      : `<span style="font-size:0.7rem;color:var(--text-muted)">General</span>`;
+
     return `
-    <tr class="${isRowUncertain ? 'preview-row-uncertain' : ''}" id="preview-row-${idx}">
+    <tr class="${isRowUncertain ? 'preview-row-uncertain' : ''}" id="preview-row-${originalIdx}">
       <td>
-        <select class="form-select" style="padding:4px 6px;font-size:0.8rem" onchange="updatePreviewEntry(${idx}, 'day', this.value)">
+        <select class="form-select" style="padding:4px 6px;font-size:0.8rem" onchange="updatePreviewEntry(${originalIdx}, 'day', this.value)">
           ${['Mon','Tue','Wed','Thu','Fri','Sat'].map(d => `<option value="${d}" ${item.day===d?'selected':''}>${d}</option>`).join('')}
         </select>
       </td>
       <td>
         <div style="display:flex;align-items:center;gap:3px">
-          <input type="text" class="form-input" style="padding:4px 4px;font-size:0.8rem;width:52px;font-family:var(--font-mono)" value="${item.time || '10:00'}" placeholder="10:00" onchange="updatePreviewEntry(${idx}, 'time', this.value)">
+          <input type="text" class="form-input" style="padding:4px 4px;font-size:0.8rem;width:52px;font-family:var(--font-mono)" value="${item.time || '10:00'}" placeholder="10:00" onchange="updatePreviewEntry(${originalIdx}, 'time', this.value)">
           <span style="color:var(--text-muted)">-</span>
-          <input type="text" class="form-input" style="padding:4px 4px;font-size:0.8rem;width:52px;font-family:var(--font-mono)" value="${item.end || '11:00'}" placeholder="11:00" onchange="updatePreviewEntry(${idx}, 'end', this.value)">
+          <input type="text" class="form-input" style="padding:4px 4px;font-size:0.8rem;width:52px;font-family:var(--font-mono)" value="${item.end || '11:00'}" placeholder="11:00" onchange="updatePreviewEntry(${originalIdx}, 'end', this.value)">
         </div>
       </td>
       <td>
-        <input type="text" class="form-input ${!item.subject ? 'error' : ''}" id="preview-subject-${idx}" style="padding:4px 6px;font-size:0.8rem;width:100%" value="${(item.subject || '').replace(/"/g, '&quot;')}" placeholder="Subject name *" onchange="updatePreviewEntry(${idx}, 'subject', this.value)">
+        <input type="text" class="form-input ${!item.subject ? 'error' : ''}" id="preview-subject-${originalIdx}" style="padding:4px 6px;font-size:0.8rem;width:100%" value="${(item.subject || '').replace(/"/g, '&quot;')}" placeholder="Subject name *" onchange="updatePreviewEntry(${originalIdx}, 'subject', this.value)">
       </td>
       <td>
-        <input type="text" class="form-input" style="padding:4px 6px;font-size:0.8rem;width:70px" value="${(item.code || '').replace(/"/g, '&quot;')}" placeholder="Code" onchange="updatePreviewEntry(${idx}, 'code', this.value)">
-      </td>
-      <td>
-        <input type="text" class="form-input" style="padding:4px 6px;font-size:0.8rem;width:70px" value="${(item.room || '').replace(/"/g, '&quot;')}" placeholder="Room" onchange="updatePreviewEntry(${idx}, 'room', this.value)">
-      </td>
-      <td>
-        <input type="text" class="form-input" style="padding:4px 6px;font-size:0.8rem;width:85px" value="${(item.teacher || '').replace(/"/g, '&quot;')}" placeholder="Faculty" onchange="updatePreviewEntry(${idx}, 'teacher', this.value)">
-      </td>
-      <td>
-        <select class="form-select" style="padding:4px 6px;font-size:0.8rem;width:78px" onchange="updatePreviewEntry(${idx}, 'type', this.value)">
+        <select class="form-select" style="padding:4px 6px;font-size:0.8rem;width:82px" onchange="updatePreviewEntry(${originalIdx}, 'type', this.value)">
           <option value="lecture" ${item.type==='lecture'?'selected':''}>Lecture</option>
           <option value="lab" ${item.type==='lab'?'selected':''}>Lab</option>
           <option value="tutorial" ${item.type==='tutorial'?'selected':''}>Tutorial</option>
@@ -1333,24 +1498,58 @@ function renderTimetablePreviewModalContent(backdrop) {
         </select>
       </td>
       <td style="text-align:center">
+        ${batchLabel}
+      </td>
+      <td>
+        <input type="text" class="form-input" style="padding:4px 6px;font-size:0.8rem;width:68px" value="${(item.code || '').replace(/"/g, '&quot;')}" placeholder="Code" onchange="updatePreviewEntry(${originalIdx}, 'code', this.value)">
+      </td>
+      <td>
+        <input type="text" class="form-input" style="padding:4px 6px;font-size:0.8rem;width:68px" value="${(item.room || '').replace(/"/g, '&quot;')}" placeholder="Room" onchange="updatePreviewEntry(${originalIdx}, 'room', this.value)">
+      </td>
+      <td>
+        <input type="text" class="form-input" style="padding:4px 6px;font-size:0.8rem;width:85px" value="${(item.teacher || '').replace(/"/g, '&quot;')}" placeholder="Faculty" onchange="updatePreviewEntry(${originalIdx}, 'teacher', this.value)">
+      </td>
+      <td style="text-align:center">
         ${isRowUncertain ? '<span class="uncertain-badge" title="Please review or edit missing details">⚠️ Review</span>' : '<span style="color:var(--green);font-size:0.75rem;font-weight:600">✓ Ready</span>'}
       </td>
       <td style="text-align:center">
-        <button class="task-delete-btn" onclick="removePreviewEntry(${idx})" title="Remove class entry">${icons.trash()}</button>
+        <button class="task-delete-btn" onclick="removePreviewEntry(${originalIdx})" title="Remove class entry">${icons.trash()}</button>
       </td>
     </tr>`;
   }).join('');
 
   backdrop.innerHTML = `
-    <div class="modal" onclick="event.stopPropagation()" style="max-width:820px;width:95%">
+    <div class="modal" onclick="event.stopPropagation()" style="max-width:860px;width:95%">
       <div class="modal-header">
         <div>
           <h2 class="modal-title">Extracted Timetable Preview</h2>
           <div style="font-size:0.8rem;color:var(--text-muted);margin-top:2px">
-            ${pendingExtractedSchedule.length} class${pendingExtractedSchedule.length !== 1 ? 'es' : ''} extracted ${uncertainCount > 0 ? `· <span style="color:var(--yellow);font-weight:600">${uncertainCount} entries need review</span>` : '· <span style="color:var(--green);font-weight:600">All fields structured</span>'}
+            ${visibleSchedule.length} class${visibleSchedule.length !== 1 ? 'es' : ''} shown ${selectedTimetablePreviewBatch !== 'all' ? `(Filtered for Batch ${selectedTimetablePreviewBatch})` : ''} ${uncertainCount > 0 ? `· <span style="color:var(--yellow);font-weight:600">${uncertainCount} entries need review</span>` : '· <span style="color:var(--green);font-weight:600">All fields structured</span>'}
           </div>
         </div>
         <button class="modal-close" onclick="document.getElementById('tt-preview-backdrop').remove()">${icons.x()}</button>
+      </div>
+
+      <!-- Batch Filter & Normalization Controls -->
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--surface-2);padding:10px 14px;border-radius:var(--radius-sm);margin-bottom:14px;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span style="font-size:0.82rem;font-weight:600;color:var(--text-primary)">Your Practical Batch / Section:</span>
+          <select class="form-select" id="tt-preview-batch-select" style="padding:4px 8px;font-size:0.82rem;max-width:160px" onchange="onTimetablePreviewBatchChange(this.value)">
+            <option value="all" ${selectedTimetablePreviewBatch === 'all' ? 'selected' : ''}>All Batches (No Filter)</option>
+            ${batchList.map(b => `<option value="${b}" ${selectedTimetablePreviewBatch === b ? 'selected' : ''}>Batch ${b}</option>`).join('')}
+            ${!batchList.includes('A1') ? '<option value="A1"' + (selectedTimetablePreviewBatch === 'A1' ? ' selected' : '') + '>Batch A1</option>' : ''}
+            ${!batchList.includes('A2') ? '<option value="A2"' + (selectedTimetablePreviewBatch === 'A2' ? ' selected' : '') + '>Batch A2</option>' : ''}
+            ${!batchList.includes('B1') ? '<option value="B1"' + (selectedTimetablePreviewBatch === 'B1' ? ' selected' : '') + '>Batch B1</option>' : ''}
+            ${!batchList.includes('B2') ? '<option value="B2"' + (selectedTimetablePreviewBatch === 'B2' ? ' selected' : '') + '>Batch B2</option>' : ''}
+            ${!batchList.includes('C1') ? '<option value="C1"' + (selectedTimetablePreviewBatch === 'C1' ? ' selected' : '') + '>Batch C1</option>' : ''}
+            ${!batchList.includes('C2') ? '<option value="C2"' + (selectedTimetablePreviewBatch === 'C2' ? ' selected' : '') + '>Batch C2</option>' : ''}
+            ${!batchList.includes('D1') ? '<option value="D1"' + (selectedTimetablePreviewBatch === 'D1' ? ' selected' : '') + '>Batch D1</option>' : ''}
+            ${!batchList.includes('D2') ? '<option value="D2"' + (selectedTimetablePreviewBatch === 'D2' ? ' selected' : '') + '>Batch D2</option>' : ''}
+          </select>
+        </div>
+        <div style="font-size:0.76rem;color:var(--text-muted)">
+          Hides other batch practicals so you only save classes for your section.
+        </div>
       </div>
 
       <div style="overflow-x:auto;max-height:380px;margin-bottom:16px;border:1px solid var(--border);border-radius:var(--radius-sm)">
@@ -1360,19 +1559,20 @@ function renderTimetablePreviewModalContent(backdrop) {
               <th style="width:75px">Day</th>
               <th style="width:125px">Time</th>
               <th>Subject Name *</th>
-              <th style="width:75px">Code</th>
-              <th style="width:75px">Room</th>
-              <th style="width:90px">Faculty</th>
               <th style="width:85px">Type</th>
-              <th style="width:80px;text-align:center">Status</th>
+              <th style="width:70px;text-align:center">Batch</th>
+              <th style="width:70px">Code</th>
+              <th style="width:70px">Room</th>
+              <th style="width:90px">Faculty</th>
+              <th style="width:75px;text-align:center">Status</th>
               <th style="width:36px"></th>
             </tr>
           </thead>
           <tbody>
             ${rowsHtml.length > 0 ? rowsHtml : `
               <tr>
-                <td colspan="9" style="text-align:center;padding:24px;color:var(--text-muted)">
-                  No timetable rows extracted. Click "Add Class Row" below to enter your schedule manually.
+                <td colspan="10" style="text-align:center;padding:24px;color:var(--text-muted)">
+                  No timetable rows matched the chosen batch (${selectedTimetablePreviewBatch}). Change batch or click "Add Class Row" below.
                 </td>
               </tr>
             `}
@@ -1393,6 +1593,12 @@ function renderTimetablePreviewModalContent(backdrop) {
     </div>
   `;
 }
+
+window.onTimetablePreviewBatchChange = function(val) {
+  selectedTimetablePreviewBatch = val;
+  const backdrop = document.getElementById('tt-preview-backdrop');
+  if (backdrop) renderTimetablePreviewModalContent(backdrop);
+};
 
 window.updatePreviewEntry = function(idx, key, val) {
   if (pendingExtractedSchedule[idx]) {
@@ -1421,6 +1627,7 @@ window.addPreviewEntry = function() {
     room: '',
     teacher: '',
     type: 'lecture',
+    batches: selectedTimetablePreviewBatch !== 'all' ? [selectedTimetablePreviewBatch] : [],
     isUncertain: true
   });
   const backdrop = document.getElementById('tt-preview-backdrop');
@@ -1428,29 +1635,26 @@ window.addPreviewEntry = function() {
 };
 
 window.confirmSaveExtractedTimetable = function() {
-  if (!pendingExtractedSchedule.length) {
-    showToast("Timetable schedule is empty. Add at least one class row.", "info");
+  const toSave = pendingExtractedSchedule.filter(item => shouldKeepClassForUserBatch(item, selectedTimetablePreviewBatch));
+
+  if (!toSave.length) {
+    showToast("No classes to save for the selected batch. Add at least one class row or select 'All Batches'.", "info");
     return;
   }
 
-  // 1. Validate that all entries have valid subject names
-  for (let i = 0; i < pendingExtractedSchedule.length; i++) {
-    const item = pendingExtractedSchedule[i];
+  // 1. Validate that all kept entries have valid subject names
+  for (let i = 0; i < toSave.length; i++) {
+    const item = toSave[i];
     const subj = (item.subject || '').trim();
     if (!subj && item.type !== 'off') {
-      const subjInput = document.getElementById(`preview-subject-${i}`);
-      if (subjInput) {
-        subjInput.classList.add('error', 'shake');
-        subjInput.focus();
-      }
-      showToast(`Row ${i + 1} (${item.day} ${item.time}) is missing a Subject name. Please fill it in or delete the row.`, "error");
+      showToast(`A class on ${item.day} at ${item.time} is missing a Subject name. Please fill it in or delete the row.`, "error");
       return;
     }
 
     // Validate times
     const timeNorm = normalizeTimetableTime(`${item.time || '10:00'} - ${item.end || '11:00'}`);
     if (!timeNorm.isValid) {
-      showToast(`Row ${i + 1} (${subj || 'Class'}) has an invalid time format. Use HH:MM.`, "error");
+      showToast(`Class "${subj || 'Class'}" on ${item.day} has an invalid time format. Use HH:MM.`, "error");
       return;
     }
   }
@@ -1458,7 +1662,7 @@ window.confirmSaveExtractedTimetable = function() {
   const dayMap = { "Mon": 1, "Tue": 2, "Wed": 3, "Thu": 4, "Fri": 5, "Sat": 6 };
   const newTT = { 1: [], 2: [], 3: [], 4: [], 5: [], 6: [], 0: [] };
 
-  pendingExtractedSchedule.forEach(item => {
+  toSave.forEach(item => {
     const dayNum = dayMap[item.day] || 1;
     const timeNorm = normalizeTimetableTime(`${item.time || '10:00'} - ${item.end || '11:00'}`);
 
@@ -1478,8 +1682,16 @@ window.confirmSaveExtractedTimetable = function() {
   });
 
   saveTimetable(newTT);
+
+  // If user chose a specific batch during preview, update profile batch
+  if (selectedTimetablePreviewBatch && selectedTimetablePreviewBatch !== 'all') {
+    liveProfile.batch = selectedTimetablePreviewBatch;
+    safeSetStorage(KEY_PROFILE, liveProfile);
+    syncToCloud();
+  }
+
   document.getElementById('tt-preview-backdrop')?.remove();
-  showToast("Timetable imported and saved successfully!", "success");
+  showToast(`Timetable saved! ${toSave.length} classes loaded${selectedTimetablePreviewBatch !== 'all' ? ` for Batch ${selectedTimetablePreviewBatch}` : ''}.`, "success");
   renderPage(state.currentPage);
 };
 
@@ -3430,6 +3642,10 @@ window.showOnboardingModal = function() {
             <label class="form-label">Year / Semester / Term</label>
             <input type="text" class="form-input" id="ob-year" value="${(p.year||'').replace(/"/g, '&quot;')}" placeholder="e.g. 3rd Semester, Year 2, Fall 2026">
           </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Practical Batch / Section <span style="color:var(--text-muted);font-weight:normal">(optional)</span></label>
+            <input type="text" class="form-input" id="ob-batch" value="${(p.batch||'').replace(/"/g, '&quot;')}" placeholder="e.g. A1, A2, B2, D1">
+          </div>
 
           <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;margin-top:4px">
             <div style="font-weight:600;font-size:0.86rem;color:var(--text-primary);margin-bottom:2px">
@@ -3542,6 +3758,7 @@ window.finishOnboarding = function() {
     college: collegeVal,
     branch: branchVal,
     year: yearVal,
+    batch: (document.getElementById('ob-batch')?.value || '').trim(),
     examDate: liveProfile.examDate || '',
   };
 
@@ -4296,26 +4513,51 @@ function getSubjectList() {
   const map = new Map();
   const liveTT = loadTimetable();
 
+  const getOrCreateSubject = (rawName, rawCode, classType, teacher = '', room = '', color = 'var(--accent)') => {
+    if (!rawName || typeof rawName !== 'string') return null;
+    const cleanRaw = rawName.trim();
+    if (!cleanRaw || /^(off|lunch|break|holiday|recess|free)$/i.test(cleanRaw)) return null;
+
+    const norm = normalizeSubjectIdentity(cleanRaw, [], classType);
+    const isLab = classType === 'lab' || norm.isLab;
+    const finalName = norm.canonicalName || cleanRaw;
+    const finalCode = norm.canonicalCode || rawCode || finalName;
+
+    // Distinguish theory from lab canonical identity cleanly
+    const key = `${finalName.toLowerCase()}|||${isLab ? 'lab' : 'theory'}`;
+    if (!map.has(key)) {
+      map.set(key, {
+        name: finalName,
+        code: finalCode,
+        type: isLab ? 'lab' : (classType || norm.classType || 'lecture'),
+        teacher: teacher || norm.teacher || '',
+        room: room || norm.room || '',
+        color: color || 'var(--accent)',
+        slots: []
+      });
+    }
+    const item = map.get(key);
+    if (!item.teacher && (teacher || norm.teacher)) item.teacher = teacher || norm.teacher;
+    if (!item.room && (room || norm.room)) item.room = room || norm.room;
+    if (!item.code && finalCode) item.code = finalCode;
+    return item;
+  };
+
   // 1. Collect from Timetable
   [1, 2, 3, 4, 5, 6, 0].forEach(d => {
     (liveTT[d] || []).forEach(c => {
       if (isTeachingClass(c) && c.subject) {
-        const key = c.subject.trim();
-        if (!map.has(key)) {
-          map.set(key, {
-            name: key,
-            code: c.code || key,
-            teacher: c.teacher || '',
-            room: c.room || '',
-            color: c.color || 'var(--accent)',
-            slots: []
+        const item = getOrCreateSubject(c.subject, c.code, c.type, c.teacher, c.room, c.color);
+        if (item) {
+          item.slots.push({
+            day: d,
+            time: c.time,
+            end: c.end,
+            room: c.room || item.room,
+            teacher: c.teacher || item.teacher,
+            code: c.code || item.code
           });
         }
-        const item = map.get(key);
-        if (!item.teacher && c.teacher) item.teacher = c.teacher;
-        if (!item.room && c.room) item.room = c.room;
-        if (!item.code && c.code) item.code = c.code;
-        item.slots.push({ day: d, time: c.time, end: c.end, room: c.room, teacher: c.teacher, code: c.code || item.code });
       }
     });
   });
@@ -4323,34 +4565,14 @@ function getSubjectList() {
   // 2. Collect from Tasks
   allTasks().forEach(t => {
     if (t.subject && t.subject.trim()) {
-      const key = t.subject.trim();
-      if (!map.has(key)) {
-        map.set(key, {
-          name: key,
-          code: key,
-          teacher: '',
-          room: '',
-          color: 'var(--accent)',
-          slots: []
-        });
-      }
+      getOrCreateSubject(t.subject, t.subject, 'lecture');
     }
   });
 
   // 3. Collect from Quick Links
   loadCustomLinks().forEach(l => {
     if (l.subject && l.subject.trim()) {
-      const key = l.subject.trim();
-      if (!map.has(key)) {
-        map.set(key, {
-          name: key,
-          code: key,
-          teacher: '',
-          room: '',
-          color: l.color || 'var(--accent)',
-          slots: []
-        });
-      }
+      getOrCreateSubject(l.subject, l.subject, 'lecture', '', '', l.color);
     }
   });
 
@@ -7497,6 +7719,10 @@ function renderSettings() {
           <label class="form-label">Year / Semester / Term</label>
           <input type="text" class="form-input" id="s-year" value="${(p.year || '').replace(/"/g, '&quot;')}" placeholder="e.g. 3rd Semester, Year 2, Fall 2026">
         </div>
+        <div class="form-group">
+          <label class="form-label">Practical Batch / Section</label>
+          <input type="text" class="form-input" id="s-batch" value="${(p.batch || '').replace(/"/g, '&quot;')}" placeholder="e.g. A1, A2, B2, D1">
+        </div>
       </div>
     </div>
 
@@ -7773,6 +7999,7 @@ function saveSettings() {
   const rawBranch  = (document.getElementById('s-branch')?.value || '').trim();
   const rawYear    = (document.getElementById('s-year')?.value || '').trim();
   const rawRoll    = (document.getElementById('s-roll')?.value || '').trim();
+  const rawBatch   = (document.getElementById('s-batch')?.value || '').trim();
 
   const profile = {
     name:     nameToSave,
@@ -7780,6 +8007,7 @@ function saveSettings() {
     branch:   (rawBranch.toLowerCase() === 'your branch' || rawBranch.toLowerCase() === 'your major' || rawBranch.toLowerCase() === 'your department') ? '' : rawBranch,
     year:     (rawYear.toLowerCase() === 'your year' || rawYear.toLowerCase() === 'your semester' || rawYear.toLowerCase() === 'your term') ? '' : rawYear,
     rollNo:   (rawRoll.toLowerCase() === 'your roll no.' || rawRoll.toLowerCase() === 'your roll number' || rawRoll.toLowerCase() === 'your student id') ? '' : rawRoll,
+    batch:    (rawBatch.toLowerCase() === 'your batch' || rawBatch.toLowerCase() === 'batch') ? '' : rawBatch,
     examDate: document.getElementById('s-exam-date')?.value || '',
   };
   safeSetStorage(KEY_PROFILE, profile);
