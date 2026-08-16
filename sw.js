@@ -1,4 +1,4 @@
-const CACHE_NAME = 'clarity-desk-v89';
+const CACHE_NAME = 'clarity-desk-v90';
 const PRECACHE_ASSETS = [
   './',
   './index.html',
@@ -134,3 +134,4 @@ self.addEventListener('push', (event) => {
     })
   );
 });
+

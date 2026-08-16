@@ -18,6 +18,7 @@ const KEY_GEMINI_KEY          = 'cos_gemini_key';
 const KEY_THEME               = 'cos_theme';
 const KEY_NOTIF_PREFS         = 'cos_notif_prefs';
 const KEY_NOTICE_CHANNELS     = 'cos_notice_channels';
+const KEY_ATT_TARGET          = 'cos_att_target';
 
 // ── Safe Storage Helpers ─────────────────────────────────────
 function safeGetStorage(key, fallback = null) {
@@ -2094,11 +2095,11 @@ function checkScheduledNotifications() {
     const totalMarked = totalAttended + totalSkipped;
     const pct = totalMarked > 0 ? Math.round((totalAttended / totalMarked) * 100) : null;
 
-    if (pct !== null && pct < 75) {
+    if (pct !== null && pct < getAttendanceTarget()) {
       const attKey = `att_warning_${today}`;
       if (!notifiedMap[attKey]) {
         dispatchNotification(`Attendance Alert: ${pct}%`, {
-          body: `Your attendance is currently ${pct}% (below 75% target). Tap to review.`,
+          body: `Your attendance is currently ${pct}% (below ${getAttendanceTarget()}% target). Tap to review.`,
           tag: attKey,
           data: { url: './#review' }
         });
@@ -2470,6 +2471,55 @@ function greetingWord() {
   if (h >= 12 && h < 17) return 'Good afternoon';
   if (h >= 17 && h < 22) return 'Good evening';
   return 'Good night';
+}
+
+// Returns user's configured attendance target (default 75)
+function getAttendanceTarget() {
+  const stored = parseInt(safeGetStorage(KEY_ATT_TARGET, 75) || '75', 10);
+  if (isNaN(stored) || stored < 50 || stored > 100) return 75;
+  return stored;
+}
+
+// Builds a situation-aware context line for the dashboard masthead.
+// Priority: attendance risk > overdue tasks > exam imminent > normal > all clear.
+function buildDashboardContextLine(opts = {}) {
+  const { attendancePct, attTarget, overdue, pending, classesLeft, totalClasses, examDaysLeft, firstName, dayClasses } = opts;
+  const isWeekend = dayClasses !== undefined && dayClasses.length === 0;
+
+  // Attendance at risk — highest urgency, surfaces immediately
+  if (attendancePct !== null && attendancePct < attTarget) {
+    return `Attendance at <strong>${attendancePct}%</strong> — below your ${attTarget}% target. Attend today's classes.`;
+  }
+
+  // Overdue tasks — second priority
+  if (overdue > 0) {
+    return `${overdue} overdue task${overdue !== 1 ? 's' : ''} need${overdue === 1 ? 's' : ''} attention before anything else.`;
+  }
+
+  // Exam imminent (≤ 7 days)
+  if (examDaysLeft !== null && examDaysLeft >= 0 && examDaysLeft <= 7) {
+    if (examDaysLeft === 0) return 'End-Sem exam is <strong>today</strong>. Good luck.';
+    if (examDaysLeft === 1) return 'End-Sem exam is <strong>tomorrow</strong>. Make today count.';
+    return `<strong>${examDaysLeft} days</strong> to End-Sem. Stay consistent.`;
+  }
+
+  // Weekend or free day with no tasks
+  if (isWeekend && pending === 0) {
+    return 'No classes today. A clear desk — use it well.';
+  }
+
+  // Normal day with classes remaining
+  if (classesLeft > 0) {
+    return `${classesLeft} class${classesLeft !== 1 ? 'es' : ''} remaining today.${pending > 0 ? ` ${pending} task${pending !== 1 ? 's' : ''} pending.` : ''}`;
+  }
+
+  // All classes done, tasks pending
+  if (pending > 0) {
+    return `Classes done for today. ${pending} task${pending !== 1 ? 's' : ''} still pending.`;
+  }
+
+  // Everything clear
+  return 'All clear. Classes attended, tasks on track.';
 }
 
 function allTasks() {
@@ -3002,7 +3052,7 @@ function renderReview() {
 }
 
 // ── Weekly Attendance Helper Functions ───────────────────────
-function calculateSmartAttendanceGuidance(totalAttended, totalSkipped, targetPct = 75) {
+function calculateSmartAttendanceGuidance(totalAttended, totalSkipped, targetPct = getAttendanceTarget()) {
   const totalMarked = totalAttended + totalSkipped;
   if (totalMarked === 0) {
     return {
@@ -3389,6 +3439,19 @@ window.showOnboardingModal = function() {
             </button>
           </div>
 
+          <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;margin-top:4px">
+            <div style="font-weight:600;font-size:0.86rem;color:var(--text-primary);margin-bottom:2px">
+              Attendance Target
+            </div>
+            <div style="font-size:0.78rem;color:var(--text-secondary);line-height:1.45;margin-bottom:8px">
+              What % do you need to maintain? (Most colleges require 75%.)
+            </div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <input type="number" class="form-input" id="ob-att-target" value="75" min="50" max="100" step="1" style="width:90px;font-size:0.88rem;padding:5px 10px">
+              <span style="font-size:0.82rem;color:var(--text-muted)">% minimum</span>
+            </div>
+          </div>
+
           <div id="ob-error" style="color:var(--red);font-size:0.78rem;display:none">Please enter your Full Name and College to finish setup.</div>
         </div>
         <div style="display:flex;align-items:center;justify-content:flex-end;gap:10px">
@@ -3461,6 +3524,12 @@ window.finishOnboarding = function() {
 
   safeSetStorage(KEY_PROFILE, profile);
   Object.assign(liveProfile, profile);
+
+  // Save attendance target from onboarding
+  const obAttTargetRaw = parseInt(document.getElementById('ob-att-target')?.value || '75', 10);
+  const obAttTargetSafe = (isNaN(obAttTargetRaw) || obAttTargetRaw < 50 || obAttTargetRaw > 100) ? 75 : obAttTargetRaw;
+  safeSetStorage(KEY_ATT_TARGET, obAttTargetSafe);
+
   localStorage.setItem('cos_onboarding_dismissed', 'true');
 
   syncToCloud();
@@ -3664,8 +3733,9 @@ function renderDashboard() {
   const totalSkipped = overallAtt.skipped;
   const totalMarked = overallAtt.total;
   const attendancePct = overallAtt.pct;
-  const isAttendanceAtRisk = attendancePct !== null && attendancePct < 75;
-  const dashGuidance = calculateSmartAttendanceGuidance(totalAttended, totalSkipped, 75);
+  const attTarget = getAttendanceTarget();
+  const isAttendanceAtRisk = attendancePct !== null && attendancePct < attTarget;
+  const dashGuidance = calculateSmartAttendanceGuidance(totalAttended, totalSkipped, attTarget);
 
   // Active class (now) or next class
   let activeClass = null;
@@ -3701,6 +3771,34 @@ function renderDashboard() {
   const firstName = displayName ? displayName.split(' ')[0] : '';
   const greeting = greetingWord();
   const needsSetup = !displayName;
+  const hasTimetable = isCustomTimetableActive() && dayClasses.length > 0;
+  const hasAttendanceData = totalMarked > 0;
+  const hasAnyTask = allTasks().length > 0;
+
+  // Exam days left (null if not set)
+  const examDaysLeftNum = (liveProfile.examDate && countdownText)
+    ? (() => { const today = new Date(); today.setHours(0,0,0,0); return Math.ceil((new Date(liveProfile.examDate + 'T00:00:00') - today) / 86400000); })()
+    : null;
+
+  // Situation-aware context line replacing the generic sub-greeting
+  const contextLine = buildDashboardContextLine({
+    attendancePct,
+    attTarget,
+    overdue,
+    pending,
+    classesLeft: classesLeftCount,
+    totalClasses: dayClasses.length,
+    examDaysLeft: examDaysLeftNum,
+    firstName,
+    dayClasses,
+  });
+
+  // Setup completeness — only show steps that are still missing
+  const setupSteps = [];
+  if (!displayName)    setupSteps.push({ id: 'name', label: 'Add your name', action: `navigateTo('settings')`, icon: '👤' });
+  if (!isCustomTimetableActive() || !hasTimetable) setupSteps.push({ id: 'tt', label: 'Set up your timetable', action: `navigateTo('timetable')`, icon: '🗓' });
+  if (!hasAttendanceData) setupSteps.push({ id: 'att', label: 'Configure attendance', action: `showBaselineModal()`, icon: '📊' });
+  const isFullySetup = setupSteps.length === 0;
 
   // Masthead ticker items in monospace ledger strip
   const formattedDay = `${DAY_NAMES[dayIdx]}, ${now.getDate()} ${MONTH_NAMES[now.getMonth()]}`;
@@ -3774,14 +3872,22 @@ function renderDashboard() {
       </div>`;
   }
 
-  const setupBanner = needsSetup ? `
-    <div class="card" style="margin-bottom:18px;display:flex;align-items:center;gap:14px;background:var(--accent-dim);border-color:color-mix(in srgb, var(--accent) 35%, var(--border));padding:14px 18px">
-      <div style="width:36px;height:36px;border-radius:10px;background:color-mix(in srgb, var(--accent) 20%, transparent);color:var(--accent);display:grid;place-items:center;flex-shrink:0">${icons.user()}</div>
-      <div style="flex:1;min-width:200px">
-        <div style="font-weight:650;font-size:0.9rem;color:var(--text-primary);letter-spacing:-0.015em">Personalize your student profile</div>
-        <div style="font-size:0.8rem;color:var(--text-muted);margin-top:2px">Set up your name, college, and semester to customize your timetable and countdown.</div>
+  // Setup guide banner — shown only when there are missing setup steps
+  const setupBanner = !isFullySetup ? `
+    <div class="desk-setup-guide" role="complementary" aria-label="Setup checklist">
+      <div class="setup-guide-header">
+        <span class="setup-guide-title">Finish setting up your desk</span>
+        <span class="setup-guide-count">${setupSteps.length} step${setupSteps.length !== 1 ? 's' : ''} left</span>
       </div>
-      <button class="btn-primary" onclick="navigateTo('settings')" style="flex-shrink:0;padding:7px 16px;font-size:0.82rem;font-weight:600">Set Up Profile →</button>
+      <div class="setup-guide-steps">
+        ${setupSteps.map((s, i) => `
+          <button class="setup-guide-step" onclick="${s.action}" aria-label="${s.label}">
+            <span class="setup-step-icon">${s.icon}</span>
+            <span class="setup-step-label">${s.label}</span>
+            <span class="setup-step-arrow">→</span>
+          </button>
+        `).join('')}
+      </div>
     </div>` : '';
 
   // Urgent & Active tasks
@@ -3813,7 +3919,7 @@ function renderDashboard() {
       <div class="desk-masthead-top">
         <div>
           <div class="desk-greeting">${greeting}${firstName ? `, ${firstName}` : ''}.</div>
-          <div class="desk-greeting-sub">${dayClasses.length > 0 ? `${classesLeftCount} class${classesLeftCount !== 1 ? 'es' : ''} left on your desk today.` : 'No classes scheduled today. A good day for focus or rest.'}</div>
+          <div class="desk-greeting-sub">${contextLine}</div>
         </div>
         <button class="btn btn-sm btn-secondary" onclick="navigateTo('review')" title="Weekly reflection &amp; guidance" style="font-size:0.76rem;padding:5px 12px;align-self:flex-end;white-space:nowrap">
           Weekly Review →
@@ -3860,7 +3966,7 @@ function renderDashboard() {
               }).join('')}
             </div>
           ` : `
-            <div style="padding:24px 0;color:var(--text-muted);font-size:0.85rem">No classes today. 🏖️</div>
+            <div style="padding:20px 0;color:var(--text-muted);font-size:0.85rem">${!isCustomTimetableActive() ? 'No timetable set up yet. <button class="setup-inline-link" onclick="navigateTo(\'timetable\')">Add your schedule →</button>' : 'No classes today — a free day on your desk.'}</div>
           `}
 
         <!-- TASKS & DEADLINES -->
@@ -3935,7 +4041,7 @@ function renderDashboard() {
             <div class="att-stat-figure ${isAttendanceAtRisk ? 'at-risk' : attendancePct !== null ? 'is-safe' : ''}">
               ${attendancePct !== null ? `${attendancePct}%` : '—'}
             </div>
-            <div class="att-stat-label">${attendancePct !== null ? (dashGuidance.isSafe ? 'Safe · ≥75%' : 'Action needed · <75%') : 'Not configured'}</div>
+            <div class="att-stat-label">${attendancePct !== null ? (dashGuidance.isSafe ? `Safe · ≥${attTarget}%` : `Action needed · <${attTarget}%`) : 'Not configured'}</div>
             <div class="att-stat-message">${dashGuidance.message}</div>
             ${attendancePct !== null ? `
               <div style="margin-top:10px">
@@ -7191,13 +7297,22 @@ function renderSettings() {
       </button>
     </div>
 
-    <div class="section-heading">${icons.clock()} Academic Countdown</div>
+    <div class="section-heading">${icons.clock()} Academic Goals & Countdown</div>
     <div class="card" style="padding:20px;margin-bottom:20px">
-      <div class="form-group" style="margin-bottom:0">
-        <label class="form-label">End-Semester Exam Date</label>
-        <input type="date" class="form-input" id="s-exam-date" value="${p.examDate || ''}" style="max-width:240px">
-        <div style="font-size:0.78rem;color:var(--text-muted);margin-top:6px">
-          Shows a calm daily countdown on your dashboard once set.
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">End-Semester Exam Date</label>
+          <input type="date" class="form-input" id="s-exam-date" value="${p.examDate || ''}" style="max-width:240px">
+          <div style="font-size:0.78rem;color:var(--text-muted);margin-top:6px">
+            Shows a calm daily countdown on your dashboard once set.
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Attendance Target (%)</label>
+          <input type="number" class="form-input" id="s-att-target" value="${getAttendanceTarget()}" min="50" max="100" step="1" style="max-width:120px">
+          <div style="font-size:0.78rem;color:var(--text-muted);margin-top:6px">
+            Minimum attendance % to maintain. Default is 75% (most colleges).
+          </div>
         </div>
       </div>
     </div>
@@ -7438,6 +7553,11 @@ function saveSettings() {
   };
   safeSetStorage(KEY_PROFILE, profile);
   Object.assign(liveProfile, profile);
+
+  // Save attendance target separately (not part of profile)
+  const attTargetRaw = parseInt(document.getElementById('s-att-target')?.value || '75', 10);
+  const attTargetSafe = (isNaN(attTargetRaw) || attTargetRaw < 50 || attTargetRaw > 100) ? 75 : attTargetRaw;
+  safeSetStorage(KEY_ATT_TARGET, attTargetSafe);
 
   const nPrefs = {
     taskUpcoming: document.getElementById('np-task-upcoming')?.value || 'day_before',
@@ -8146,16 +8266,17 @@ const ClarityAssistant = (() => {
       return `No attendance recorded yet. Mark classes as Attended or Skipped in the Timetable to start tracking.`;
     }
     const pct = Math.round((attended / total) * 100);
-    const isSafe = pct >= 75;
+    const attTgt = getAttendanceTarget();
+    const isSafe = pct >= attTgt;
     const tag = isSafe
       ? '<span class="cd-tag cd-tag-safe">Safe Zone</span>'
       : '<span class="cd-tag cd-tag-risk">Risk Zone</span>';
-    return `${tag}<strong>${pct}% attendance</strong> — ${attended} attended, ${skipped} skipped (${total} total marked).<br><br>75% is the general target. ${isSafe ? 'You are currently above target.' : 'You are below target.'}`;
+    return `${tag}<strong>${pct}% attendance</strong> — ${attended} attended, ${skipped} skipped (${total} total marked).<br><br>${attTgt}% is your target. ${isSafe ? 'You are currently above target.' : 'You are below target.'}`;
   }
 
   function buildAttendanceSkip() {
     const { attended, skipped, total } = getAttendanceSummary();
-    const guidance = calculateSmartAttendanceGuidance(attended, skipped, 75);
+    const guidance = calculateSmartAttendanceGuidance(attended, skipped, getAttendanceTarget());
     if (total === 0) return `No attendance data yet. Start marking classes first.`;
     // Strip HTML from guidance message for cleaner display
     const cleanMsg = guidance.message.replace(/<\/?strong>/g, '');
