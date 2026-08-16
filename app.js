@@ -66,10 +66,10 @@ function loadProfile() {
 
   return {
     name:     getCleanVal(saved.name, STUDENT.name, ['your name']),
-    college:  getCleanVal(saved.college, STUDENT.college, ['your college']),
-    branch:   getCleanVal(saved.branch, STUDENT.branch, ['artificial intelligence & data science', 'artificial intelligence']),
-    year:     getCleanVal(saved.year, STUDENT.year, ['2nd year — semester 3', '2nd year']),
-    rollNo:   getCleanVal(saved.rollNo, STUDENT.rollNo, ['your roll no.']),
+    college:  getCleanVal(saved.college, STUDENT.college, ['your college', 'your university']),
+    branch:   getCleanVal(saved.branch, STUDENT.branch, ['your branch', 'your major', 'your department']),
+    year:     getCleanVal(saved.year, STUDENT.year, ['your year', 'your semester', 'your term']),
+    rollNo:   getCleanVal(saved.rollNo, STUDENT.rollNo, ['your roll no.', 'your roll number', 'your student id']),
     examDate: (saved.examDate || '').trim(),
   };
 }
@@ -2687,18 +2687,34 @@ window.handleQuickAdd = function() {
   let subjectName = 'General';
   let foundAlias = false;
 
-  for (const [key, val] of Object.entries(SUBJECT_ALIASES)) {
-    // Check key or value match
-    if (text.toLowerCase().includes(key.toLowerCase()) || text.toLowerCase().includes(val.toLowerCase())) {
-      subjectCode = key;
-      subjectName = val;
+  // 1. Check dynamically against the user's subjects (from timetable, tasks, etc.)
+  const lowerText = text.toLowerCase();
+  const knownSubjects = (typeof getSubjectList === 'function') ? getSubjectList() : [];
+  for (const s of knownSubjects) {
+    const sName = (s.name || '').toLowerCase();
+    const sCode = (s.code || '').toLowerCase();
+    if ((sName && lowerText.includes(sName)) || (sCode && sCode.length >= 2 && lowerText.includes(sCode))) {
+      subjectCode = s.code || s.name;
+      subjectName = s.name;
       foundAlias = true;
       break;
     }
   }
-  
+
+  // 2. Fallback check against standard aliases
   if (!foundAlias) {
-    console.warn("[Quick Add] Unmapped subject for text:", text);
+    for (const [key, val] of Object.entries(SUBJECT_ALIASES)) {
+      if (lowerText.includes(key.toLowerCase()) || lowerText.includes(val.toLowerCase())) {
+        subjectCode = key;
+        subjectName = val;
+        foundAlias = true;
+        break;
+      }
+    }
+  }
+
+  if (!foundAlias) {
+    console.log("[Quick Add] Assigned general category for text:", text);
   }
 
   let dueDate = new Date();
@@ -3396,40 +3412,40 @@ window.showOnboardingModal = function() {
         <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:20px">
           <div class="form-group" style="margin-bottom:0">
             <label class="form-label">Full Name <span style="color:var(--red)">*</span></label>
-            <input type="text" class="form-input" id="ob-name" value="${(p.name||'').replace(/"/g, '&quot;')}" placeholder="Your full name (e.g. Sanghpal Bhakte)">
+            <input type="text" class="form-input" id="ob-name" value="${(p.name||'').replace(/"/g, '&quot;')}" placeholder="Your full name (e.g. Alex Morgan)">
           </div>
           <div class="form-group" style="margin-bottom:0">
-            <label class="form-label">Roll Number <span style="color:var(--text-muted);font-weight:normal">(optional)</span></label>
-            <input type="text" class="form-input" id="ob-roll" value="${(p.rollNo||'').replace(/"/g, '&quot;')}" placeholder="Roll number (optional)">
+            <label class="form-label">Student ID / Roll Number <span style="color:var(--text-muted);font-weight:normal">(optional)</span></label>
+            <input type="text" class="form-input" id="ob-roll" value="${(p.rollNo||'').replace(/"/g, '&quot;')}" placeholder="Student ID or Roll number (optional)">
           </div>
           <div class="form-group" style="margin-bottom:0">
             <label class="form-label">College / University <span style="color:var(--red)">*</span></label>
-            <input type="text" class="form-input" id="ob-college" value="${(p.college||'').replace(/"/g, '&quot;')}" placeholder="College or University name">
+            <input type="text" class="form-input" id="ob-college" value="${(p.college||'').replace(/"/g, '&quot;')}" placeholder="College, university, or school name">
           </div>
           <div class="form-group" style="margin-bottom:0">
-            <label class="form-label">Branch / Department</label>
-            <input type="text" class="form-input" id="ob-branch" value="${(p.branch||'').replace(/"/g, '&quot;')}" placeholder="Branch (e.g. AI &amp; Data Science)">
+            <label class="form-label">Major / Branch / Department</label>
+            <input type="text" class="form-input" id="ob-branch" value="${(p.branch||'').replace(/"/g, '&quot;')}" placeholder="e.g. Computer Science, Mechanical, Biology">
           </div>
           <div class="form-group" style="margin-bottom:0">
-            <label class="form-label">Year &amp; Semester</label>
-            <input type="text" class="form-input" id="ob-year" value="${(p.year||'').replace(/"/g, '&quot;')}" placeholder="Year &amp; semester (e.g. 2nd Year)">
+            <label class="form-label">Year / Semester / Term</label>
+            <input type="text" class="form-input" id="ob-year" value="${(p.year||'').replace(/"/g, '&quot;')}" placeholder="e.g. 3rd Semester, Year 2, Fall 2026">
           </div>
 
           <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;margin-top:4px">
-            <div style="font-weight:600;font-size:0.86rem;color:var(--text-primary);margin-bottom:4px">
-              Are you a Second Year (SY) AI &amp; Data Science student?
+            <div style="font-weight:600;font-size:0.86rem;color:var(--text-primary);margin-bottom:2px">
+              Timetable Schedule Setup
             </div>
             <div style="font-size:0.78rem;color:var(--text-secondary);line-height:1.45;margin-bottom:10px">
-              We have the official Sem 3 AI-DS class schedule pre-configured. You can load it right away, or start with a clean schedule to build or scan your own timetable.
+              Start clean to build or scan your own class schedule, or load a sample college timetable.
             </div>
-            <div style="display:flex;gap:10px;flex-wrap:wrap">
-              <label style="display:flex;align-items:center;gap:6px;font-size:0.82rem;cursor:pointer;padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface)">
-                <input type="radio" name="ob-tt-choice" value="aids" id="ob-tt-aids" style="accent-color:var(--accent)">
-                <span>Yes, load SY AI-DS timetable</span>
-              </label>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
               <label style="display:flex;align-items:center;gap:6px;font-size:0.82rem;cursor:pointer;padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface)">
                 <input type="radio" name="ob-tt-choice" value="clean" id="ob-tt-clean" checked style="accent-color:var(--accent)">
-                <span>No, start clean</span>
+                <span>Start with a clean schedule</span>
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:0.82rem;cursor:pointer;padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface)">
+                <input type="radio" name="ob-tt-choice" value="aids" id="ob-tt-aids" style="accent-color:var(--accent)">
+                <span>Load sample timetable (SY AI-DS)</span>
               </label>
             </div>
           </div>
@@ -3439,7 +3455,7 @@ window.showOnboardingModal = function() {
               Set your current attendance (Optional)
             </div>
             <div style="font-size:0.78rem;color:var(--text-secondary);line-height:1.45;margin-bottom:10px">
-              Add your present and absent counts once. Clarity Desk will continue from there.
+              Add your current attended and missed class counts once. Clarity Desk will track continuously from there.
             </div>
             <button type="button" class="btn btn-sm btn-secondary" onclick="showBaselineModal()" style="font-size:0.78rem;padding:5px 12px;display:inline-flex;align-items:center;gap:6px">
               📊 Set Current Attendance Counts →
@@ -3448,10 +3464,10 @@ window.showOnboardingModal = function() {
 
           <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;margin-top:4px">
             <div style="font-weight:600;font-size:0.86rem;color:var(--text-primary);margin-bottom:2px">
-              Attendance Target
+              Attendance Target (%)
             </div>
             <div style="font-size:0.78rem;color:var(--text-secondary);line-height:1.45;margin-bottom:8px">
-              What % do you need to maintain? (Most colleges require 75%.)
+              Configure your institution's minimum required attendance % (default is 75%).
             </div>
             <div style="display:flex;align-items:center;gap:8px">
               <input type="number" class="form-input" id="ob-att-target" value="75" min="50" max="100" step="1" style="width:90px;font-size:0.88rem;padding:5px 10px">
@@ -3569,12 +3585,27 @@ window.handleAssistantQuestion = function() {
     intentType = 'timetable-day';
     intentData.dayMatch = text.match(/\b(tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/)[0];
   } else {
-    for (const [key, val] of Object.entries(SUBJECT_ALIASES)) {
-      if (text.includes(key.toLowerCase()) || text.includes(val.toLowerCase())) {
+    // 1. Check dynamically against user's actual subjects
+    const knownSubjects = (typeof getSubjectList === 'function') ? getSubjectList() : [];
+    for (const s of knownSubjects) {
+      const sName = (s.name || '').toLowerCase();
+      const sCode = (s.code || '').toLowerCase();
+      if ((sName && text.includes(sName)) || (sCode && sCode.length >= 2 && text.includes(sCode))) {
         intentType = 'subject-tasks';
-        intentData.subject = key;
+        intentData.subject = s.name;
         intentData.window = text.includes('next week') ? 'next-week' : 'this-week';
         break;
+      }
+    }
+    // 2. Fallback to common aliases
+    if (intentType === 'unknown') {
+      for (const [key, val] of Object.entries(SUBJECT_ALIASES)) {
+        if (text.includes(key.toLowerCase()) || text.includes(val.toLowerCase())) {
+          intentType = 'subject-tasks';
+          intentData.subject = key;
+          intentData.window = text.includes('next week') ? 'next-week' : 'this-week';
+          break;
+        }
       }
     }
   }
@@ -4135,11 +4166,11 @@ function renderTimetable() {
       <div class="empty-state-card" style="margin-top:8px">
         <span class="empty-state-icon">🏖️</span>
         <div class="empty-state-title">No Classes on ${DAY_NAMES[day]}</div>
-        <div class="empty-state-desc">No classes scheduled for this day. You can add class slots manually, scan your college timetable photo, or load the SY AI-DS template if you belong to that department.</div>
+        <div class="empty-state-desc">No classes scheduled for this day. You can add class slots manually, scan your class timetable photo, or load a sample template.</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:6px">
           <button class="btn-primary" onclick="showTimetableEntryModal(${day}, null)" style="font-size:0.82rem;padding:6px 14px">+ Add Class Entry</button>
           <button class="btn-secondary" onclick="triggerTimetableImport()" style="font-size:0.82rem;padding:6px 14px">📷 Scan Photo</button>
-          <button class="btn-secondary" onclick="loadOfficialAidsTimetable()" style="font-size:0.82rem;padding:6px 14px">⚡ Load SY AI-DS Template</button>
+          <button class="btn-secondary" onclick="loadOfficialAidsTimetable()" style="font-size:0.82rem;padding:6px 14px">📋 Load Sample Template</button>
         </div>
       </div>`;
   } else {
@@ -4218,8 +4249,8 @@ function renderTimetable() {
         <button class="btn-secondary" onclick="triggerTimetableImport()" style="display:flex;align-items:center;gap:6px;font-size:0.8rem;padding:7px 14px">
           📷 Scan Timetable
         </button>
-        <button class="btn-secondary" onclick="loadOfficialAidsTimetable()" style="display:flex;align-items:center;gap:6px;font-size:0.8rem;padding:7px 14px" title="Load official SY AI-DS schedule template">
-          ⚡ Load SY AI-DS
+        <button class="btn-secondary" onclick="loadOfficialAidsTimetable()" style="display:flex;align-items:center;gap:6px;font-size:0.8rem;padding:7px 14px" title="Load sample schedule template">
+          📋 Sample Schedule
         </button>
         ${isCustom ? `
           <button class="btn-secondary" onclick="resetTimetableToDefault()" style="font-size:0.8rem;padding:7px 12px;color:var(--text-muted)">
@@ -7256,40 +7287,40 @@ function renderSettings() {
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">Full Name</label>
-          <input type="text" class="form-input" id="s-name" value="${(p.name || '').replace(/"/g, '&quot;')}" placeholder="Full name (e.g. Sanghpal Bhakte)">
+          <input type="text" class="form-input" id="s-name" value="${(p.name || '').replace(/"/g, '&quot;')}" placeholder="Full name (e.g. Alex Morgan)">
         </div>
         <div class="form-group">
-          <label class="form-label">Roll Number</label>
-          <input type="text" class="form-input" id="s-roll" value="${(p.rollNo || '').replace(/"/g, '&quot;')}" placeholder="Roll number (e.g. 2K23/AIDS/042)">
+          <label class="form-label">Student ID / Roll Number</label>
+          <input type="text" class="form-input" id="s-roll" value="${(p.rollNo || '').replace(/"/g, '&quot;')}" placeholder="Student ID or Roll number (e.g. 2026/CS/042)">
         </div>
       </div>
       <div class="form-group">
-        <label class="form-label">College / University</label>
-        <input type="text" class="form-input" id="s-college" value="${(p.college || '').replace(/"/g, '&quot;')}" placeholder="College / University">
+        <label class="form-label">College / University / School</label>
+        <input type="text" class="form-input" id="s-college" value="${(p.college || '').replace(/"/g, '&quot;')}" placeholder="College or University name">
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">Branch / Department</label>
-          <input type="text" class="form-input" id="s-branch" value="${(p.branch || '').replace(/"/g, '&quot;')}" placeholder="Branch (e.g. AI &amp; Data Science)">
+          <label class="form-label">Major / Branch / Department</label>
+          <input type="text" class="form-input" id="s-branch" value="${(p.branch || '').replace(/"/g, '&quot;')}" placeholder="e.g. Computer Science, Mechanical, Biology">
         </div>
         <div class="form-group">
-          <label class="form-label">Year &amp; Semester</label>
-          <input type="text" class="form-input" id="s-year" value="${(p.year || '').replace(/"/g, '&quot;')}" placeholder="Year &amp; semester (e.g. 2nd Year)">
+          <label class="form-label">Year / Semester / Term</label>
+          <input type="text" class="form-input" id="s-year" value="${(p.year || '').replace(/"/g, '&quot;')}" placeholder="e.g. 3rd Semester, Year 2, Fall 2026">
         </div>
       </div>
     </div>
 
-    <div class="section-heading">${icons.timetable()} Timetable Schedule Template</div>
+    <div class="section-heading">${icons.timetable()} Timetable Schedule Management</div>
     <div class="card" style="padding:20px;margin-bottom:20px">
       <div style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:12px;line-height:1.5">
-        Clarity Desk can start with a clean schedule or load the pre-configured official Sem 3 SY AI-DS timetable template if you belong to that department.
+        Manage your schedule template. You can start clean to add or scan classes for any degree/major, or load the sample Sem 3 AI-DS template.
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap">
-        <button class="btn-secondary" onclick="loadOfficialAidsTimetable()" style="display:inline-flex;align-items:center;gap:6px;font-size:0.84rem;padding:7px 14px">
-          ⚡ Load Official SY AI-DS Template
-        </button>
         <button class="btn-secondary" onclick="resetTimetableToDefault()" style="display:inline-flex;align-items:center;gap:6px;font-size:0.84rem;padding:7px 14px;color:var(--red);border-color:rgba(239,68,68,0.3)">
           Clear Timetable (Start Clean)
+        </button>
+        <button class="btn-secondary" onclick="loadOfficialAidsTimetable()" style="display:inline-flex;align-items:center;gap:6px;font-size:0.84rem;padding:7px 14px">
+          📋 Load Sample SY AI-DS Template
         </button>
       </div>
     </div>
@@ -7451,10 +7482,10 @@ function renderSettings() {
         <div style="display:flex;align-items:center;justify-content:space-between;font-size:0.88rem;gap:12px;flex-wrap:wrap">
           <div>
             <span style="font-weight:500;color:var(--text-primary)">Low-Attendance Alerts</span>
-            <div style="font-size:0.75rem;color:var(--text-muted)">Alert if attendance drops below 75% target</div>
+            <div style="font-size:0.75rem;color:var(--text-muted)">Alert if attendance drops below target (${getAttendanceTarget()}%)</div>
           </div>
           <select class="form-select" id="np-attendance-alerts" style="width:170px;padding:5px 8px;font-size:0.82rem">
-            <option value="instant" ${nPrefs.attendanceAlerts === 'instant' ? 'selected' : ''}>Instant Alert (&lt; 75%)</option>
+            <option value="instant" ${nPrefs.attendanceAlerts === 'instant' ? 'selected' : ''}>Instant Alert (&lt; ${getAttendanceTarget()}%)</option>
             <option value="weekly" ${nPrefs.attendanceAlerts === 'weekly' ? 'selected' : ''}>Weekly Summary Only</option>
             <option value="off" ${nPrefs.attendanceAlerts === 'off' ? 'selected' : ''}>Off</option>
           </select>
@@ -7555,10 +7586,10 @@ function saveSettings() {
 
   const profile = {
     name:     nameToSave,
-    college:  (rawCollege.toLowerCase() === 'your college') ? '' : rawCollege,
-    branch:   (rawBranch.toLowerCase().includes('artificial intelligence & data science')) ? '' : rawBranch,
-    year:     (rawYear.toLowerCase().includes('2nd year — semester 3')) ? '' : rawYear,
-    rollNo:   (rawRoll.toLowerCase() === 'your roll no.') ? '' : rawRoll,
+    college:  (rawCollege.toLowerCase() === 'your college' || rawCollege.toLowerCase() === 'your university') ? '' : rawCollege,
+    branch:   (rawBranch.toLowerCase() === 'your branch' || rawBranch.toLowerCase() === 'your major' || rawBranch.toLowerCase() === 'your department') ? '' : rawBranch,
+    year:     (rawYear.toLowerCase() === 'your year' || rawYear.toLowerCase() === 'your semester' || rawYear.toLowerCase() === 'your term') ? '' : rawYear,
+    rollNo:   (rawRoll.toLowerCase() === 'your roll no.' || rawRoll.toLowerCase() === 'your roll number' || rawRoll.toLowerCase() === 'your student id') ? '' : rawRoll,
     examDate: document.getElementById('s-exam-date')?.value || '',
   };
   safeSetStorage(KEY_PROFILE, profile);
@@ -8358,7 +8389,38 @@ const ClarityAssistant = (() => {
       case 'attendance_skip': return buildAttendanceSkip();
       case 'notices':       return buildNotices();
       case 'profile':       return buildProfile();
-      default:              return buildUnknown();
+      default: {
+        // Dynamic check against all user subjects
+        const subjects = (typeof getSubjectList === 'function') ? getSubjectList() : [];
+        const lQuery = query.toLowerCase();
+        for (const s of subjects) {
+          if ((s.name && lQuery.includes(s.name.toLowerCase())) || (s.code && s.code.length >= 2 && lQuery.includes(s.code.toLowerCase()))) {
+            const tt = loadTimetable();
+            const classes = [];
+            [1,2,3,4,5,6,0].forEach(d => {
+              (tt[d] || []).forEach(c => {
+                if (isTeachingClass(c) && c.subject && c.subject.toLowerCase() === s.name.toLowerCase()) {
+                  classes.push(`${DAY_SHORT[d]} ${c.time}–${c.end || 'end'}${c.room ? ' (' + c.room + ')' : ''}`);
+                }
+              });
+            });
+            const pTasks = allTasks().filter(t => t.subject && t.subject.toLowerCase() === s.name.toLowerCase() && t.status === 'pending');
+            let res = `<strong>${escHtml(s.name)}:</strong><br>`;
+            if (classes.length) {
+              res += `Schedule: ${classes.join(' · ')}<br>`;
+            } else {
+              res += `No weekly timetable slots scheduled.<br>`;
+            }
+            if (pTasks.length) {
+              res += `${pTasks.length} pending task${pTasks.length !== 1 ? 's' : ''}: ${pTasks.map(t => escHtml(t.title)).join(', ')}`;
+            } else {
+              res += `No pending tasks.`;
+            }
+            return res;
+          }
+        }
+        return buildUnknown();
+      }
     }
   }
 
