@@ -1761,14 +1761,14 @@ function loadNoticeChannels() {
     return {
       officialTitle: (saved.officialTitle || 'Official Updates').trim(),
       officialUrl:   (saved.officialUrl || '').trim(),
-      whatsappTitle: (saved.whatsappTitle || 'WhatsApp Group').trim(),
+      whatsappTitle: (saved.whatsappTitle || 'Class Community').trim(),
       whatsappUrl:   (saved.whatsappUrl || '').trim()
     };
   }
   return {
     officialTitle: 'Official Updates',
     officialUrl:   '',
-    whatsappTitle: 'WhatsApp Group',
+    whatsappTitle: 'Class Community',
     whatsappUrl:   ''
   };
 }
@@ -1793,22 +1793,29 @@ function showNoticeChannelModal(targetKey) {
       <div class="modal-header">
         <div style="display:flex;align-items:center;gap:8px">
           <span style="font-size:1.2rem">${isOfficial ? '📢' : '💬'}</span>
-          <span class="modal-title">${isOfficial ? 'Configure Official Notice Source' : 'Configure WhatsApp Group'}</span>
+          <span class="modal-title">${isOfficial ? 'Configure Official Notice Source' : 'Configure Class Community / WhatsApp'}</span>
         </div>
         <button class="modal-close" onclick="document.getElementById('notice-channel-modal-backdrop')?.remove()">${icons.x()}</button>
       </div>
       <div class="modal-body" style="display:flex;flex-direction:column;gap:14px">
         <div style="font-size:0.82rem;color:var(--text-muted);line-height:1.45">
-          ${isOfficial ? 'Set your college portal link, class channel, or department notice page URL.' : 'Set your official batch or class WhatsApp group invite link for 1-tap access.'}
+          ${isOfficial 
+            ? 'Set your college portal link, class channel, or department notice page URL.' 
+            : 'Add your batch WhatsApp group invite link, community link, or class representative contact URL. Tapping the card opens WhatsApp to preview the group and request or complete access.'}
         </div>
         <div class="form-group" style="margin-bottom:0">
-          <label class="form-label">Card Title</label>
-          <input type="text" class="form-input" id="nc-modal-title" value="${(currentTitle || '').replace(/"/g, '&quot;')}" placeholder="${isOfficial ? 'e.g. Official Updates or College Portal' : 'e.g. WhatsApp Group or Batch 2026'}">
+          <label class="form-label">${isOfficial ? 'Card Title' : 'Community / Group Title'}</label>
+          <input type="text" class="form-input" id="nc-modal-title" value="${(currentTitle || '').replace(/"/g, '&quot;')}" placeholder="${isOfficial ? 'e.g. Official Updates or College Portal' : 'e.g. Class Community or SY-AIDS 2026'}">
         </div>
         <div class="form-group" style="margin-bottom:0">
-          <label class="form-label">Destination Link / URL</label>
-          <input type="url" class="form-input" id="nc-modal-url" value="${(currentUrl || '').replace(/"/g, '&quot;')}" placeholder="${isOfficial ? 'https://college.edu/notices' : 'https://chat.whatsapp.com/invite...'}">
+          <label class="form-label">${isOfficial ? 'Destination Link / URL' : 'Invite Link or Contact URL'}</label>
+          <input type="url" class="form-input" id="nc-modal-url" value="${(currentUrl || '').replace(/"/g, '&quot;')}" placeholder="${isOfficial ? 'https://college.edu/notices' : 'https://chat.whatsapp.com/... or https://wa.me/...'}">
         </div>
+        ${!isOfficial ? `
+          <div style="font-size:0.75rem;color:var(--text-muted);background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-xs,6px);padding:8px 10px;line-height:1.4">
+            💡 <strong>Note:</strong> WhatsApp group entry depends on your invite link validity and group admin approval settings in WhatsApp.
+          </div>
+        ` : ''}
       </div>
       <div class="modal-footer" style="margin-top:16px;display:flex;justify-content:flex-end;gap:8px">
         <button class="btn-secondary" onclick="document.getElementById('notice-channel-modal-backdrop')?.remove()">Cancel</button>
@@ -1831,7 +1838,7 @@ function submitNoticeChannelModal(targetKey) {
     channels.officialTitle = title || 'Official Updates';
     channels.officialUrl   = url;
   } else {
-    channels.whatsappTitle = title || 'WhatsApp Group';
+    channels.whatsappTitle = title || 'Class Community';
     channels.whatsappUrl   = url;
   }
 
@@ -1848,7 +1855,7 @@ function handleNoticeSourceClick(targetKey) {
   if (url && (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('tg://') || url.startsWith('whatsapp://'))) {
     window.open(url, '_blank', 'noopener,noreferrer');
   } else {
-    showToast(targetKey === 'official' ? 'Configure your official notice link' : 'Configure your WhatsApp group link', 'info');
+    showToast(targetKey === 'official' ? 'Configure your official notice link' : 'Add your WhatsApp group invite or community link to enable quick access', 'info');
     showNoticeChannelModal(targetKey);
   }
 }
@@ -6668,20 +6675,20 @@ function renderNotices() {
         </div>
       </div>
 
-      <!-- Card 2: WhatsApp Group -->
-      <div class="notice-source-card tint-whatsapp" onclick="handleNoticeSourceClick('whatsapp')" title="Open class WhatsApp group">
+      <!-- Card 2: WhatsApp / Community Group -->
+      <div class="notice-source-card tint-whatsapp" onclick="handleNoticeSourceClick('whatsapp')" title="Open class WhatsApp group invite or community">
         <div class="notice-source-top">
           <div class="notice-source-icon-wrap notice-source-icon-whatsapp">💬</div>
-          <button class="btn-icon" onclick="event.stopPropagation(); showNoticeChannelModal('whatsapp')" title="Edit WhatsApp group settings" style="width:24px;height:24px;font-size:0.72rem" aria-label="Edit WhatsApp group settings">
+          <button class="btn-icon" onclick="event.stopPropagation(); showNoticeChannelModal('whatsapp')" title="Edit WhatsApp community settings" style="width:24px;height:24px;font-size:0.72rem" aria-label="Edit WhatsApp community settings">
             ✏️
           </button>
         </div>
         <div>
-          <div class="notice-source-title">${escHtml_cd(channels.whatsappTitle || 'WhatsApp Group')}</div>
-          <div class="notice-source-sub">Open your saved WhatsApp group in one tap</div>
+          <div class="notice-source-title">${escHtml_cd(channels.whatsappTitle || 'Class Community')}</div>
+          <div class="notice-source-sub">Open group invite or community in WhatsApp</div>
         </div>
         <div class="notice-source-action" style="color:#25D366">
-          <span>${channels.whatsappUrl ? 'Open WhatsApp Group ↗' : '+ Configure Link'}</span>
+          <span>${channels.whatsappUrl ? 'Join via WhatsApp ↗' : '+ Set Invite Link'}</span>
         </div>
       </div>
 
@@ -7477,10 +7484,10 @@ function renderSettings() {
       </div>
     </div>
 
-    <div class="section-heading">📢 Notice Channels &amp; Class Groups</div>
+    <div class="section-heading">📢 Notice Channels &amp; Class Communities</div>
     <div class="card" style="padding:20px;margin-bottom:20px">
       <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:14px">
-        Customize the title and destination link for quick-access notice sources on your Notice Board.
+        Customize your department notice portal link and batch WhatsApp community invite link for quick access on your Notice Board.
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -7494,13 +7501,16 @@ function renderSettings() {
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">WhatsApp Card Title</label>
-          <input type="text" class="form-input" id="nc-wa-title" value="${(channels.whatsappTitle || 'WhatsApp Group').replace(/"/g, '&quot;')}" placeholder="e.g. WhatsApp Group or Batch 2026">
+          <label class="form-label">WhatsApp Community Card Title</label>
+          <input type="text" class="form-input" id="nc-wa-title" value="${(channels.whatsappTitle || 'Class Community').replace(/"/g, '&quot;')}" placeholder="e.g. Class Community or Batch 2026">
         </div>
         <div class="form-group">
-          <label class="form-label">WhatsApp Group Link</label>
-          <input type="url" class="form-input" id="nc-wa-url" value="${(channels.whatsappUrl || '').replace(/"/g, '&quot;')}" placeholder="https://chat.whatsapp.com/invite...">
+          <label class="form-label">Group Invite Link or Admin Contact</label>
+          <input type="url" class="form-input" id="nc-wa-url" value="${(channels.whatsappUrl || '').replace(/"/g, '&quot;')}" placeholder="https://chat.whatsapp.com/... or https://wa.me/...">
         </div>
+      </div>
+      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:6px;line-height:1.4">
+        💡 Links open in WhatsApp where you can preview group details, submit join requests, or contact the group admin.
       </div>
     </div>
 
@@ -7577,7 +7587,7 @@ function saveSettings() {
     const channels = {
       officialTitle: (offTitleEl ? offTitleEl.value : '').trim() || 'Official Updates',
       officialUrl:   (offUrlEl ? offUrlEl.value : '').trim(),
-      whatsappTitle: (waTitleEl ? waTitleEl.value : '').trim() || 'WhatsApp Group',
+      whatsappTitle: (waTitleEl ? waTitleEl.value : '').trim() || 'Class Community',
       whatsappUrl:   (waUrlEl ? waUrlEl.value : '').trim()
     };
     saveNoticeChannels(channels);
