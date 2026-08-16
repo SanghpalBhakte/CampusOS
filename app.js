@@ -558,7 +558,7 @@ function preprocessImageForOCR(base64Data, mimeType) {
       let width = img.width;
       let height = img.height;
 
-      // 1. Target upscaling: upscale narrow/low-res photos (up to 2x) for crisp OCR character recognition
+      // 1. Target upscaling: upscale narrow/low-res photos for crisp OCR character recognition
       const TARGET_MIN_WIDTH = 1400;
       if (width < TARGET_MIN_WIDTH) {
         const scale = Math.min(2.0, TARGET_MIN_WIDTH / width);
@@ -580,28 +580,30 @@ function preprocessImageForOCR(base64Data, mimeType) {
       ctx.imageSmoothingQuality = 'high';
       ctx.drawImage(img, 0, 0, width, height);
 
-      // 2. Perceptual luminance grayscale and adaptive contrast thresholding
+      // 2. Grayscale & contrast enhancement with dynamic range expansion & soft S-curve
       const imageData = ctx.getImageData(0, 0, width, height);
       const data = imageData.data;
 
-      let totalLuminance = 0;
+      let minL = 255, maxL = 0;
       const grayValues = new Uint8ClampedArray(data.length / 4);
       for (let i = 0, j = 0; i < data.length; i += 4, j++) {
         const r = data[i], g = data[i + 1], b = data[i + 2];
         const gray = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
         grayValues[j] = gray;
-        totalLuminance += gray;
+        if (gray < minL) minL = gray;
+        if (gray > maxL) maxL = gray;
       }
-      const meanLuminance = totalLuminance / (width * height);
-      const threshold = Math.max(120, Math.min(215, Math.round(meanLuminance * 0.88)));
 
+      const range = Math.max(1, maxL - minL);
       for (let i = 0, j = 0; i < data.length; i += 4, j++) {
-        const gray = grayValues[j];
-        // High contrast boost & clean binarization for crisp text extraction
-        const binVal = gray < threshold ? 0 : 255;
-        data[i] = binVal;
-        data[i + 1] = binVal;
-        data[i + 2] = binVal;
+        const normalized = Math.min(255, Math.max(0, Math.round(((grayValues[j] - minL) / range) * 255)));
+        // Soft S-curve boost to keep font edges anti-aliased while whitening light backgrounds
+        const boosted = normalized < 130 
+          ? Math.round(Math.pow(normalized / 130, 1.35) * 115) 
+          : Math.min(255, Math.round(115 + Math.pow((normalized - 130) / 125, 0.75) * 140));
+        data[i] = boosted;
+        data[i + 1] = boosted;
+        data[i + 2] = boosted;
       }
 
       ctx.putImageData(imageData, 0, 0);
@@ -904,7 +906,9 @@ function normalizeSubjectIdentity(rawText, existingSubjects = [], forceType = nu
     'digital electronics': 'Digital Electronics and Microprocessors',
     'digital electronics and microprocessor': 'Digital Electronics and Microprocessors',
     'pbst': 'Probability and Statistics',
+    'probability statistics': 'Probability and Statistics',
     'probability & statistics': 'Probability and Statistics',
+    'probability and statistic': 'Probability and Statistics',
     'bmfa': 'Business Management and Financial Accounting',
     'business management': 'Business Management and Financial Accounting',
     'coi': 'Constitution of India',
@@ -1031,13 +1035,9 @@ function cleanupTimetableDomain(rawText, existingSubjects = []) {
   };
 }
 
-// ── Multi-Strategy Timetable Parser (Geometric + Text Stream) ───
-function parseTimetableFromGrid(ocrData, existingSubjects = []) {
+// ── Table-Aware 2D Grid Reconstructor ────────────────────────────
+function reconstructTimetable2DGrid(ocrData, existingSubjects = []) {
   if (!ocrData || !ocrData.words || ocrData.words.length === 0) {
-    if (ocrData?.text) {
-      const textFallback = parseTimetableFromTextStream(ocrData.text, existingSubjects);
-      return { schedule: textFallback, confidence: textFallback.length ? 60 : 0, ambiguous: textFallback.length === 0 };
-    }
     return { schedule: [], confidence: 0, ambiguous: true };
   }
 
@@ -1049,7 +1049,206 @@ function parseTimetableFromGrid(ocrData, existingSubjects = []) {
     cy: ((w.bbox?.y0 || 0) + (w.bbox?.y1 || 0)) / 2
   })).filter(w => w.text.length > 0);
 
-  // Group into visual lines based on vertical overlap
+  // 1. Identify Day Tokens and Time Tokens with coordinates
+  const dayTokens = [];
+  const timeTokens = [];
+
+  for (let i = 0; i < words.length; i++) {
+    const w = words[i];
+    const cleanWord = w.text.toLowerCase().replace(/[^a-z]/g, '');
+    const stdDay = standardizeTimetableDay(cleanWord);
+    if (stdDay && (cleanWord.length >= 3 || ['mon','tue','wed','thu','fri','sat'].includes(cleanWord))) {
+      dayTokens.push({ word: w, stdDay, cx: w.cx, cy: w.cy });
+      continue;
+    }
+
+    // Check single word or multi-word window for time range
+    const timeWin1 = normalizeTimetableTime(w.text);
+    if (timeWin1.isValid) {
+      timeTokens.push({ words: [w], timeNorm: timeWin1, cx: w.cx, cy: w.cy });
+    } else if (i < words.length - 1) {
+      const pairText = `${w.text} ${words[i+1].text}`;
+      const timeWin2 = normalizeTimetableTime(pairText);
+      if (timeWin2.isValid) {
+        const cx = (w.cx + words[i+1].cx) / 2;
+        const cy = (w.cy + words[i+1].cy) / 2;
+        timeTokens.push({ words: [w, words[i+1]], timeNorm: timeWin2, cx, cy });
+        i++;
+      } else if (i < words.length - 2) {
+        const tripText = `${w.text} ${words[i+1].text} ${words[i+2].text}`;
+        const timeWin3 = normalizeTimetableTime(tripText);
+        if (timeWin3.isValid) {
+          const cx = (w.cx + words[i+2].cx) / 2;
+          const cy = (w.cy + words[i+2].cy) / 2;
+          timeTokens.push({ words: [w, words[i+1], words[i+2]], timeNorm: timeWin3, cx, cy });
+          i += 2;
+        }
+      }
+    }
+  }
+
+  // 2. Detect Orientation:
+  // Layout A: Rows = Days (stacked vertically), Columns = Times (spread horizontally)
+  // Layout B: Rows = Times (stacked vertically), Columns = Days (spread horizontally)
+  const dayXSpread = dayTokens.length > 1 ? Math.max(...dayTokens.map(d => d.cx)) - Math.min(...dayTokens.map(d => d.cx)) : 0;
+  const dayYSpread = dayTokens.length > 1 ? Math.max(...dayTokens.map(d => d.cy)) - Math.min(...dayTokens.map(d => d.cy)) : 0;
+  const timeXSpread = timeTokens.length > 1 ? Math.max(...timeTokens.map(t => t.cx)) - Math.min(...timeTokens.map(t => t.cx)) : 0;
+  const timeYSpread = timeTokens.length > 1 ? Math.max(...timeTokens.map(t => t.cy)) - Math.min(...timeTokens.map(t => t.cy)) : 0;
+
+  let isLayoutA = true;
+  let isLayoutB = false;
+
+  if (dayXSpread > dayYSpread * 1.5 && timeYSpread >= timeXSpread) {
+    isLayoutA = false;
+    isLayoutB = true;
+  } else if (dayYSpread >= dayXSpread) {
+    isLayoutA = true;
+    isLayoutB = false;
+  }
+
+  const schedule = [];
+
+  if (isLayoutA && dayTokens.length >= 1 && timeTokens.length >= 1) {
+    // Layout A: Days are row headers along left, Times are column headers along top
+    dayTokens.sort((a, b) => a.cy - b.cy);
+    timeTokens.sort((a, b) => a.cx - b.cx);
+
+    const dayIntervals = [];
+    for (let i = 0; i < dayTokens.length; i++) {
+      const curr = dayTokens[i];
+      const prevY = i > 0 ? (dayTokens[i - 1].cy + curr.cy) / 2 : curr.cy - 40;
+      const nextY = i < dayTokens.length - 1 ? (curr.cy + dayTokens[i + 1].cy) / 2 : curr.cy + 70;
+      dayIntervals.push({ day: curr.stdDay, minY: prevY, maxY: nextY });
+    }
+
+    const timeIntervals = [];
+    for (let i = 0; i < timeTokens.length; i++) {
+      const curr = timeTokens[i];
+      const prevX = i > 0 ? (timeTokens[i - 1].cx + curr.cx) / 2 : curr.cx - 60;
+      const nextX = i < timeTokens.length - 1 ? (curr.cx + timeTokens[i + 1].cx) / 2 : curr.cx + 90;
+      timeIntervals.push({ timeNorm: curr.timeNorm, minX: prevX, maxX: nextX });
+    }
+
+    const headerWordSet = new Set([...dayTokens.map(d => d.word), ...timeTokens.flatMap(t => t.words)]);
+
+    dayIntervals.forEach(dInt => {
+      timeIntervals.forEach(tInt => {
+        const cellWords = words.filter(w => {
+          if (headerWordSet.has(w)) return false;
+          return w.cy >= dInt.minY && w.cy < dInt.maxY && w.cx >= tInt.minX && w.cx < tInt.maxX;
+        });
+
+        if (cellWords.length > 0) {
+          cellWords.sort((a, b) => a.bbox.y0 === b.bbox.y0 ? a.bbox.x0 - b.bbox.x0 : a.bbox.y0 - b.bbox.y0);
+          const cellRaw = cellWords.map(w => w.text).join(' ');
+          if (cellRaw.length >= 2 && !/^(break|lunch|recess|tea|interval)$/i.test(cellRaw.trim())) {
+            const norm = normalizeSubjectIdentity(cellRaw, existingSubjects);
+            if (norm.canonicalName && !TIMETABLE_JUNK_TOKENS.has(norm.canonicalName.toLowerCase())) {
+              schedule.push({
+                day: dInt.day,
+                time: tInt.timeNorm.time,
+                end: tInt.timeNorm.end,
+                subject: norm.canonicalName,
+                code: norm.canonicalCode,
+                room: norm.room,
+                teacher: norm.teacher,
+                type: norm.classType,
+                batches: norm.batches,
+                isUncertain: !norm.canonicalName
+              });
+            }
+          }
+        }
+      });
+    });
+  } else if (isLayoutB && dayTokens.length >= 1 && timeTokens.length >= 1) {
+    // Layout B: Days are column headers along top, Times are row headers along left
+    dayTokens.sort((a, b) => a.cx - b.cx);
+    timeTokens.sort((a, b) => a.cy - b.cy);
+
+    const dayIntervals = [];
+    for (let i = 0; i < dayTokens.length; i++) {
+      const curr = dayTokens[i];
+      const prevX = i > 0 ? (dayTokens[i - 1].cx + curr.cx) / 2 : curr.cx - 60;
+      const nextX = i < dayTokens.length - 1 ? (curr.cx + dayTokens[i + 1].cx) / 2 : curr.cx + 90;
+      dayIntervals.push({ day: curr.stdDay, minX: prevX, maxX: nextX });
+    }
+
+    const timeIntervals = [];
+    for (let i = 0; i < timeTokens.length; i++) {
+      const curr = timeTokens[i];
+      const prevY = i > 0 ? (timeTokens[i - 1].cy + curr.cy) / 2 : curr.cy - 40;
+      const nextY = i < timeTokens.length - 1 ? (curr.cy + timeTokens[i + 1].cy) / 2 : curr.cy + 70;
+      timeIntervals.push({ timeNorm: curr.timeNorm, minY: prevY, maxY: nextY });
+    }
+
+    const headerWordSet = new Set([...dayTokens.map(d => d.word), ...timeTokens.flatMap(t => t.words)]);
+
+    timeIntervals.forEach(tInt => {
+      dayIntervals.forEach(dInt => {
+        const cellWords = words.filter(w => {
+          if (headerWordSet.has(w)) return false;
+          return w.cy >= tInt.minY && w.cy < tInt.maxY && w.cx >= dInt.minX && w.cx < dInt.maxX;
+        });
+
+        if (cellWords.length > 0) {
+          cellWords.sort((a, b) => a.bbox.y0 === b.bbox.y0 ? a.bbox.x0 - b.bbox.x0 : a.bbox.y0 - b.bbox.y0);
+          const cellRaw = cellWords.map(w => w.text).join(' ');
+          if (cellRaw.length >= 2 && !/^(break|lunch|recess|tea|interval)$/i.test(cellRaw.trim())) {
+            const norm = normalizeSubjectIdentity(cellRaw, existingSubjects);
+            if (norm.canonicalName && !TIMETABLE_JUNK_TOKENS.has(norm.canonicalName.toLowerCase())) {
+              schedule.push({
+                day: dInt.day,
+                time: tInt.timeNorm.time,
+                end: tInt.timeNorm.end,
+                subject: norm.canonicalName,
+                code: norm.canonicalCode,
+                room: norm.room,
+                teacher: norm.teacher,
+                type: norm.classType,
+                batches: norm.batches,
+                isUncertain: !norm.canonicalName
+              });
+            }
+          }
+        }
+      });
+    });
+  }
+
+  const confidence = Math.min(95, 30 + schedule.length * 10);
+  return { schedule, confidence, ambiguous: schedule.length === 0 };
+}
+
+// ── Multi-Strategy Timetable Parser (2D Grid + Geometric Rows + Text Stream) ───
+function parseTimetableFromGrid(ocrData, existingSubjects = []) {
+  if (!ocrData || !ocrData.words || ocrData.words.length === 0) {
+    if (ocrData?.text) {
+      const textFallback = parseTimetableFromTextStream(ocrData.text, existingSubjects);
+      return { schedule: textFallback, confidence: textFallback.length ? 60 : 0, ambiguous: textFallback.length === 0 };
+    }
+    return { schedule: [], confidence: 0, ambiguous: true };
+  }
+
+  // Strategy 1: Table-Aware 2D Grid Reconstructor (Layout A & Layout B)
+  try {
+    const gridResult = reconstructTimetable2DGrid(ocrData, existingSubjects);
+    if (gridResult.schedule && gridResult.schedule.length > 0) {
+      return gridResult;
+    }
+  } catch (err) {
+    console.warn("[TimetableParser] 2D grid reconstructor error, falling back to visual line clusterer:", err);
+  }
+
+  // Strategy 2: Visual Line / Card Clusterer (for list/card-based schedules)
+  const words = ocrData.words.map(w => ({
+    text: (w.text || '').trim(),
+    bbox: w.bbox || { x0: 0, y0: 0, x1: 0, y1: 0 },
+    conf: w.confidence || 0,
+    cx: ((w.bbox?.x0 || 0) + (w.bbox?.x1 || 0)) / 2,
+    cy: ((w.bbox?.y0 || 0) + (w.bbox?.y1 || 0)) / 2
+  })).filter(w => w.text.length > 0);
+
   words.sort((a, b) => a.bbox.y0 - b.bbox.y0);
   const visualLines = [];
   for (const word of words) {
@@ -1108,7 +1307,7 @@ function parseTimetableFromGrid(ocrData, existingSubjects = []) {
     }
   }
 
-  // Fallback to text stream parser if geometric parser found no classes
+  // Strategy 3: Text stream linear extractor fallback
   if (schedule.length === 0 && ocrData.text) {
     const streamSchedule = parseTimetableFromTextStream(ocrData.text, existingSubjects);
     if (streamSchedule.length > 0) {
@@ -1200,9 +1399,9 @@ async function extractTimetableFromImage(base64Data, mimeType) {
     }
   }
   
-  // If deterministic parser has good confidence and extracted rows, use it immediately!
-  if (deterministicResult.confidence >= 65 && !deterministicResult.ambiguous && deterministicResult.schedule.length > 0) {
-    return { schedule: deterministicResult.schedule, confidence: deterministicResult.confidence };
+  // If deterministic parser extracted classes, return immediately!
+  if (deterministicResult.schedule && deterministicResult.schedule.length > 0) {
+    return { schedule: deterministicResult.schedule, confidence: Math.max(70, deterministicResult.confidence) };
   }
   
   // AI structured repair fallback (only if user has configured an API key)
@@ -1314,33 +1513,24 @@ function handleTimetableImageUpload(event) {
       document.getElementById('tt-loading-backdrop')?.remove();
 
       const schedule = result?.schedule || [];
-      const confidence = result?.confidence || 0;
 
       if (schedule.length === 0) {
-        if (confidence > 10) {
-          // OCR found some timetable-like data but couldn't parse it well. Drop them in manual edit.
-          console.log('[TimetableUpload] Deterministic parse was low confidence/ambiguous. Falling back to manual edit.');
-          showTimetablePreviewModal([]);
-          return;
-        } else {
-          // Total failure, probably not a timetable
-          showTimetableUploadErrorModal(
-            'No timetable entries could be read from this image. The image may be blurry, low-contrast, or not a timetable.',
-            base64Data, mimeType
-          );
-          return;
-        }
+        // Extraction found no valid classes
+        showTimetableUploadErrorModal(
+          'No timetable entries could be extracted from this photo. The image may be blurry, low-contrast, or not a timetable.',
+          base64Data, mimeType
+        );
+        return;
       }
 
-      // ✅ SUCCESS → show preview/edit modal
-      console.log('[TimetableUpload] Extraction successful. UI transitioning to showTimetablePreviewModal.');
+      // ✅ SUCCESS → ALWAYS show preview/edit modal with extracted entries and batch filter
+      console.log('[TimetableUpload] Extraction successful. UI transitioning to showTimetablePreviewModal with', schedule.length, 'classes.');
       showTimetablePreviewModal(schedule);
 
     } catch (err) {
       document.getElementById('tt-loading-backdrop')?.remove();
       console.warn('[TimetableUpload] Extraction error:', err);
-      console.log('[TimetableUpload] UI transitioning to showTimetableUploadErrorModal due to API/extraction failure.');
-      const reason = err?.message || 'AI extraction service returned an error.';
+      const reason = err?.message || 'Timetable extraction failed.';
       showTimetableUploadErrorModal(reason, base64Data, mimeType);
     }
   };
