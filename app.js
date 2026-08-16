@@ -5684,6 +5684,96 @@ function parseColumnNumberToken(arr) {
   return 0;
 }
 
+function solveAttendanceCounts(numTokens, pctToken = null) {
+  const nums = (numTokens || []).filter(n => typeof n === 'number' && !isNaN(n) && n >= 0);
+  if (nums.length < 2) return null;
+
+  // 1. Check mathematical consistency: Present + Absent + [Leave + NotEntered] == Total
+  for (let tIdx = 0; tIdx < nums.length; tIdx++) {
+    const candidateTotal = nums[tIdx];
+    if (candidateTotal < 1) continue;
+
+    for (let pIdx = 0; pIdx < nums.length; pIdx++) {
+      if (pIdx === tIdx) continue;
+      for (let aIdx = 0; aIdx < nums.length; aIdx++) {
+        if (aIdx === tIdx || aIdx === pIdx) continue;
+
+        const p = nums[pIdx];
+        const a = nums[aIdx];
+
+        // Direct 2-term balance: P + A == Total
+        if (p + a === candidateTotal) {
+          if (pctToken) {
+            const expectedPct = (p / candidateTotal) * 100;
+            if (Math.abs(expectedPct - pctToken) < 1.5) {
+              return { present: Math.round(p), absent: Math.round(a), leave: 0, notEntered: 0, total: Math.round(candidateTotal), confidence: 95 };
+            }
+          } else {
+            return { present: Math.round(p), absent: Math.round(a), leave: 0, notEntered: 0, total: Math.round(candidateTotal), confidence: 85 };
+          }
+        }
+
+        // 3-term balance: P + A + L == Total
+        for (let lIdx = 0; lIdx < nums.length; lIdx++) {
+          if (lIdx === tIdx || lIdx === pIdx || lIdx === aIdx) continue;
+          const l = nums[lIdx];
+          if (p + a + l === candidateTotal) {
+            return { present: Math.round(p), absent: Math.round(a), leave: Math.round(l), notEntered: 0, total: Math.round(candidateTotal), confidence: 90 };
+          }
+
+          // 4-term balance: P + A + L + N == Total
+          for (let nIdx = 0; nIdx < nums.length; nIdx++) {
+            if (nIdx === tIdx || nIdx === pIdx || nIdx === aIdx || nIdx === lIdx) continue;
+            const n = nums[nIdx];
+            if (p + a + l + n === candidateTotal) {
+              return { present: Math.round(p), absent: Math.round(a), leave: Math.round(l), notEntered: Math.round(n), total: Math.round(candidateTotal), confidence: 95 };
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // 2. Intelligent offset extraction skipping serial numbers and 30/45/60/90 planned session counts
+  let offset = 0;
+  if (nums[0] >= 1 && nums[0] <= 30 && Number.isInteger(nums[0]) && nums.length >= 3) {
+    offset = 1;
+  }
+  if (nums[offset] === 30 || nums[offset] === 45 || nums[offset] === 60 || nums[offset] === 90) {
+    offset++;
+  }
+
+  const remaining = nums.slice(offset);
+  if (remaining.length >= 2) {
+    const present = Math.round(remaining[0]);
+    const absent = Math.round(remaining[1]);
+    const leave = remaining.length >= 3 ? Math.round(remaining[2]) : 0;
+    const notEntered = remaining.length >= 4 ? Math.round(remaining[3]) : 0;
+    return { present, absent, leave, notEntered, total: present + absent + leave + notEntered, confidence: 70 };
+  }
+
+  return { present: Math.round(nums[0]), absent: Math.round(nums[1]), leave: 0, notEntered: 0, total: Math.round(nums[0] + nums[1]), confidence: 60 };
+}
+
+function cleanSubjectString(s, existingSubjects = []) {
+  if (!s || typeof s !== 'string') return { subject: 'General Subject', code: '' };
+
+  let text = s.trim();
+  // Strip leading serial numbers (e.g. "1.", "02", "1 -")
+  text = text.replace(/^\d+[\s.\-–)]+/, '');
+  // Strip standalone numeric tokens from subject text
+  text = text.replace(/\b\d+(\.\d+)?%?\b/g, ' ');
+  // Strip portal table headers & metadata tokens
+  text = text.replace(/\b(?:semester|sem|lecture|sessions|total|present|absent|leave|entered|percentage|percent|att|count|marked|held|conducted)\b/gi, ' ');
+
+  // Pass through canonical normalization layer
+  const norm = normalizeSubjectIdentity(text, existingSubjects);
+  return {
+    subject: norm.canonicalName || 'General Subject',
+    code: norm.canonicalCode || ''
+  };
+}
+
 function parseRowWithIntervals(rowWords, intervals) {
   const buckets = {};
   intervals.forEach(inv => { buckets[inv.type] = []; });
@@ -5716,26 +5806,28 @@ function parseRowWithIntervals(rowWords, intervals) {
   const total = parseColumnNumberToken(buckets.total);
   const totalSessions = parseColumnNumberToken(buckets.sessions);
 
-  const cleanName = cleanSubjectString(rawName);
+  const clean = cleanSubjectString(rawName);
 
   return {
-    subject: cleanName || rawCode || 'General Subject',
-    code: rawCode && /^[A-Z0-9_-]+$/.test(rawCode) ? rawCode : '',
+    subject: clean.subject || rawCode || 'General Subject',
+    code: clean.code || (rawCode && /^[A-Z0-9_-]+$/.test(rawCode) ? rawCode : ''),
     present,
     absent,
     leave,
     notEntered,
     totalSessions,
-    isUncertain: false
+    isUncertain: !clean.subject || (present + absent === 0)
   };
 }
 
 function parseRowUsingMathematicalSolver(rowWords) {
   const textTokens = [];
   const numTokens = [];
+  let pctVal = null;
 
   rowWords.forEach(w => {
     const cleaned = w.text.trim();
+    const isPct = cleaned.includes('%');
     const numCandidate = cleaned
       .replace(/[%]/g, '')
       .replace(/^[OoQD]$/, '0')
@@ -5744,7 +5836,9 @@ function parseRowUsingMathematicalSolver(rowWords) {
       .replace(/^[Bb]$/, '8');
 
     if (/^\d+(\.\d+)?$/.test(numCandidate)) {
-      numTokens.push(parseFloat(numCandidate));
+      const val = parseFloat(numCandidate);
+      if (isPct) pctVal = val;
+      numTokens.push(val);
     } else if (cleaned.length > 0 && !/^[.\-/,:;]+$/.test(cleaned)) {
       textTokens.push(cleaned);
     }
@@ -5753,63 +5847,22 @@ function parseRowUsingMathematicalSolver(rowWords) {
   if (numTokens.length < 2 || textTokens.length === 0) return null;
 
   const cleanTexts = textTokens.filter(t => !/^(dr\.|mr\.|ms\.|mrs\.|prof\.)/i.test(t));
-  let code = '';
-  let subject = '';
+  const rawSubjectStr = cleanTexts.join(' ');
+  const clean = cleanSubjectString(rawSubjectStr);
 
-  cleanTexts.forEach(t => {
-    if (/^[A-Z0-9]{5,15}$/.test(t) && !code) {
-      code = t;
-    } else {
-      subject += (subject ? ' ' : '') + t;
-    }
-  });
-
-  let present = 0;
-  let absent = 0;
-  let leave = 0;
-  let notEntered = 0;
-
-  if (numTokens.length >= 4) {
-    let startIndex = 0;
-    if (numTokens[0] >= 1 && numTokens[0] <= 50 && Number.isInteger(numTokens[0])) {
-      startIndex = 1;
-    }
-    if (startIndex === 1 && (numTokens[1] === 30 || numTokens[1] === 45 || numTokens[1] === 60 || numTokens[1] === 90)) {
-      startIndex = 2;
-    }
-
-    const countTokens = numTokens.slice(startIndex);
-    if (countTokens.length >= 2) {
-      present = Math.round(countTokens[0]);
-      absent = Math.round(countTokens[1]);
-      if (countTokens.length >= 4) {
-        leave = Math.round(countTokens[2]);
-        notEntered = Math.round(countTokens[3]);
-      }
-    }
-  } else {
-    present = Math.round(numTokens[0]);
-    absent = Math.round(numTokens[1]);
-  }
+  const solved = solveAttendanceCounts(numTokens, pctVal);
+  if (!solved) return null;
 
   return {
-    subject: cleanSubjectString(subject || code || 'General Subject'),
-    code,
-    present,
-    absent,
-    leave,
-    notEntered,
+    subject: clean.subject || clean.code || 'General Subject',
+    code: clean.code || '',
+    present: solved.present,
+    absent: solved.absent,
+    leave: solved.leave,
+    notEntered: solved.notEntered,
     totalSessions: 0,
-    isUncertain: false
+    isUncertain: solved.confidence < 75 || !clean.subject || (solved.present + solved.absent === 0)
   };
-}
-
-function cleanSubjectString(s) {
-  return (s || '')
-    .replace(/\b(dr\.|mr\.|ms\.|mrs\.|prof\.)\s+[a-zA-Z\s]+/gi, '')
-    .replace(/\b(semester|sem|lecture|sessions|total|present|absent)\b/gi, '')
-    .replace(/\s+/g, ' ')
-    .trim();
 }
 
 function parseAttendanceFromText(rawText, existingSubjects = []) {
@@ -5825,87 +5878,34 @@ function parseAttendanceFromText(rawText, existingSubjects = []) {
     }
 
     const numTokens = [];
+    let pctVal = null;
     const numRegex = /\b\d+(\.\d+)?%?\b/g;
     let match;
     while ((match = numRegex.exec(line)) !== null) {
+      const isPct = match[0].includes('%');
       const cleaned = match[0].replace('%', '');
       const val = parseFloat(cleaned);
       if (!isNaN(val)) {
-        numTokens.push({ val, intVal: Math.round(val), raw: match[0], index: match.index });
+        if (isPct) pctVal = val;
+        numTokens.push(val);
       }
     }
 
     if (numTokens.length < 2) continue;
 
-    let textPortion = line
-      .replace(/\b(dr\.|mr\.|ms\.|mrs\.|prof\.)\s+[a-zA-Z\s]+/gi, '')
-      .replace(/\b(semester|sem|lecture|sessions|total|present|absent)\b/gi, '')
-      .replace(/\b\d+(\.\d+)?%?\b/g, ' ')
-      .replace(/[^a-zA-Z0-9\s_-]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-
-    let code = '';
-    const codeMatch = line.match(/\b([A-Z0-9]{2,6}[0-9]{2,6}[A-Z0-9]{0,4})\b/);
-    if (codeMatch && codeMatch[1].length >= 5) {
-      code = codeMatch[1];
-      textPortion = textPortion.replace(code, '').trim();
-    }
-
-    if (!textPortion && !code) continue;
-
-    let present = 0;
-    let absent = 0;
-    let leave = 0;
-    let notEntered = 0;
-    let totalSessions = 0;
-
-    if (numTokens.length >= 6) {
-      let offset = 0;
-      if (numTokens[0].intVal >= 1 && numTokens[0].intVal <= 50) {
-        offset = 1;
-      }
-      if (numTokens[offset] && (numTokens[offset].intVal === 30 || numTokens[offset].intVal === 45 || numTokens[offset].intVal === 60 || numTokens[offset].intVal === 90)) {
-        totalSessions = numTokens[offset].intVal;
-        offset++;
-      }
-
-      const counts = numTokens.slice(offset);
-      if (counts.length >= 2) {
-        present = counts[0].intVal;
-        absent = counts[1].intVal;
-        if (counts.length >= 3) leave = counts[2].intVal;
-        if (counts.length >= 4) notEntered = counts[3].intVal;
-      }
-    } else if (numTokens.length === 2) {
-      present = numTokens[0].intVal;
-      absent = numTokens[1].intVal;
-    } else if (numTokens.length === 3) {
-      present = numTokens[0].intVal;
-      absent = numTokens[1].intVal;
-      if (numTokens[2].intVal > present + absent) {
-        leave = numTokens[2].intVal - (present + absent);
-      }
-    } else if (numTokens.length >= 4) {
-      if (numTokens[0].intVal <= 50 && numTokens[3].intVal === numTokens[1].intVal + numTokens[2].intVal) {
-        present = numTokens[1].intVal;
-        absent = numTokens[2].intVal;
-      } else {
-        present = numTokens[0].intVal;
-        absent = numTokens[1].intVal;
-        leave = numTokens[2].intVal;
-      }
-    }
+    const clean = cleanSubjectString(line, existingSubjects);
+    const solved = solveAttendanceCounts(numTokens, pctVal);
+    if (!solved) continue;
 
     const rawRow = {
-      subject: textPortion || code || 'General Subject',
-      code,
-      present,
-      absent,
-      leave,
-      notEntered,
-      totalSessions,
-      isUncertain: false
+      subject: clean.subject || clean.code || 'General Subject',
+      code: clean.code || '',
+      present: solved.present,
+      absent: solved.absent,
+      leave: solved.leave,
+      notEntered: solved.notEntered,
+      totalSessions: 0,
+      isUncertain: solved.confidence < 75 || !clean.subject || (solved.present + solved.absent === 0)
     };
 
     const matched = matchScannedRowToSubjects(rawRow, existingSubjects);
@@ -5977,7 +5977,7 @@ function matchScannedRowToSubjects(rawRow, existingSubjects = []) {
     leave: Math.max(0, parseInt(rawRow.leave) || 0),
     notEntered: Math.max(0, parseInt(rawRow.notEntered) || 0),
     totalSessions: Math.max(0, parseInt(rawRow.totalSessions) || 0),
-    isUncertain: !bestMatch && (!rawRow.subject || rawRow.present + rawRow.absent === 0)
+    isUncertain: !bestMatch && (!rawRow.subject || rawRow.present + rawRow.absent === 0 || !!rawRow.isUncertain)
   };
 }
 
