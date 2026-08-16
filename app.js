@@ -4848,29 +4848,30 @@ function preprocessAttendanceImageForOCR(base64Data, mimeType) {
       ctx.imageSmoothingQuality = 'high';
       ctx.drawImage(img, 0, 0, width, height);
 
-      // 2. Grayscale, adaptive contrast stretching, and Otsu-like binarization
+      // 2. Grayscale & contrast enhancement with dynamic range expansion
       const imageData = ctx.getImageData(0, 0, width, height);
       const data = imageData.data;
 
-      // Calculate luminance histogram for optimal thresholding
-      let totalLuminance = 0;
+      let minL = 255, maxL = 0;
       const grayValues = new Uint8ClampedArray(data.length / 4);
       for (let i = 0, j = 0; i < data.length; i += 4, j++) {
         const r = data[i], g = data[i + 1], b = data[i + 2];
         const gray = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
         grayValues[j] = gray;
-        totalLuminance += gray;
+        if (gray < minL) minL = gray;
+        if (gray > maxL) maxL = gray;
       }
-      const meanLuminance = totalLuminance / (width * height);
-      const threshold = Math.max(120, Math.min(210, Math.round(meanLuminance * 0.88)));
 
+      const range = Math.max(1, maxL - minL);
       for (let i = 0, j = 0; i < data.length; i += 4, j++) {
-        const gray = grayValues[j];
-        // High contrast boost & clean binarization
-        const binVal = gray < threshold ? 0 : 255;
-        data[i] = binVal;
-        data[i + 1] = binVal;
-        data[i + 2] = binVal;
+        const normalized = Math.min(255, Math.max(0, Math.round(((grayValues[j] - minL) / range) * 255)));
+        // Soft S-curve boost to keep font edges anti-aliased while whitening light backgrounds
+        const boosted = normalized < 130 
+          ? Math.round(Math.pow(normalized / 130, 1.35) * 115) 
+          : Math.min(255, Math.round(115 + Math.pow((normalized - 130) / 125, 0.75) * 140));
+        data[i] = boosted;
+        data[i + 1] = boosted;
+        data[i + 2] = boosted;
       }
 
       ctx.putImageData(imageData, 0, 0);
@@ -4928,7 +4929,6 @@ function preprocessAttendanceImageForOCR(base64Data, mimeType) {
 
       const resultDataUrl = trimmedCanvas.toDataURL(mimeType, 0.92);
 
-      // Release canvas buffers to keep memory low on mobile
       canvas.width = 1;
       canvas.height = 1;
       trimmedCanvas.width = 1;
@@ -4982,7 +4982,7 @@ async function handleAttendancePhotoUpload(event) {
     try {
       if (_isAttendanceScanCanceled || currentScanId !== _currentAttendanceScanId) return;
 
-      updateAttendanceScanLoadingMessage('Preprocessing image (upscaling, binarization, table crop)…');
+      updateAttendanceScanLoadingMessage('Preprocessing image (contrast normalization, table crop)…');
       const preprocessedDataUrl = await preprocessAttendanceImageForOCR(base64Data, mimeType);
 
       if (_isAttendanceScanCanceled || currentScanId !== _currentAttendanceScanId) return;
@@ -4993,7 +4993,7 @@ async function handleAttendancePhotoUpload(event) {
 
       if (_isAttendanceScanCanceled || currentScanId !== _currentAttendanceScanId) return;
 
-      updateAttendanceScanLoadingMessage('Reconstructing table rows and validating attendance numbers…');
+      updateAttendanceScanLoadingMessage('Reconstructing table columns and mapping attendance counts…');
       const extractedRows = await extractAttendanceRowsFromOCR(ocrResult?.data, base64Data, mimeType);
 
       _isOcrBusy = false;
@@ -5036,13 +5036,10 @@ async function extractAttendanceRowsFromOCR(ocrData, base64Data, mimeType) {
   }
 
   if (geometricResult.length > 0) {
-    const highConfidenceCount = geometricResult.filter(r => !r.isUncertain).length;
-    if (highConfidenceCount >= 1 || geometricResult.length >= 2) {
-      return geometricResult;
-    }
+    return geometricResult;
   }
 
-  // 2. Second attempt: AI-Assisted Structured Extraction (if API key available)
+  // 2. Second attempt: AI-Assisted Structured Extraction (if API key configured)
   const hasGroqKey = !!window.CAMPUS_OS_GROQ_KEY;
   const hasGeminiKey = !!window.CAMPUS_OS_GEMINI_KEY;
 
@@ -5054,7 +5051,7 @@ Return JSON with this exact structure:
     {
       "subject": "Data Structures",
       "code": "AID21PCL202",
-      "present": 9,
+      "present": 10,
       "absent": 8,
       "leave": 0,
       "notEntered": 0,
@@ -5091,7 +5088,7 @@ function reconstructAttendanceTableFromGrid(ocrData, existingSubjects = []) {
 
   // 1. Sanitize OCR words and attach coordinate centers
   const words = ocrData.words.map(w => ({
-    text: w.text.trim(),
+    text: (w.text || '').trim(),
     bbox: w.bbox || { x0: 0, y0: 0, x1: 0, y1: 0 },
     conf: w.confidence || 0,
     cx: ((w.bbox?.x0 || 0) + (w.bbox?.x1 || 0)) / 2,
@@ -5110,7 +5107,7 @@ function reconstructAttendanceTableFromGrid(ocrData, existingSubjects = []) {
       const wordH = word.bbox.y1 - word.bbox.y0;
 
       const overlap = Math.max(0, Math.min(word.bbox.y1, avgY1) - Math.max(word.bbox.y0, avgY0));
-      if (wordH > 0 && (overlap / wordH) > 0.42) {
+      if (wordH > 0 && (overlap / wordH) > 0.38) {
         row.push(word);
         added = true;
         break;
@@ -5124,20 +5121,22 @@ function reconstructAttendanceTableFromGrid(ocrData, existingSubjects = []) {
   // Sort words inside each row horizontally (left to right)
   visualRows.forEach(r => r.sort((a, b) => a.bbox.x0 - b.bbox.x0));
 
-  // 3. Identify header line or column anchors
-  const headerKeywords = ['course', 'subject', 'present', 'absent', 'leave', 'attended', 'total', 'percent', '%', 'entered', 'status'];
+  // 3. Identify header row and compute column boundary intervals
+  const headerKeywords = ['course', 'subject', 'present', 'absent', 'leave', 'attended', 'total', 'percent', '%', 'entered', 'status', 'sessions', 'faculty', 'code', 'sr.'];
   let headerRowIndex = -1;
+  let intervals = null;
 
   for (let i = 0; i < visualRows.length; i++) {
     const rowText = visualRows[i].map(w => w.text.toLowerCase()).join(' ');
     const matchCount = headerKeywords.filter(kw => rowText.includes(kw)).length;
-    if (matchCount >= 2) {
+    if (matchCount >= 3) {
       headerRowIndex = i;
+      intervals = extractColumnIntervalsFromHeader(visualRows[i]);
       break;
     }
   }
 
-  // 4. Parse candidate data rows (rows below header, or rows with numbers + text)
+  // 4. Parse candidate data rows
   const candidateRows = [];
   const startIdx = headerRowIndex >= 0 ? headerRowIndex + 1 : 0;
 
@@ -5145,113 +5144,24 @@ function reconstructAttendanceTableFromGrid(ocrData, existingSubjects = []) {
     const rowWords = visualRows[i];
     const fullRowText = rowWords.map(w => w.text).join(' ');
 
-    // Separate text tokens from numeric tokens
-    const textTokens = [];
-    const numTokens = [];
+    // Check if this is a summary / footer row (e.g. Total, Overall, or all-numeric summary)
+    const isSummaryRow = /^(total|overall|aggregate|grand\s*total)\b/i.test(fullRowText) ||
+      (rowWords.length <= 7 && rowWords.every(w => /^\d+(\.\d+)?%?$/.test(w.text)));
+    if (isSummaryRow) {
+      continue;
+    }
 
-    rowWords.forEach(w => {
-      const cleaned = w.text.trim();
-      // Handle digit OCR fixes
-      const numCandidate = cleaned
-        .replace(/[%]/g, '')
-        .replace(/^[OoQD]$/, '0')
-        .replace(/^[lI|i]$/, '1')
-        .replace(/^[Ss]$/, '5')
-        .replace(/^[Bb]$/, '8');
+    let parsedRow = null;
+    if (intervals && intervals.length >= 3) {
+      parsedRow = parseRowWithIntervals(rowWords, intervals);
+    }
 
-      if (/^\d+(\.\d+)?$/.test(numCandidate)) {
-        numTokens.push({
-          val: parseFloat(numCandidate),
-          intVal: Math.round(parseFloat(numCandidate)),
-          orig: cleaned,
-          bbox: w.bbox,
-          conf: w.conf
-        });
-      } else if (cleaned.length > 1 && !/^[.\-/,:;]+$/.test(cleaned)) {
-        textTokens.push(cleaned);
-      }
-    });
+    if (!parsedRow || !parsedRow.subject) {
+      parsedRow = parseRowUsingMathematicalSolver(rowWords);
+    }
 
-    if (numTokens.length >= 2 && textTokens.length >= 1) {
-      const candidateTitle = textTokens.join(' ');
-      // Ignore pure metadata headers like 'Semester IV', 'Academic Year'
-      if (/academic\s*year|semester|roll\s*no|student\s*name/i.test(candidateTitle)) {
-        continue;
-      }
-
-      // Assign numbers based on column sequence (standard ERP order: Present, Absent, Leave, Not Entered, Total, Pct)
-      let present = numTokens[0]?.intVal || 0;
-      let absent = numTokens[1]?.intVal || 0;
-      let leave = 0;
-      let notEntered = 0;
-      let scannedTotal = 0;
-      let scannedPct = null;
-
-      if (numTokens.length === 2) {
-        // [present, absent]
-        scannedTotal = present + absent;
-      } else if (numTokens.length === 3) {
-        // [present, absent, total] OR [present, absent, leave]
-        if (numTokens[2].intVal === present + absent) {
-          scannedTotal = numTokens[2].intVal;
-        } else {
-          leave = numTokens[2].intVal;
-          scannedTotal = present + absent + leave;
-        }
-      } else if (numTokens.length === 4) {
-        // [present, absent, leave, total] or [present, absent, total, pct]
-        if (numTokens[2].intVal === present + absent || (numTokens[3].orig && numTokens[3].orig.includes('%'))) {
-          scannedTotal = numTokens[2].intVal;
-          scannedPct = numTokens[3].val;
-        } else {
-          leave = numTokens[2].intVal;
-          scannedTotal = numTokens[3].intVal;
-        }
-      } else if (numTokens.length === 5) {
-        // Typical: [present, absent, leave, total, pct]
-        if (numTokens[3].intVal === (present + absent + numTokens[2].intVal) || (numTokens[4].orig && numTokens[4].orig.includes('%'))) {
-          leave = numTokens[2].intVal;
-          scannedTotal = numTokens[3].intVal;
-          scannedPct = numTokens[4].val;
-        } else {
-          leave = numTokens[2].intVal;
-          notEntered = numTokens[3].intVal;
-          scannedTotal = numTokens[4].intVal;
-        }
-      } else if (numTokens.length >= 6) {
-        // [present, absent, leave, notEntered, total, pct]
-        leave = numTokens[2].intVal;
-        notEntered = numTokens[3].intVal;
-        scannedTotal = numTokens[4].intVal;
-        scannedPct = numTokens[5]?.val || null;
-      }
-
-      // Check if present was abnormally large (e.g. course code mistaken for number)
-      if (present > 100 && numTokens.length > 2) {
-        present = numTokens[1].intVal;
-        absent = numTokens[2].intVal;
-        leave = numTokens[3]?.intVal || 0;
-      }
-
-      const expectedTotal = present + absent + leave + notEntered;
-      let isUncertain = false;
-
-      if (scannedTotal > 0 && Math.abs(scannedTotal - expectedTotal) > 1) {
-        isUncertain = true;
-      }
-
-      const rawRow = {
-        subject: candidateTitle,
-        code: '',
-        present,
-        absent,
-        leave,
-        notEntered,
-        totalSessions: scannedTotal > expectedTotal ? scannedTotal : 0,
-        isUncertain: isUncertain || numTokens.length < 2
-      };
-
-      const matched = matchScannedRowToSubjects(rawRow, existingSubjects);
+    if (parsedRow && (parsedRow.subject || parsedRow.code)) {
+      const matched = matchScannedRowToSubjects(parsedRow, existingSubjects);
       candidateRows.push(matched);
     }
   }
@@ -5270,6 +5180,226 @@ function reconstructAttendanceTableFromGrid(ocrData, existingSubjects = []) {
   return deduped;
 }
 
+function extractColumnIntervalsFromHeader(headerWords) {
+  const colKeywords = [
+    { type: 'sr', match: /^(sr\.?\s*no\.?|s\.?\s*no\.?|serial\s*no\.?|sl\.?\s*no\.?|sr|sno)$/i },
+    { type: 'code', match: /^(course\s*code|sub(ject)?\s*code|paper\s*code)$/i },
+    { type: 'name', match: /^(course\s*name|sub(ject)?\s*name|course\s*title|sub(ject)?\s*title)$/i },
+    { type: 'sessions', match: /^(total\s*sessions|total\s*lectures|total\s*hours|conducted|sessions|held)$/i },
+    { type: 'faculty', match: /^(faculty\s*name|teacher\s*name|instructor|faculty|teacher)$/i },
+    { type: 'present', match: /^(present\s*count|attended|present|att)$/i },
+    { type: 'absent', match: /^(absent\s*count|missed|absent|abs)$/i },
+    { type: 'leave', match: /^(leaves?\s*applied|leaves?|od|medical)$/i },
+    { type: 'notEntered', match: /^(attendance\s*not\s*entered|not\s*entered|pending)$/i },
+    { type: 'total', match: /^(total\s*count|total\s*marked)$/i },
+    { type: 'percentage', match: /^(percentage|percent|att\.?\s*%|%)$/i },
+
+    // Single-word fallbacks
+    { type: 'code', match: /^code$/i },
+    { type: 'name', match: /^(course|subject|title)$/i },
+    { type: 'total', match: /^total$/i }
+  ];
+
+  const detected = [];
+  let i = 0;
+  while (i < headerWords.length) {
+    let matchedType = null;
+    let endIdx = i + 1;
+
+    // Check longer phrases first
+    for (let len = 3; len >= 1; len--) {
+      if (i + len <= headerWords.length) {
+        const phrase = headerWords.slice(i, i + len).map(w => w.text).join(' ').trim();
+        const m = colKeywords.find(k => k.match.test(phrase));
+        if (m && !detected.some(d => d.type === m.type)) {
+          matchedType = m.type;
+          endIdx = i + len;
+          break;
+        }
+      }
+    }
+
+    if (matchedType) {
+      const slice = headerWords.slice(i, endIdx);
+      const x0 = Math.min(...slice.map(w => w.bbox.x0));
+      const x1 = Math.max(...slice.map(w => w.bbox.x1));
+      const cx = (x0 + x1) / 2;
+      detected.push({ type: matchedType, x0, x1, cx });
+      i = endIdx;
+    } else {
+      i++;
+    }
+  }
+
+  detected.sort((a, b) => a.cx - b.cx);
+
+  const intervals = [];
+  for (let idx = 0; idx < detected.length; idx++) {
+    const prev = detected[idx - 1];
+    const curr = detected[idx];
+    const next = detected[idx + 1];
+
+    const minX = prev ? (prev.x1 + curr.x0) / 2 : 0;
+    const maxX = next ? (curr.x1 + next.x0) / 2 : Infinity;
+
+    intervals.push({
+      type: curr.type,
+      x0: curr.x0,
+      x1: curr.x1,
+      minX,
+      maxX
+    });
+  }
+
+  return intervals;
+}
+
+function parseColumnNumberToken(arr) {
+  if (!arr || !arr.length) return 0;
+  for (const token of arr) {
+    const cleaned = token
+      .replace(/[%]/g, '')
+      .replace(/^[OoQD]$/, '0')
+      .replace(/^[lI|i]$/, '1')
+      .replace(/^[Ss]$/, '5')
+      .replace(/^[Bb]$/, '8');
+    const m = cleaned.match(/\b\d+(\.\d+)?\b/);
+    if (m) {
+      const n = parseFloat(m[0]);
+      if (!isNaN(n)) return Math.round(n);
+    }
+  }
+  return 0;
+}
+
+function parseRowWithIntervals(rowWords, intervals) {
+  const buckets = {};
+  intervals.forEach(inv => { buckets[inv.type] = []; });
+
+  rowWords.forEach(w => {
+    const cx = ((w.bbox?.x0 || 0) + (w.bbox?.x1 || 0)) / 2;
+    const matched = intervals.find(inv => cx >= inv.minX && cx < inv.maxX);
+    if (matched) {
+      buckets[matched.type].push(w.text);
+    }
+  });
+
+  const rawCode = (buckets.code || []).join('').trim();
+  
+  // Gather course name words from name bucket + any overflow text words in sessions before faculty column
+  const nameWords = [...(buckets.name || [])];
+  (buckets.sessions || []).forEach(w => {
+    if (!/^\d+$/.test(w) && !/^(dr\.|mr\.|ms\.|mrs\.|prof\.)/i.test(w)) {
+      nameWords.push(w);
+    }
+  });
+
+  let rawName = nameWords.join(' ').trim();
+  if (!rawName && rawCode) rawName = rawCode;
+
+  const present = parseColumnNumberToken(buckets.present);
+  const absent = parseColumnNumberToken(buckets.absent);
+  const leave = parseColumnNumberToken(buckets.leave);
+  const notEntered = parseColumnNumberToken(buckets.notEntered);
+  const total = parseColumnNumberToken(buckets.total);
+  const totalSessions = parseColumnNumberToken(buckets.sessions);
+
+  const cleanName = cleanSubjectString(rawName);
+
+  return {
+    subject: cleanName || rawCode || 'General Subject',
+    code: rawCode && /^[A-Z0-9_-]+$/.test(rawCode) ? rawCode : '',
+    present,
+    absent,
+    leave,
+    notEntered,
+    totalSessions,
+    isUncertain: false
+  };
+}
+
+function parseRowUsingMathematicalSolver(rowWords) {
+  const textTokens = [];
+  const numTokens = [];
+
+  rowWords.forEach(w => {
+    const cleaned = w.text.trim();
+    const numCandidate = cleaned
+      .replace(/[%]/g, '')
+      .replace(/^[OoQD]$/, '0')
+      .replace(/^[lI|i]$/, '1')
+      .replace(/^[Ss]$/, '5')
+      .replace(/^[Bb]$/, '8');
+
+    if (/^\d+(\.\d+)?$/.test(numCandidate)) {
+      numTokens.push(parseFloat(numCandidate));
+    } else if (cleaned.length > 0 && !/^[.\-/,:;]+$/.test(cleaned)) {
+      textTokens.push(cleaned);
+    }
+  });
+
+  if (numTokens.length < 2 || textTokens.length === 0) return null;
+
+  const cleanTexts = textTokens.filter(t => !/^(dr\.|mr\.|ms\.|mrs\.|prof\.)/i.test(t));
+  let code = '';
+  let subject = '';
+
+  cleanTexts.forEach(t => {
+    if (/^[A-Z0-9]{5,15}$/.test(t) && !code) {
+      code = t;
+    } else {
+      subject += (subject ? ' ' : '') + t;
+    }
+  });
+
+  let present = 0;
+  let absent = 0;
+  let leave = 0;
+  let notEntered = 0;
+
+  if (numTokens.length >= 4) {
+    let startIndex = 0;
+    if (numTokens[0] >= 1 && numTokens[0] <= 50 && Number.isInteger(numTokens[0])) {
+      startIndex = 1;
+    }
+    if (startIndex === 1 && (numTokens[1] === 30 || numTokens[1] === 45 || numTokens[1] === 60 || numTokens[1] === 90)) {
+      startIndex = 2;
+    }
+
+    const countTokens = numTokens.slice(startIndex);
+    if (countTokens.length >= 2) {
+      present = Math.round(countTokens[0]);
+      absent = Math.round(countTokens[1]);
+      if (countTokens.length >= 4) {
+        leave = Math.round(countTokens[2]);
+        notEntered = Math.round(countTokens[3]);
+      }
+    }
+  } else {
+    present = Math.round(numTokens[0]);
+    absent = Math.round(numTokens[1]);
+  }
+
+  return {
+    subject: cleanSubjectString(subject || code || 'General Subject'),
+    code,
+    present,
+    absent,
+    leave,
+    notEntered,
+    totalSessions: 0,
+    isUncertain: false
+  };
+}
+
+function cleanSubjectString(s) {
+  return (s || '')
+    .replace(/\b(dr\.|mr\.|ms\.|mrs\.|prof\.)\s+[a-zA-Z\s]+/gi, '')
+    .replace(/\b(semester|sem|lecture|sessions|total|present|absent)\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function parseAttendanceFromText(rawText, existingSubjects = []) {
   if (!rawText || typeof rawText !== 'string') return [];
   const lines = rawText.split('\n').map(l => l.trim()).filter(Boolean);
@@ -5277,110 +5407,165 @@ function parseAttendanceFromText(rawText, existingSubjects = []) {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    // Look for lines that contain numbers (counts) and text
-    const numMatches = line.match(/\b\d+(\.\d+)?\b/g);
-    if (!numMatches || numMatches.length < 2) continue;
 
-    // Check if line contains a known subject or course code
-    const words = line.replace(/[^a-zA-Z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length > 1);
-    let candidateName = words.filter(w => !/^\d+$/.test(w)).join(' ');
+    if (/^(sr\.?\s*no|course\s*code|course\s*name|total\s*sessions|present\s*count|overall|aggregate|grand\s*total)\b/i.test(line)) {
+      continue;
+    }
 
-    if (!candidateName || candidateName.length < 3) {
-      // Check previous line for subject title
-      if (i > 0 && lines[i-1] && lines[i-1].length > 3 && !/\d{2,}/.test(lines[i-1])) {
-        candidateName = lines[i-1];
+    const numTokens = [];
+    const numRegex = /\b\d+(\.\d+)?%?\b/g;
+    let match;
+    while ((match = numRegex.exec(line)) !== null) {
+      const cleaned = match[0].replace('%', '');
+      const val = parseFloat(cleaned);
+      if (!isNaN(val)) {
+        numTokens.push({ val, intVal: Math.round(val), raw: match[0], index: match.index });
       }
     }
 
-    if (candidateName && candidateName.length >= 3) {
-      if (/academic\s*year|semester|roll\s*no|student\s*name/i.test(candidateName)) {
-        continue;
+    if (numTokens.length < 2) continue;
+
+    let textPortion = line
+      .replace(/\b(dr\.|mr\.|ms\.|mrs\.|prof\.)\s+[a-zA-Z\s]+/gi, '')
+      .replace(/\b(semester|sem|lecture|sessions|total|present|absent)\b/gi, '')
+      .replace(/\b\d+(\.\d+)?%?\b/g, ' ')
+      .replace(/[^a-zA-Z0-9\s_-]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    let code = '';
+    const codeMatch = line.match(/\b([A-Z0-9]{2,6}[0-9]{2,6}[A-Z0-9]{0,4})\b/);
+    if (codeMatch && codeMatch[1].length >= 5) {
+      code = codeMatch[1];
+      textPortion = textPortion.replace(code, '').trim();
+    }
+
+    if (!textPortion && !code) continue;
+
+    let present = 0;
+    let absent = 0;
+    let leave = 0;
+    let notEntered = 0;
+    let totalSessions = 0;
+
+    if (numTokens.length >= 6) {
+      let offset = 0;
+      if (numTokens[0].intVal >= 1 && numTokens[0].intVal <= 50) {
+        offset = 1;
+      }
+      if (numTokens[offset] && (numTokens[offset].intVal === 30 || numTokens[offset].intVal === 45 || numTokens[offset].intVal === 60 || numTokens[offset].intVal === 90)) {
+        totalSessions = numTokens[offset].intVal;
+        offset++;
       }
 
-      const ints = numMatches.map(n => parseInt(n)).filter(n => !isNaN(n));
-      if (ints.length >= 2) {
-        let present = ints[0] || 0;
-        let absent = ints[1] || 0;
-        let leave = ints[2] !== undefined && ints.length > 3 ? ints[2] : 0;
-        let notEntered = ints[3] !== undefined && ints.length > 4 ? ints[3] : 0;
-        let totalSessions = ints[ints.length - 1] > 20 ? ints[ints.length - 1] : 0;
-
-        // If present count appears unreasonably larger than total, adjust
-        if (present > 100 && ints.length > 2) {
-          present = ints[1] || 0;
-          absent = ints[2] || 0;
-        }
-
-        const rawRow = {
-          subject: candidateName,
-          code: '',
-          present,
-          absent,
-          leave,
-          notEntered,
-          totalSessions,
-          isUncertain: ints.length < 2
-        };
-
-        const matched = matchScannedRowToSubjects(rawRow, existingSubjects);
-        rows.push(matched);
+      const counts = numTokens.slice(offset);
+      if (counts.length >= 2) {
+        present = counts[0].intVal;
+        absent = counts[1].intVal;
+        if (counts.length >= 3) leave = counts[2].intVal;
+        if (counts.length >= 4) notEntered = counts[3].intVal;
+      }
+    } else if (numTokens.length === 2) {
+      present = numTokens[0].intVal;
+      absent = numTokens[1].intVal;
+    } else if (numTokens.length === 3) {
+      present = numTokens[0].intVal;
+      absent = numTokens[1].intVal;
+      if (numTokens[2].intVal > present + absent) {
+        leave = numTokens[2].intVal - (present + absent);
+      }
+    } else if (numTokens.length >= 4) {
+      if (numTokens[0].intVal <= 50 && numTokens[3].intVal === numTokens[1].intVal + numTokens[2].intVal) {
+        present = numTokens[1].intVal;
+        absent = numTokens[2].intVal;
+      } else {
+        present = numTokens[0].intVal;
+        absent = numTokens[1].intVal;
+        leave = numTokens[2].intVal;
       }
     }
+
+    const rawRow = {
+      subject: textPortion || code || 'General Subject',
+      code,
+      present,
+      absent,
+      leave,
+      notEntered,
+      totalSessions,
+      isUncertain: false
+    };
+
+    const matched = matchScannedRowToSubjects(rawRow, existingSubjects);
+    rows.push(matched);
   }
 
-  // Deduplicate matched rows by subject code/name
-  const seen = new Set();
-  const deduped = [];
-  for (const r of rows) {
-    const key = (r.code || r.subject).toLowerCase().replace(/[^a-z0-9]/g, '');
-    if (key && !seen.has(key)) {
-      seen.add(key);
-      deduped.push(r);
-    }
-  }
-
-  return deduped;
+  return rows;
 }
 
-function matchScannedRowToSubjects(scannedRow, existingSubjects = []) {
-  const rawName = (scannedRow.subject || '').trim();
-  const rawCode = (scannedRow.code || '').trim();
+function matchScannedRowToSubjects(rawRow, existingSubjects = []) {
+  const rawName = (rawRow.subject || '').trim();
+  const rawCode = (rawRow.code || '').trim();
   const cleanRawName = rawName.toLowerCase().replace(/[^a-z0-9]/g, '');
   const cleanRawCode = rawCode.toLowerCase().replace(/[^a-z0-9]/g, '');
 
   let bestMatch = null;
-  let isUncertain = !!scannedRow.isUncertain;
 
-  for (const s of existingSubjects) {
-    const sName = (s.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-    const sCode = (s.code || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  // 1. Exact code match
+  if (cleanRawCode) {
+    for (const s of existingSubjects) {
+      const sCode = (s.code || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (sCode && cleanRawCode === sCode) {
+        bestMatch = s;
+        break;
+      }
+    }
+  }
 
-    if (cleanRawCode && sCode && cleanRawCode === sCode) {
-      bestMatch = s;
-      isUncertain = false;
-      break;
+  // 2. Exact name match
+  if (!bestMatch && cleanRawName) {
+    for (const s of existingSubjects) {
+      const sName = (s.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (sName && cleanRawName === sName) {
+        bestMatch = s;
+        break;
+      }
     }
-    if (cleanRawName && sName && (cleanRawName.includes(sName) || sName.includes(cleanRawName))) {
-      bestMatch = s;
-      isUncertain = false;
-      break;
+  }
+
+  // 3. Longest name substring match (most specific first, e.g. "Lab" versions first)
+  if (!bestMatch && cleanRawName) {
+    const sortedSubjects = [...existingSubjects].sort((a, b) => (b.name || '').length - (a.name || '').length);
+    for (const s of sortedSubjects) {
+      const sName = (s.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (sName && sName.length >= 4 && (cleanRawName.includes(sName) || sName.includes(cleanRawName))) {
+        bestMatch = s;
+        break;
+      }
     }
-    if (cleanRawName && sCode && cleanRawName.includes(sCode)) {
-      bestMatch = s;
-      isUncertain = false;
-      break;
+  }
+
+  // 4. Word token code match
+  if (!bestMatch && rawName) {
+    const tokens = rawName.toUpperCase().split(/[^A-Z0-9_-]+/);
+    for (const s of existingSubjects) {
+      const sCodeUpper = (s.code || '').toUpperCase();
+      if (sCodeUpper && sCodeUpper.length >= 2 && tokens.includes(sCodeUpper)) {
+        bestMatch = s;
+        break;
+      }
     }
   }
 
   return {
     subject: bestMatch ? bestMatch.name : rawName || 'General Subject',
     code: bestMatch ? bestMatch.code : rawCode || '',
-    present: Math.max(0, parseInt(scannedRow.present) || 0),
-    absent: Math.max(0, parseInt(scannedRow.absent) || 0),
-    leave: Math.max(0, parseInt(scannedRow.leave) || 0),
-    notEntered: Math.max(0, parseInt(scannedRow.notEntered) || 0),
-    totalSessions: Math.max(0, parseInt(scannedRow.totalSessions) || 0),
-    isUncertain: !bestMatch || isUncertain
+    present: Math.max(0, parseInt(rawRow.present) || 0),
+    absent: Math.max(0, parseInt(rawRow.absent) || 0),
+    leave: Math.max(0, parseInt(rawRow.leave) || 0),
+    notEntered: Math.max(0, parseInt(rawRow.notEntered) || 0),
+    totalSessions: Math.max(0, parseInt(rawRow.totalSessions) || 0),
+    isUncertain: !bestMatch && (!rawRow.subject || rawRow.present + rawRow.absent === 0)
   };
 }
 
@@ -5407,7 +5592,7 @@ function showAttendanceScanReviewModal(rows = []) {
       ${hasUncertain ? `
         <div style="background:var(--surface-2);border-left:3px solid var(--yellow);border-radius:6px;padding:9px 12px;margin-bottom:14px;font-size:0.79rem;color:var(--text-secondary);display:flex;align-items:center;gap:8px">
           <span>⚠️</span>
-          <span>Couldn’t read a few rows clearly. You can fix them below.</span>
+          <span>Couldn’t match a few rows directly. You can select your subject or keep the detected name below.</span>
         </div>
       ` : ''}
 
@@ -5439,15 +5624,19 @@ function renderReviewRowsHTML(rows, subjects) {
     return `<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:0.84rem">No rows found. Tap + Add Subject Row to add one.</div>`;
   }
 
+  const targetPct = getAttendanceTarget();
+
   return rows.map((r, idx) => {
     const total = (parseInt(r.present) || 0) + (parseInt(r.absent) || 0) + (parseInt(r.leave) || 0) + (parseInt(r.notEntered) || 0);
     const pct = total > 0 ? (((parseInt(r.present) || 0) / total) * 100).toFixed(1) : '0.0';
-    const isSafe = parseFloat(pct) >= 75;
+    const isSafe = parseFloat(pct) >= targetPct;
 
     const subjectOptionsHTML = subjects.map(s => {
-      const isSel = (s.name.toLowerCase() === r.subject.toLowerCase() || (r.code && s.code.toLowerCase() === r.code.toLowerCase()));
-      return `<option value="${s.name}|||${s.code}" ${isSel ? 'selected' : ''}>${s.name} (${s.code || 'No Code'})</option>`;
+      const isSel = (s.name.toLowerCase() === r.subject.toLowerCase() || (r.code && s.code && s.code.toLowerCase() === r.code.toLowerCase()));
+      return `<option value="${s.name}|||${s.code || ''}" ${isSel ? 'selected' : ''}>${s.name} ${s.code ? `(${s.code})` : ''}</option>`;
     }).join('');
+
+    const isExisting = subjects.some(s => s.name.toLowerCase() === r.subject.toLowerCase() || (r.code && s.code && s.code.toLowerCase() === r.code.toLowerCase()));
 
     return `
       <div class="attendance-review-row ${r.isUncertain ? 'uncertain' : ''}" id="review-row-${idx}">
@@ -5456,7 +5645,7 @@ function renderReviewRowsHTML(rows, subjects) {
             <label class="form-label" style="font-size:0.75rem;margin-bottom:3px">Subject</label>
             <select class="form-select review-subject-select" style="font-size:0.84rem;padding:5px 8px" onchange="onReviewRowInputChange(${idx})">
               ${subjectOptionsHTML}
-              <option value="${r.subject}|||${r.code}" ${!subjects.some(s=>s.name===r.subject)?'selected':''}>${r.subject} (Custom)</option>
+              ${!isExisting ? `<option value="${r.subject}|||${r.code || ''}" selected>${r.subject} ${r.code ? `(${r.code})` : ''} (Detected)</option>` : ''}
             </select>
           </div>
           <div style="display:flex;align-items:center;gap:8px">
@@ -5496,9 +5685,10 @@ function onReviewRowInputChange(idx) {
   const l = Math.max(0, parseInt(document.getElementById(`row-leave-${idx}`)?.value) || 0);
   const n = Math.max(0, parseInt(document.getElementById(`row-not-entered-${idx}`)?.value) || 0);
 
+  const targetPct = getAttendanceTarget();
   const total = p + a + l + n;
   const pct = total > 0 ? ((p / total) * 100).toFixed(1) : '0.0';
-  const isSafe = parseFloat(pct) >= 75;
+  const isSafe = parseFloat(pct) >= targetPct;
 
   const badgeEl = document.getElementById(`row-badge-${idx}`);
   if (badgeEl) {
@@ -5520,7 +5710,7 @@ function addScanReviewRow() {
   const newIdx = container.querySelectorAll('.attendance-review-row').length + Math.floor(Math.random()*1000);
 
   const subjectOptionsHTML = subjects.map(s => `
-    <option value="${s.name}|||${s.code}">${s.name} (${s.code || 'No Code'})</option>
+    <option value="${s.name}|||${s.code || ''}">${s.name} ${s.code ? `(${s.code})` : ''}</option>
   `).join('');
 
   const rowDiv = document.createElement('div');
