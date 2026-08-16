@@ -965,14 +965,23 @@ function normalizeSubjectIdentity(rawText, existingSubjects = [], forceType = nu
     }
   }
 
+  const confidence = (cleanName && cleanName !== 'General Subject') ? (code ? 95 : 85) : (code ? 80 : 50);
+
   return {
+    raw_label: rawText,
+    normalized_subject_name: cleanName || code || 'General Subject',
     canonicalName: cleanName || code || 'General Subject',
     canonicalCode: code || '',
+    code: code || '',
+    subject_kind: classType,
     classType,
+    batch_tags: batches,
     batches,
     room,
+    faculty: teacher,
     teacher,
-    isLab: classType === 'lab'
+    isLab: classType === 'lab',
+    normalization_confidence: confidence
   };
 }
 
