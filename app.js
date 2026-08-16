@@ -4669,6 +4669,9 @@ function renderTimetable() {
         <button class="btn-secondary" onclick="triggerTimetableImport()" style="display:flex;align-items:center;gap:6px;font-size:0.8rem;padding:7px 14px">
           📷 Scan Timetable
         </button>
+        <button class="btn-secondary" onclick="showDeclutterDeskModal()" style="display:flex;align-items:center;gap:6px;font-size:0.8rem;padding:7px 14px" title="Declutter duplicate or other-batch sessions">
+          🧹 Declutter Schedule
+        </button>
         <button class="btn-secondary" onclick="loadOfficialAidsTimetable()" style="display:flex;align-items:center;gap:6px;font-size:0.8rem;padding:7px 14px" title="Load sample schedule template">
           📋 Sample Schedule
         </button>
@@ -9631,6 +9634,22 @@ window.onReviewRowInputChange      = onReviewRowInputChange;
 window.deleteReviewRow             = deleteReviewRow;
 window.addScanReviewRow            = addScanReviewRow;
 window.saveAllReviewedBaselines    = saveAllReviewedBaselines;
+window.showAttendanceScanReviewModal = showAttendanceScanReviewModal;
+
+// Timetable Image Upload & Preview Modal
+window.showTimetablePreviewModal      = showTimetablePreviewModal;
+window.onTimetablePreviewBatchChange  = onTimetablePreviewBatchChange;
+window.updatePreviewEntry             = updatePreviewEntry;
+window.removePreviewEntry             = removePreviewEntry;
+window.saveExtractedTimetable         = saveExtractedTimetable;
+window.showTimetableUploadErrorModal  = showTimetableUploadErrorModal;
+
+// Declutter & Subject Recovery Engine
+window.showDeclutterDeskModal         = showDeclutterDeskModal;
+window.proceedToDeclutterPreview      = proceedToDeclutterPreview;
+window.confirmExecuteDeclutter        = confirmExecuteDeclutter;
+window.executeDeclutterPlan           = executeDeclutterPlan;
+window.detectDeskPollution            = detectDeskPollution;
 
 // Desk Assistant
 window.toggleAssistant       = toggleAssistant;
