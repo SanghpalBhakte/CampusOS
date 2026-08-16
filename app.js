@@ -3637,11 +3637,12 @@ function renderDashboard() {
           <div class="desk-greeting">${greeting}${firstName ? `, ${firstName}` : ''}.</div>
           <div class="desk-greeting-sub">${dayClasses.length > 0 ? `${classesLeftCount} class${classesLeftCount !== 1 ? 'es' : ''} left on your desk today.` : 'No classes scheduled today. A good day for focus or rest.'}</div>
         </div>
-        <button class="btn btn-sm btn-secondary" onclick="navigateTo('review')" title="Weekly reflection & guidance" style="font-size:0.76rem;padding:5px 12px;align-self:flex-start">
+        <button class="btn btn-sm btn-secondary" onclick="navigateTo('review')" title="Weekly reflection &amp; guidance" style="font-size:0.76rem;padding:5px 12px;align-self:flex-end;white-space:nowrap">
           Weekly Review →
         </button>
       </div>
       <div class="desk-ticker-strip">${tickerHTML}</div>
+      <div class="desk-masthead-rule"></div>
     </div>
 
     ${beaconHTML}
@@ -3655,92 +3656,74 @@ function renderDashboard() {
         <!-- SCHEDULE LEDGER -->
         <div class="dashboard-panel">
           <div class="panel-header">
-            <div class="panel-title">${icons.timetable()} Today's Schedule</div>
-            <button class="panel-action" onclick="navigateTo('timetable')">Full Timetable →</button>
+            <div class="panel-title">Today's Schedule</div>
+            <button class="panel-action" onclick="navigateTo('timetable')">Full timetable →</button>
           </div>
+          <!-- Open ledger: no card box -->
+          ${dayClasses.length > 0 ? `
+            <div class="schedule-ledger">
+              ${dayClasses.map(c => {
+                const classKey = `${c.code || c.subject}_${c.time}`.replace(/[^a-zA-Z0-9_]/g, '');
+                const status = attendanceData[dateStr]?.[classKey] || 'unset';
+                const isNow = (currentMin >= timeToMinutes(c.time || '00:00') && currentMin < timeToMinutes(c.end || '23:59'));
+                const isPast = (currentMin >= timeToMinutes(c.end || '23:59'));
+                return `
+                  <div class="schedule-slot ${isNow ? 'is-now' : ''} ${isPast ? 'is-past' : ''}">
+                    <div class="schedule-slot-time">${c.time}${c.end ? '–' + c.end : ''}</div>
+                    <div style="flex:1;min-width:100px;cursor:pointer" onclick="openSubjectHub('${c.subject}')">
+                      <div class="schedule-slot-title">${c.subject}</div>
+                      <div style="font-size:0.71rem;color:var(--text-muted);margin-top:1px">${c.room ? c.room + ' · ' : ''}${c.teacher ? 'Prof. ' + c.teacher + ' · ' : ''}${c.type || 'lecture'}</div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+                      <button class="btn btn-xs ${status==='attended'?'btn-primary':'btn-secondary'}" onclick="event.stopPropagation(); setAttendance('${dateStr}', '${classKey}', 'attended')" style="padding:3px 8px;font-size:0.69rem;font-weight:600;${status==='attended'?'background:var(--green);border-color:var(--green);color:white;':''}">${status==='attended'?'Attended ✓':'Present'}</button>
+                      <button class="btn btn-xs ${status==='skipped'?'btn-primary':'btn-secondary'}" onclick="event.stopPropagation(); setAttendance('${dateStr}', '${classKey}', 'skipped')" style="padding:3px 8px;font-size:0.69rem;font-weight:600;${status==='skipped'?'background:var(--red);border-color:var(--red);color:white;':''}">${status==='skipped'?'Skipped':'Missed'}</button>
+                    </div>
+                  </div>`;
+              }).join('')}
+            </div>
+          ` : `
+            <div style="padding:24px 0;color:var(--text-muted);font-size:0.85rem">No classes today. 🏖️</div>
+          `}
 
-          <div class="card" style="padding:14px">
-            ${dayClasses.length > 0 ? `
-              <div class="schedule-ledger">
-                ${dayClasses.map(c => {
-                  const classKey = `${c.code || c.subject}_${c.time}`.replace(/[^a-zA-Z0-9_]/g, '');
-                  const status = attendanceData[dateStr]?.[classKey] || 'unset';
-                  const isNow = (currentMin >= timeToMinutes(c.time || '00:00') && currentMin < timeToMinutes(c.end || '23:59'));
-                  const isPast = (currentMin >= timeToMinutes(c.end || '23:59'));
-                  return `
-                    <div class="schedule-slot ${isNow ? 'is-now' : ''} ${isPast ? 'is-past' : ''}">
-                      <div class="schedule-slot-time">${c.time}${c.end ? '–' + c.end : ''}</div>
-                      <div style="flex:1;min-width:120px;cursor:pointer" onclick="openSubjectHub('${c.subject}')">
-                        <div class="schedule-slot-title">${c.subject}</div>
-                        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:1px">
-                          ${c.room ? c.room + ' · ' : ''}${c.teacher ? 'Prof. ' + c.teacher + ' · ' : ''}${c.type || 'lecture'}
-                        </div>
-                      </div>
-                      <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
-                        <button class="btn btn-xs ${status==='attended'?'btn-primary':'btn-secondary'}" onclick="event.stopPropagation(); setAttendance('${dateStr}', '${classKey}', 'attended')" style="padding:3px 8px;font-size:0.7rem;font-weight:600;${status==='attended'?'background:var(--green);border-color:var(--green);color:white;':''}">
-                          ${status==='attended'?'Attended ✓':'Present'}
-                        </button>
-                        <button class="btn btn-xs ${status==='skipped'?'btn-primary':'btn-secondary'}" onclick="event.stopPropagation(); setAttendance('${dateStr}', '${classKey}', 'skipped')" style="padding:3px 8px;font-size:0.7rem;font-weight:600;${status==='skipped'?'background:var(--red);border-color:var(--red);color:white;':''}">
-                          ${status==='skipped'?'Skipped':'Missed'}
-                        </button>
-                      </div>
-                    </div>`;
-                }).join('')}
-              </div>
-            ` : `
-              <div style="padding:24px 12px;text-align:center;color:var(--text-muted);font-size:0.85rem">
-                🏖️ No classes scheduled for today. Take time to study or rest!
-              </div>
-            `}
-          </div>
-        </div>
-
-        <!-- TASKS & MISSIONS LEDGER -->
+        <!-- TASKS & DEADLINES -->
         <div class="dashboard-panel">
           <div class="panel-header">
-            <div class="panel-title">${icons.assignments()} Tasks &amp; Deadlines</div>
-            <button class="panel-action" onclick="navigateTo('assignments')">Open Tasks (${pending}) →</button>
+            <div class="panel-title">Tasks &amp; Deadlines</div>
+            <button class="panel-action" onclick="navigateTo('assignments')">All tasks (${pending}) →</button>
           </div>
 
-          <div class="card" style="padding:14px">
-            <!-- WORKLOAD PROGRESS BAR -->
-            <div style="margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border-light, var(--border))">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-                <span class="text-xs font-semibold" style="color:var(--text-secondary)">Completed ${submittedCount} of ${total} tasks</span>
-                <span class="text-xs text-muted font-semibold" style="font-family:var(--font-mono)">${progress}%</span>
-              </div>
-              <div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:${progress}%"></div></div>
+          <!-- Progress bar — sits outside any card box -->
+          <div style="margin-bottom:4px">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px">
+              <span style="font-size:0.74rem;color:var(--text-muted)">${submittedCount} of ${total} completed</span>
+              <span style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-muted)">${progress}%</span>
             </div>
+            <div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:${progress}%"></div></div>
+          </div>
 
-            <!-- TASK LEDGER ITEMS -->
-            ${urgentTasks.length > 0 ? `
-              <div style="display:flex;flex-direction:column;gap:4px">
-                ${urgentTasks.map(a => {
-                  const isOngoing = !!a.noDeadline || (a.taskType === 'mission' && !a.dueDate);
-                  const rel = isOngoing ? { label: 'Ongoing', cls: 'ongoing' } : formatRelativeDueDate(a.dueDate);
-                  const done = a.status === 'submitted';
-                  const pCls = a.priority === 'high' ? 'priority-high' : a.priority === 'medium' ? 'priority-medium' : 'priority-low';
-                  return `
-                    <div class="task-ledger-item ${pCls}">
-                      <div class="task-checkbox ${done ? 'checked' : ''}" onclick="toggleAssignment('${a.id}')" title="Click to mark completed">
-                        ${done ? icons.check() : ''}
-                      </div>
-                      <div style="flex:1;min-width:0;cursor:pointer" onclick="navigateTo('assignments')">
-                        <div style="font-weight:600;font-size:0.86rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${done?'text-decoration:line-through;opacity:0.5':''}">${a.title}</div>
-                        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px;display:flex;align-items:center;gap:6px">
-                          <span onclick="event.stopPropagation(); openSubjectHub('${a.subject}')" style="color:var(--accent);font-weight:600;cursor:pointer" title="Open ${a.subject} Hub">${a.subject || 'General'}</span>
-                          <span>· ${isOngoing ? 'Standing Mission' : formatDate(a.dueDate)}</span>
-                        </div>
-                      </div>
-                      <span class="due-badge ${rel.cls}" style="font-size:0.7rem;padding:2px 7px;font-family:var(--font-mono)">${rel.label}</span>
-                    </div>`;
-                }).join('')}
-              </div>
-            ` : `
-              <div style="padding:16px;text-align:center;color:var(--text-muted);font-size:0.84rem">
-                🌿 All caught up! No urgent tasks due today.
-              </div>
-            `}
+          <!-- Open task rows — no card container, flat list -->
+          <div style="position:relative;padding-left:12px">
+            ${urgentTasks.length > 0 ? urgentTasks.map(a => {
+              const isOngoing = !!a.noDeadline || (a.taskType === 'mission' && !a.dueDate);
+              const rel = isOngoing ? { label: 'Ongoing', cls: 'ongoing' } : formatRelativeDueDate(a.dueDate);
+              const done = a.status === 'submitted';
+              const pCls = a.priority === 'high' ? 'priority-high' : a.priority === 'medium' ? 'priority-medium' : 'priority-low';
+              return `
+                <div class="task-ledger-item ${pCls}">
+                  <div class="task-checkbox ${done ? 'checked' : ''}" onclick="toggleAssignment('${a.id}')" title="Mark completed">
+                    ${done ? icons.check() : ''}
+                  </div>
+                  <div style="flex:1;min-width:0;cursor:pointer" onclick="navigateTo('assignments')">
+                    <div style="font-weight:600;font-size:0.875rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${done?'text-decoration:line-through;opacity:0.45':''}">${a.title}</div>
+                    <div style="font-size:0.71rem;color:var(--text-muted);margin-top:2px;display:flex;align-items:center;gap:5px">
+                      <span onclick="event.stopPropagation(); openSubjectHub('${a.subject}')" style="color:var(--accent);font-weight:600;cursor:pointer">${a.subject || 'General'}</span>
+                      <span>·</span>
+                      <span>${isOngoing ? 'Standing' : formatDate(a.dueDate)}</span>
+                    </div>
+                  </div>
+                  <span class="due-badge ${rel.cls}" style="font-size:0.68rem;padding:2px 6px;font-family:var(--font-mono);flex-shrink:0">${rel.label}</span>
+                </div>`;
+            }).join('') : `<div style="padding:12px 0;color:var(--text-muted);font-size:0.84rem">🌿 All caught up. No urgent tasks.</div>`}
           </div>
         </div>
 
@@ -3761,32 +3744,30 @@ function renderDashboard() {
         <div id="assistant-answer-container"></div>
       </div>
 
-      <!-- RIGHT COLUMN: AMBIENT CONTEXT (Sticky on Desktop) -->
+      <!-- RIGHT COLUMN: AMBIENT CONTEXT -->
       <div class="dashboard-right-panel">
 
-        <!-- ATTENDANCE HEALTH -->
+        <!-- ATTENDANCE: Large stat figure, not a card widget -->
         <div class="dashboard-panel">
           <div class="panel-header">
-            <div class="panel-title">Attendance Health</div>
+            <div class="panel-title">Attendance</div>
             <button class="panel-action" onclick="navigateTo('review')">Guidance →</button>
           </div>
-          <div class="card card-sm" style="padding:14px;border-left:3px solid ${isAttendanceAtRisk ? 'var(--red)' : attendancePct !== null ? 'var(--green)' : 'var(--accent)'};background:${isAttendanceAtRisk ? 'rgba(239,68,68,0.04)' : 'var(--surface)'}">
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">
-              <div style="font-family:var(--font-mono);font-weight:700;font-size:0.92rem;color:${isAttendanceAtRisk ? 'var(--red)' : 'var(--text-primary)'}">
-                ${attendancePct !== null ? `${attendancePct}% Overall` : 'Attendance Health'}
-              </div>
-              <span class="type-badge" style="font-family:var(--font-mono);font-size:0.66rem;padding:2px 6px;background:${isAttendanceAtRisk ? 'rgba(239,68,68,0.12)' : 'rgba(16,185,129,0.12)'};color:${isAttendanceAtRisk ? 'var(--red)' : 'var(--green)'}">
-                ${attendancePct !== null ? (dashGuidance.isSafe ? 'Safe (≥75%)' : 'Recovery needed') : 'Not configured'}
-              </span>
+          <div>
+            <div class="att-stat-figure ${isAttendanceAtRisk ? 'at-risk' : attendancePct !== null ? 'is-safe' : ''}">
+              ${attendancePct !== null ? `${attendancePct}%` : '—'}
             </div>
-            <div style="font-size:0.78rem;color:var(--text-secondary);line-height:1.45">
-              ${dashGuidance.message}
-            </div>
+            <div class="att-stat-label">${attendancePct !== null ? (dashGuidance.isSafe ? 'Safe · ≥75%' : 'Action needed · <75%') : 'Not configured'}</div>
+            <div class="att-stat-message">${dashGuidance.message}</div>
             ${attendancePct !== null ? `
               <div style="margin-top:10px">
                 <div class="att-bar-wrap">
                   <div class="att-bar-seg att-seg-present" style="width:${totalMarked > 0 ? Math.round((totalAttended/totalMarked)*100) : 0}%"></div>
                   <div class="att-bar-seg att-seg-absent" style="width:${totalMarked > 0 ? Math.round((totalSkipped/totalMarked)*100) : 0}%"></div>
+                </div>
+                <div style="display:flex;justify-content:space-between;margin-top:4px;font-family:var(--font-mono);font-size:0.68rem;color:var(--text-muted)">
+                  <span>${totalAttended} present</span>
+                  <span>${totalSkipped} missed</span>
                 </div>
               </div>
             ` : ''}

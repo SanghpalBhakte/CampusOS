@@ -695,19 +695,21 @@ a.card:hover,
   border-radius: var(--radius-sm);
 }
 
-/* ── Architectural Masthead & Temporal Identity ─────────────── */
+/* ── Architectural Masthead ─────────────────────────────────── */
+/* Commanding first-viewport moment: large editorial greeting +
+   inline status ticker on a slightly inset surface */
 .desk-masthead {
-  padding: 8px 0 20px;
-  border-bottom: 1px solid var(--border-light, var(--border));
-  margin-bottom: 20px;
+  padding: 28px 0 24px;
+  margin-bottom: 28px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
+  /* No card box. The masthead IS the page header. */
 }
 
 .desk-masthead-top {
   display: flex;
-  align-items: flex-start;
+  align-items: flex-end;
   justify-content: space-between;
   gap: 16px;
   flex-wrap: wrap;
@@ -715,44 +717,54 @@ a.card:hover,
 
 .desk-greeting {
   font-family: var(--font-display);
-  font-size: 1.65rem;
-  font-weight: 700;
+  font-size: 2.1rem;
+  font-weight: 800;
   color: var(--text-primary);
-  letter-spacing: -0.03em;
-  line-height: 1.2;
+  letter-spacing: -0.04em;
+  line-height: 1.12;
 }
 
 .desk-greeting-sub {
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-  margin-top: 4px;
-  line-height: 1.4;
+  font-size: 0.92rem;
+  color: var(--text-muted);
+  margin-top: 6px;
+  line-height: 1.5;
+  font-weight: 400;
 }
 
+/* Separator rule under masthead — single ruled line, not a box */
+.desk-masthead-rule {
+  height: 1px;
+  background: var(--border-light, var(--border));
+  width: 100%;
+}
+
+/* Ticker: monospace inline strip — visually subordinate to the heading */
 .desk-ticker-strip {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   flex-wrap: wrap;
   font-family: var(--font-mono);
-  font-size: 0.76rem;
+  font-size: 0.74rem;
   color: var(--text-muted);
-  background: var(--surface-well, var(--surface-2));
-  padding: 6px 14px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border-light, var(--border));
-  width: fit-content;
+  /* No background box — sits directly on the page bg */
+  padding: 0;
+  border: none;
+  width: auto;
+  letter-spacing: 0.01em;
 }
 
 .desk-ticker-item {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
 }
 
 .desk-ticker-sep {
   color: var(--border-btn, var(--border));
-  opacity: 0.6;
+  opacity: 0.5;
+  font-size: 0.7rem;
 }
 
 /* ── Signature Layout Moment: The Chrono Beacon ──────────── */
@@ -825,21 +837,23 @@ a.card:hover,
 }
 
 /* ── Open Schedule Timeline Ledger ───────────────────────── */
+/* No outer card. The ledger is an open vertical timeline
+   that sits directly on the section surface. */
 .schedule-ledger {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 0;
   position: relative;
-  padding-left: 18px;
+  padding-left: 24px;
 }
 
 .schedule-ledger::before {
   content: '';
   position: absolute;
-  left: 5px;
-  top: 14px;
-  bottom: 14px;
-  width: 2px;
+  left: 6px;
+  top: 20px;
+  bottom: 20px;
+  width: 1px;
   background: var(--border-light, var(--border));
   border-radius: 999px;
 }
@@ -850,52 +864,69 @@ a.card:hover,
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 10px 14px;
+  padding: 9px 12px 9px 0;
   border-radius: var(--radius-sm);
   background: transparent;
-  transition: background 0.15s ease;
+  transition: background 0.14s ease;
+  /* Subtle separator between slots */
+  border-bottom: 1px solid var(--border-light, var(--border));
+}
+
+.schedule-slot:last-child {
+  border-bottom: none;
 }
 
 .schedule-slot:hover {
   background: var(--surface-2);
+  padding-left: 6px;
 }
 
+/* Timeline node dot */
 .schedule-slot::before {
   content: '';
   position: absolute;
-  left: -18px;
+  left: -24px;
   top: 50%;
-  transform: translate(3px, -50%);
-  width: 8px;
-  height: 8px;
+  transform: translateY(-50%);
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
-  background: var(--border);
-  border: 2px solid var(--bg);
+  background: var(--surface);
+  border: 2px solid var(--border);
   transition: all 0.18s ease;
 }
 
 .schedule-slot.is-now {
-  background: var(--accent-dim);
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
   border-radius: var(--radius-sm);
+  border-bottom-color: transparent;
 }
 
 .schedule-slot.is-now::before {
   background: var(--green);
-  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.25);
-  transform: translate(2px, -50%) scale(1.2);
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+  width: 10px;
+  height: 10px;
+}
+
+.schedule-slot.is-past::before {
+  background: var(--border);
+  border-color: var(--border);
 }
 
 .schedule-slot.is-past {
-  opacity: 0.5;
+  opacity: 0.45;
 }
 
 .schedule-slot-time {
   font-family: var(--font-mono);
-  font-size: 0.78rem;
-  font-weight: 600;
+  font-size: 0.75rem;
+  font-weight: 500;
   color: var(--text-muted);
-  width: 85px;
+  width: 90px;
   flex-shrink: 0;
+  letter-spacing: 0.01em;
 }
 
 .schedule-slot.is-now .schedule-slot-time {
@@ -906,52 +937,73 @@ a.card:hover,
 .schedule-slot-title {
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: 0.88rem;
+  font-size: 0.875rem;
   color: var(--text-primary);
+  letter-spacing: -0.01em;
 }
 
 /* ── Task Ledger Items ───────────────────────────────────── */
+/* Flat, borderless rows — no card box — sits on section surface.
+   Priority is signalled by a left rail dot, not full border. */
 .task-ledger-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 9px 12px;
-  border-radius: var(--radius-sm);
-  border-left: 3px solid transparent;
-  background: var(--surface);
-  border: 1px solid var(--border-light, var(--border));
-  margin-bottom: 4px;
-  transition: border-color 0.15s ease, transform 0.15s ease, background 0.15s ease;
+  gap: 12px;
+  padding: 10px 4px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border-light, var(--border));
+  margin-bottom: 0;
+  transition: background 0.13s ease;
+  position: relative;
+}
+
+.task-ledger-item:last-child {
+  border-bottom: none;
 }
 
 .task-ledger-item:hover {
-  border-color: var(--border-btn, var(--border));
-  transform: translateX(2px);
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
 }
 
-.task-ledger-item.priority-high {
-  border-left: 3px solid var(--red);
+/* Priority rail — a small dot on left rather than a full border */
+.task-ledger-item::before {
+  content: '';
+  position: absolute;
+  left: -10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--border-btn, var(--border));
 }
 
-.task-ledger-item.priority-medium {
-  border-left: 3px solid var(--yellow);
+.task-ledger-item.priority-high::before {
+  background: var(--red);
 }
 
-.task-ledger-item.priority-low {
-  border-left: 3px solid var(--border-btn, var(--border));
+.task-ledger-item.priority-medium::before {
+  background: var(--yellow);
 }
 
 .task-checkbox {
   width: 17px;
   height: 17px;
   border-radius: 4px;
-  border: 2px solid var(--border-btn, var(--border));
+  border: 1.5px solid var(--border-btn, var(--border));
   display: grid;
   place-items: center;
   cursor: pointer;
   flex-shrink: 0;
   transition: all 0.15s ease;
   background: transparent;
+}
+
+.task-checkbox:hover {
+  border-color: var(--accent);
+  background: var(--accent-dim);
 }
 
 .task-checkbox.checked {
@@ -1013,8 +1065,6 @@ a.card:hover,
   padding: 1px 4px;
   color: var(--text-muted);
 }
-  text-overflow: ellipsis;
-}
 
 /* ── Page-Level Dashboard Layout (left workbench + right panel) ── */
 .dashboard-layout {
@@ -1047,40 +1097,40 @@ a.card:hover,
 .dashboard-panel {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .panel-header {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
-  margin-bottom: 2px;
+  margin-bottom: 0;
 }
 
+/* Panel title: slightly more weight than before — section label not micro-label */
 .panel-title {
-  font-size: 0.78rem;
-  font-weight: 600;
-  text-transform: none;
-  letter-spacing: -0.01em;
-  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
 .panel-action {
-  font-size: 0.76rem;
-  font-weight: 600;
-  color: var(--accent);
+  font-size: 0.74rem;
+  font-weight: 500;
+  color: var(--text-muted);
   background: none;
   border: none;
   cursor: pointer;
-  padding: 2px 4px;
-  border-radius: 4px;
-  transition: opacity 0.15s ease;
+  padding: 2px 0;
+  transition: color 0.15s ease;
 }
 
-.panel-action:hover { opacity: 0.75; }
+.panel-action:hover { color: var(--accent); }
 
 /* ── Timeline Rows ──────────────────────────────────────────── */
 .timeline-row {
@@ -2714,13 +2764,14 @@ button:disabled {
 /* Two-column dashboard layout — only on genuinely wide screens */
 @media (min-width: 1100px) {
   .dashboard-layout {
-    grid-template-columns: 1fr 300px;
+    grid-template-columns: 1fr 280px;
+    gap: 32px;
     align-items: start;
   }
   .dashboard-right-panel {
     position: sticky;
-    top: calc(var(--topbar-h) + 20px);
-    max-height: calc(100vh - var(--topbar-h) - 40px);
+    top: calc(var(--topbar-h) + 24px);
+    max-height: calc(100vh - var(--topbar-h) - 48px);
     overflow-y: auto;
   }
   /* Inner grid inside left column — two columns at 1100+ */
@@ -2728,19 +2779,60 @@ button:disabled {
     grid-template-columns: 1.2fr 0.8fr;
     gap: 18px;
   }
+  /* On desktop the schedule-ledger is not enclosed in a card */
+  .schedule-ledger-panel .card-shell {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+  }
 }
 
 @media (min-width: 1280px) {
-  .content-area { padding: 28px 44px 52px; }
+  .content-area { padding: 28px 52px 52px; }
   .topbar {
-    padding: 0 40px;
+    padding: 0 48px;
     gap: 32px;
   }
   .topbar-search { max-width: 480px; }
   .dashboard-layout {
-    grid-template-columns: 1fr 320px;
-    gap: 24px;
+    grid-template-columns: 1fr 300px;
+    gap: 40px;
   }
+}
+
+/* Right panel attendance figure: large printed number, not a card widget */
+.att-stat-figure {
+  font-family: var(--font-mono);
+  font-size: 2.4rem;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  color: var(--text-primary);
+}
+
+.att-stat-figure.at-risk {
+  color: var(--red);
+}
+
+.att-stat-figure.is-safe {
+  color: var(--green);
+}
+
+.att-stat-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.att-stat-message {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-top: 6px;
 }
 
 /* ── Utility Classes ──────────────────────────────────────────*/
