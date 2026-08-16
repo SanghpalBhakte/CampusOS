@@ -5927,66 +5927,80 @@ function parseAttendanceFromText(rawText, existingSubjects = []) {
 function matchScannedRowToSubjects(rawRow, existingSubjects = []) {
   const rawName = (rawRow.subject || '').trim();
   const rawCode = (rawRow.code || '').trim();
-  const cleanRawName = rawName.toLowerCase().replace(/[^a-z0-9]/g, '');
-  const cleanRawCode = rawCode.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  // 1. Run raw text through canonical normalizer
+  const norm = normalizeSubjectIdentity(rawName, existingSubjects);
+  const isLab = norm.isLab || /\blab\b/i.test(rawName) || rawCode.endsWith('-LAB');
+  const targetName = norm.canonicalName || rawName;
+  const targetCode = norm.canonicalCode || rawCode;
+
+  const cleanTargetName = targetName.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const cleanTargetCode = targetCode.toLowerCase().replace(/[^a-z0-9]/g, '');
 
   let bestMatch = null;
 
-  // 1. Exact code match
-  if (cleanRawCode) {
+  // 2. Exact code match (preserving theory vs lab distinction)
+  if (cleanTargetCode) {
     for (const s of existingSubjects) {
       const sCode = (s.code || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-      if (sCode && cleanRawCode === sCode) {
+      const sIsLab = s.type === 'lab' || /\blab\b/i.test(s.name);
+      if (sCode && cleanTargetCode === sCode && sIsLab === isLab) {
         bestMatch = s;
         break;
       }
     }
   }
 
-  // 2. Exact name match
-  if (!bestMatch && cleanRawName) {
+  // 3. Exact name match (preserving theory vs lab distinction)
+  if (!bestMatch && cleanTargetName) {
     for (const s of existingSubjects) {
       const sName = (s.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-      if (sName && cleanRawName === sName) {
+      const sIsLab = s.type === 'lab' || /\blab\b/i.test(s.name);
+      if (sName && cleanTargetName === sName && sIsLab === isLab) {
         bestMatch = s;
         break;
       }
     }
   }
 
-  // 3. Longest name substring match (most specific first, e.g. "Lab" versions first)
-  if (!bestMatch && cleanRawName) {
+  // 4. Substring name match (longest name match first)
+  if (!bestMatch && cleanTargetName) {
     const sortedSubjects = [...existingSubjects].sort((a, b) => (b.name || '').length - (a.name || '').length);
     for (const s of sortedSubjects) {
       const sName = (s.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-      if (sName && sName.length >= 4 && (cleanRawName.includes(sName) || sName.includes(cleanRawName))) {
+      const sIsLab = s.type === 'lab' || /\blab\b/i.test(s.name);
+      if (sName && sName.length >= 4 && sIsLab === isLab && (cleanTargetName.includes(sName) || sName.includes(cleanTargetName))) {
         bestMatch = s;
         break;
       }
     }
   }
 
-  // 4. Word token code match
+  // 5. Word token code match
   if (!bestMatch && rawName) {
     const tokens = rawName.toUpperCase().split(/[^A-Z0-9_-]+/);
     for (const s of existingSubjects) {
       const sCodeUpper = (s.code || '').toUpperCase();
-      if (sCodeUpper && sCodeUpper.length >= 2 && tokens.includes(sCodeUpper)) {
+      const sIsLab = s.type === 'lab' || /\blab\b/i.test(s.name);
+      if (sCodeUpper && sCodeUpper.length >= 2 && tokens.includes(sCodeUpper) && sIsLab === isLab) {
         bestMatch = s;
         break;
       }
     }
   }
 
+  const finalSubject = bestMatch ? bestMatch.name : (targetName || 'General Subject');
+  const finalCode = bestMatch ? bestMatch.code : targetCode;
+
   return {
-    subject: bestMatch ? bestMatch.name : rawName || 'General Subject',
-    code: bestMatch ? bestMatch.code : rawCode || '',
+    subject: finalSubject,
+    code: finalCode,
     present: Math.max(0, parseInt(rawRow.present) || 0),
     absent: Math.max(0, parseInt(rawRow.absent) || 0),
     leave: Math.max(0, parseInt(rawRow.leave) || 0),
     notEntered: Math.max(0, parseInt(rawRow.notEntered) || 0),
     totalSessions: Math.max(0, parseInt(rawRow.totalSessions) || 0),
-    isUncertain: !bestMatch && (!rawRow.subject || rawRow.present + rawRow.absent === 0 || !!rawRow.isUncertain)
+    isUncertain: !bestMatch || (rawRow.present + rawRow.absent === 0) || norm.normalization_confidence < 80 || !!rawRow.isUncertain
   };
 }
 
