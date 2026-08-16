@@ -19,6 +19,8 @@ const KEY_THEME               = 'cos_theme';
 const KEY_NOTIF_PREFS         = 'cos_notif_prefs';
 const KEY_NOTICE_CHANNELS     = 'cos_notice_channels';
 const KEY_ATT_TARGET          = 'cos_att_target';
+const KEY_USER_BATCH          = 'cos_user_batch';
+const KEY_CLEANUP_BACKUP      = 'cos_cleanup_backup';
 
 // ── Safe Storage Helpers ─────────────────────────────────────
 function safeGetStorage(key, fallback = null) {
@@ -883,6 +885,7 @@ function normalizeSubjectIdentity(rawText, existingSubjects = [], forceType = nu
   }
 
   // 6. Clean Subject Name words
+  text = text.replace(/^\d+[\s.\-–)]+/, '');
   let cleanName = text
     .replace(/[^a-zA-Z0-9\s/&+-]/g, ' ')
     .replace(/\s+/g, ' ')
@@ -893,6 +896,7 @@ function normalizeSubjectIdentity(rawText, existingSubjects = [], forceType = nu
     if (w.length <= 1 && !['c', 'r'].includes(wLow)) return false;
     if (TIMETABLE_JUNK_TOKENS.has(wLow)) return false;
     if (/^[A-D][1-4]$/i.test(w)) return false;
+    if (/^\d+$/.test(w)) return false;
     return true;
   });
 
@@ -6387,6 +6391,361 @@ function clearSubjectBaseline() {
   renderPage(state.currentPage);
 }
 
+// ── Declutter & Subject Recovery Engine ──────────────────────────
+
+function detectDeskPollution() {
+  const subjects = getSubjectList();
+  if (!subjects || !subjects.length) return false;
+
+  for (const s of subjects) {
+    const raw = (s.name + ' ' + (s.code || '')).toLowerCase();
+    // Check batch markers in subject identity
+    if (/\b(?:batch|sec|section)\s*[a-d0-9]/i.test(raw) || /\b[a-d][1-4]\b/i.test(raw)) return true;
+    // Check room numbers or faculty in subject identity
+    if (/\b(?:prof\.|dr\.|mr\.|ms\.|mrs\.|lab-\d+|lh-\d+|lt-\d+|room\s*\d+)\b/i.test(raw)) return true;
+    // Check timetable junk tokens
+    for (const kw of TIMETABLE_JUNK_TOKENS) {
+      if (raw.includes(kw)) return true;
+    }
+  }
+
+  // Check if multiple subjects map to the same canonical core
+  const seenCanonical = new Set();
+  for (const s of subjects) {
+    const norm = normalizeSubjectIdentity(s.name, [], s.type);
+    const key = `${(norm.canonicalName || s.name).toLowerCase()}|||${s.type}`;
+    if (seenCanonical.has(key)) return true;
+    seenCanonical.add(key);
+  }
+
+  return false;
+}
+
+function showDeclutterDeskModal() {
+  const existingBackdrop = document.getElementById('declutter-modal-backdrop');
+  if (existingBackdrop) existingBackdrop.remove();
+
+  const p = liveProfile || loadProfile() || {};
+  const currentBatch = p.batch || safeGetStorage(KEY_USER_BATCH, '') || '';
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  backdrop.id = 'declutter-modal-backdrop';
+  backdrop.innerHTML = `
+    <div class="modal declutter-dialog" onclick="event.stopPropagation()" style="max-width:540px;padding:26px 22px">
+      <div class="modal-header" style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px">
+        <div>
+          <h2 class="modal-title" style="margin:0;font-size:1.24rem;font-weight:700">Declutter my desk</h2>
+          <div style="font-size:0.8rem;color:var(--text-muted);margin-top:3px">Clean up duplicate, noisy, or other-batch subject cards and normalize your schedule.</div>
+        </div>
+        <button class="modal-close" onclick="document.getElementById('declutter-modal-backdrop')?.remove()">${icons.x()}</button>
+      </div>
+
+      <div style="background:var(--surface-2);border-left:3px solid var(--accent);border-radius:6px;padding:10px 14px;margin-bottom:16px;font-size:0.8rem;color:var(--text-secondary);line-height:1.45">
+        💡 <strong>How decluttering works:</strong>
+        <ul style="margin:6px 0 0 16px;padding:0;font-size:0.78rem;line-height:1.4">
+          <li><strong>General lectures</strong> with no batch markers will be kept for everyone.</li>
+          <li><strong>Practical lab sessions</strong> will only be kept if they match your specific batch.</li>
+          <li>Duplicate variations and OCR noise will be merged into clean canonical Subject Hub cards.</li>
+          <li>Attendance records, tasks, and timetable slots will be safely remapped.</li>
+        </ul>
+      </div>
+
+      <div class="form-group" style="margin-bottom:18px">
+        <label class="form-label" style="font-weight:600">Your Practical Batch / Section</label>
+        <input type="text" id="declutter-user-batch" class="form-input" value="${(currentBatch || '').replace(/"/g, '&quot;')}" placeholder="e.g. A2, B1, D1 (or leave blank for All)" style="font-size:0.9rem">
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px">
+          Enter your batch (e.g. <strong>A1</strong>, <strong>A2</strong>, <strong>B2</strong>, <strong>D1</strong>). Leave blank if you wish to keep all sessions.
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:flex-end;gap:10px;padding-top:10px;border-top:1px solid var(--border)">
+        <button type="button" class="btn-secondary" onclick="document.getElementById('declutter-modal-backdrop')?.remove()" style="font-size:0.84rem">
+          Cancel
+        </button>
+        <button type="button" class="btn-primary" onclick="proceedToDeclutterPreview()" style="font-size:0.85rem;padding:8px 18px;font-weight:600">
+          Preview Cleanup Plan →
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+}
+
+function proceedToDeclutterPreview() {
+  const batchInput = document.getElementById('declutter-user-batch');
+  const userBatch = (batchInput ? batchInput.value.trim() : '') || 'all';
+
+  const liveTT = loadTimetable();
+  const liveBaselines = loadAttendanceBaselines();
+  const liveTasks = allTasks();
+
+  const plan = generateDeclutterPlan(liveTT, liveBaselines, liveTasks, userBatch);
+  renderDeclutterPreviewModal(plan, userBatch);
+}
+
+function generateDeclutterPlan(liveTT, liveBaselines, liveTasks, userBatch = 'all') {
+  const newTT = { 1: [], 2: [], 3: [], 4: [], 5: [], 6: [], 0: [] };
+  const archivedSlots = [];
+  const subjectMap = new Map();
+  const remappedBaselines = [];
+  const mergedSubjects = new Map();
+
+  // 1. Process Timetable Slots
+  [1, 2, 3, 4, 5, 6, 0].forEach(d => {
+    (liveTT[d] || []).forEach(c => {
+      const rawName = c.subject || '';
+      if (!rawName.trim() || /^(off|lunch|break|holiday|recess|free)$/i.test(rawName.trim())) {
+        newTT[d].push(c);
+        return;
+      }
+
+      const shouldKeep = shouldKeepClassForUserBatch(c, userBatch);
+      if (!shouldKeep) {
+        archivedSlots.push({ day: d, time: c.time, subject: c.subject, batches: c.batches || extractBatchTags(c.subject) });
+        return;
+      }
+
+      const norm = normalizeSubjectIdentity(rawName, [], c.type);
+      const isLab = c.type === 'lab' || norm.isLab;
+      const canonicalName = norm.canonicalName || rawName;
+      const canonicalCode = norm.canonicalCode || c.code || '';
+      const subjectKey = `${canonicalName.toLowerCase()}|||${isLab ? 'lab' : 'theory'}`;
+
+      if (!subjectMap.has(subjectKey)) {
+        subjectMap.set(subjectKey, {
+          name: canonicalName,
+          code: canonicalCode,
+          type: isLab ? 'lab' : (c.type || norm.classType || 'lecture'),
+          teacher: c.teacher || norm.teacher || '',
+          room: c.room || norm.room || '',
+          slotsCount: 0
+        });
+      }
+      subjectMap.get(subjectKey).slotsCount++;
+
+      if (!mergedSubjects.has(canonicalName)) {
+        mergedSubjects.set(canonicalName, new Set());
+      }
+      mergedSubjects.get(canonicalName).add(rawName);
+
+      newTT[d].push({
+        ...c,
+        subject: canonicalName,
+        code: canonicalCode,
+        type: isLab ? 'lab' : (c.type || norm.classType || 'lecture'),
+        teacher: c.teacher || norm.teacher || '',
+        room: c.room || norm.room || '',
+        batches: norm.batches
+      });
+    });
+  });
+
+  // 2. Process Attendance Baselines
+  const survivingList = Array.from(subjectMap.values());
+  const newBaselines = {};
+
+  Object.entries(liveBaselines || {}).forEach(([oldKey, oldVal]) => {
+    const rawSubj = oldVal.subjectName || oldKey;
+    const norm = normalizeSubjectIdentity(rawSubj, survivingList);
+    const matched = survivingList.find(s => 
+      s.name.toLowerCase() === norm.canonicalName.toLowerCase() || 
+      (s.code && norm.canonicalCode && s.code.toLowerCase() === norm.canonicalCode.toLowerCase())
+    );
+
+    const targetKey = matched ? (matched.code || matched.name) : (norm.canonicalCode || norm.canonicalName || oldKey);
+    const targetName = matched ? matched.name : (norm.canonicalName || rawSubj);
+    const targetCode = matched ? matched.code : (norm.canonicalCode || '');
+
+    if (!newBaselines[targetKey]) {
+      newBaselines[targetKey] = {
+        subjectCode: targetCode,
+        subjectName: targetName,
+        present: 0,
+        absent: 0,
+        leave: 0,
+        notEntered: 0,
+        totalSessions: oldVal.totalSessions || 0,
+        updatedAt: new Date().toISOString()
+      };
+    }
+
+    newBaselines[targetKey].present += (parseInt(oldVal.present) || 0);
+    newBaselines[targetKey].absent += (parseInt(oldVal.absent) || 0);
+    newBaselines[targetKey].leave += (parseInt(oldVal.leave) || 0);
+    newBaselines[targetKey].notEntered += (parseInt(oldVal.notEntered) || 0);
+
+    remappedBaselines.push({
+      oldKey,
+      newKey: targetKey,
+      subjectName: targetName,
+      present: newBaselines[targetKey].present,
+      absent: newBaselines[targetKey].absent
+    });
+  });
+
+  return {
+    newTimetable: newTT,
+    newBaselines,
+    survivingSubjects: survivingList,
+    archivedSlots,
+    mergedSubjects: Array.from(mergedSubjects.entries()).map(([k, v]) => ({ canonicalName: k, rawSources: Array.from(v) })),
+    remappedBaselines
+  };
+}
+
+function renderDeclutterPreviewModal(plan, userBatch) {
+  const existingBackdrop = document.getElementById('declutter-modal-backdrop');
+  if (existingBackdrop) existingBackdrop.remove();
+
+  const subjectsHTML = plan.survivingSubjects.map(s => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--surface-2);border-radius:6px;margin-bottom:6px">
+      <div>
+        <div style="font-weight:600;font-size:0.88rem;color:var(--text-primary)">${s.name}</div>
+        <div style="font-size:0.75rem;color:var(--text-muted)">${s.code || 'No Code'} · ${s.slotsCount} slot${s.slotsCount!==1?'s':''}/wk ${s.room ? `· ${s.room}` : ''}</div>
+      </div>
+      <span class="type-badge" style="font-size:0.72rem;padding:2px 8px;text-transform:capitalize">
+        ${s.type}
+      </span>
+    </div>
+  `).join('');
+
+  const archivedHTML = plan.archivedSlots.length > 0 ? plan.archivedSlots.map(a => `
+    <div style="font-size:0.77rem;color:var(--text-muted);padding:4px 8px;background:var(--surface-2);border-radius:4px;margin-bottom:4px;display:flex;justify-content:space-between">
+      <span>${a.subject}</span>
+      <span style="color:var(--yellow)">Batch: ${(a.batches || []).join(', ') || 'Other'}</span>
+    </div>
+  `).join('') : '<div style="font-size:0.78rem;color:var(--text-muted)">No other-batch classes found to remove.</div>';
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  backdrop.id = 'declutter-modal-backdrop';
+  backdrop.innerHTML = `
+    <div class="modal declutter-preview-dialog" onclick="event.stopPropagation()" style="max-width:620px;padding:26px 22px">
+      <div class="modal-header" style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px">
+        <div>
+          <h2 class="modal-title" style="margin:0;font-size:1.24rem;font-weight:700">Preview your clean desk setup</h2>
+          <div style="font-size:0.8rem;color:var(--text-muted);margin-top:3px">Review the normalized course structure before applying changes.</div>
+        </div>
+        <button class="modal-close" onclick="document.getElementById('declutter-modal-backdrop')?.remove()">${icons.x()}</button>
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;background:var(--surface-2);border-radius:6px;padding:8px 12px;margin-bottom:14px;font-size:0.8rem">
+        <span>🎓 Practical Batch Filter:</span>
+        <strong style="color:var(--accent)">${userBatch === 'all' ? 'All (Keep all batches)' : `Batch ${userBatch.toUpperCase()}`}</strong>
+      </div>
+
+      <div style="max-height:50vh;overflow-y:auto;padding-right:4px;margin-bottom:16px">
+        <div style="font-weight:700;font-size:0.86rem;margin-bottom:8px;color:var(--text-primary)">
+          🟢 Surviving Canonical Subject Hubs (${plan.survivingSubjects.length})
+        </div>
+        ${subjectsHTML}
+
+        ${plan.archivedSlots.length > 0 ? `
+          <div style="font-weight:700;font-size:0.86rem;margin:14px 0 6px 0;color:var(--text-secondary)">
+            🗑️ Other-Batch Sessions Removed (${plan.archivedSlots.length})
+          </div>
+          ${archivedHTML}
+        ` : ''}
+
+        ${plan.remappedBaselines.length > 0 ? `
+          <div style="font-weight:700;font-size:0.86rem;margin:14px 0 6px 0;color:var(--text-secondary)">
+            📊 Attendance Baselines Reassigned (${plan.remappedBaselines.length})
+          </div>
+          <div style="font-size:0.77rem;color:var(--text-muted);background:var(--surface-2);padding:8px 12px;border-radius:6px">
+            All existing present and absent counts have been remapped to your clean canonical subjects.
+          </div>
+        ` : ''}
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:12px;border-top:1px solid var(--border)">
+        <button type="button" class="btn-secondary" onclick="showDeclutterDeskModal()" style="font-size:0.84rem">
+          ← Back
+        </button>
+        <button type="button" class="btn-primary" onclick="confirmExecuteDeclutter()" style="font-size:0.86rem;padding:8px 20px;font-weight:600">
+          Confirm &amp; Clean Up Desk ✓
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+
+  window._pendingDeclutterPlan = plan;
+  window._pendingDeclutterBatch = userBatch;
+}
+
+function confirmExecuteDeclutter() {
+  if (window._pendingDeclutterPlan) {
+    executeDeclutterPlan(window._pendingDeclutterPlan, window._pendingDeclutterBatch || 'all');
+    window._pendingDeclutterPlan = null;
+    window._pendingDeclutterBatch = null;
+  }
+}
+
+function executeDeclutterPlan(plan, userBatch) {
+  // 1. Take a safe snapshot before applying changes
+  const backup = {
+    timestamp: new Date().toISOString(),
+    userBatch,
+    timetable: loadTimetable(),
+    baselines: loadAttendanceBaselines(),
+    liveAttendance: loadLiveAttendanceActions(),
+    tasks: safeGetStorage(KEY_CUSTOM_TASKS, []),
+    links: safeGetStorage(KEY_CUSTOM_LINKS, []),
+    profile: liveProfile || loadProfile() || {}
+  };
+  safeSetStorage(KEY_CLEANUP_BACKUP, backup);
+
+  // 2. Save new timetable
+  safeSetStorage(KEY_CUSTOM_TIMETABLE, plan.newTimetable);
+
+  // 3. Save remapped attendance baselines
+  saveAttendanceBaselines(plan.newBaselines);
+
+  // 4. Remap tasks
+  const tasks = safeGetStorage(KEY_CUSTOM_TASKS, []);
+  if (Array.isArray(tasks) && tasks.length > 0) {
+    const updatedTasks = tasks.map(t => {
+      if (!t.subject) return t;
+      const matched = plan.survivingSubjects.find(s => 
+        s.name.toLowerCase() === t.subject.toLowerCase() || 
+        (s.code && s.code.toLowerCase() === t.subject.toLowerCase())
+      );
+      return matched ? { ...t, subject: matched.name } : t;
+    });
+    safeSetStorage(KEY_CUSTOM_TASKS, updatedTasks);
+  }
+
+  // 5. Remap custom links
+  const links = safeGetStorage(KEY_CUSTOM_LINKS, []);
+  if (Array.isArray(links) && links.length > 0) {
+    const updatedLinks = links.map(l => {
+      if (!l.subject) return l;
+      const matched = plan.survivingSubjects.find(s => 
+        s.name.toLowerCase() === l.subject.toLowerCase() || 
+        (s.code && s.code.toLowerCase() === l.subject.toLowerCase())
+      );
+      return matched ? { ...l, subject: matched.name } : l;
+    });
+    safeSetStorage(KEY_CUSTOM_LINKS, updatedLinks);
+  }
+
+  // 6. Update user profile batch
+  if (userBatch && userBatch.toLowerCase() !== 'all') {
+    safeSetStorage(KEY_USER_BATCH, userBatch);
+    const p = liveProfile || loadProfile() || {};
+    p.batch = userBatch;
+    liveProfile = p;
+    safeSetStorage(KEY_PROFILE, p);
+  }
+
+  syncToCloud();
+
+  document.getElementById('declutter-modal-backdrop')?.remove();
+  showToast('Your desk is now decluttered and normalized! ✨', 'success');
+  renderPage(state.currentPage);
+}
+
 function renderSubjects() {
   const el = document.getElementById('page-subjects');
   if (!el) return;
@@ -6492,6 +6851,8 @@ function renderSubjectsOverview(el, subjects) {
     `;
   }).join('');
 
+  const hasPollution = detectDeskPollution();
+
   el.innerHTML = `
     <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
       <div>
@@ -6499,6 +6860,9 @@ function renderSubjectsOverview(el, subjects) {
         <div class="page-subtitle">Course schedules, attendance baselines, tasks &amp; study resources organized per subject</div>
       </div>
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-secondary" onclick="showDeclutterDeskModal()" style="display:inline-flex;align-items:center;gap:6px;font-size:0.84rem;padding:7px 14px" title="Declutter duplicate or other-batch subject cards">
+          🧹 Declutter my desk
+        </button>
         <button class="btn btn-secondary" onclick="showBaselineModal(null, 'scan')" style="display:inline-flex;align-items:center;gap:6px;font-size:0.84rem;padding:7px 14px">
           📷 Scan from Photo
         </button>
@@ -6507,6 +6871,20 @@ function renderSubjectsOverview(el, subjects) {
         </button>
       </div>
     </div>
+
+    ${hasPollution ? `
+      <div class="card" style="padding:12px 16px;margin-bottom:16px;background:var(--surface-2);border-left:3px solid var(--yellow);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div>
+          <div style="font-weight:700;font-size:0.88rem;color:var(--text-primary)">✨ Declutter your personalized desk</div>
+          <div style="font-size:0.79rem;color:var(--text-secondary);margin-top:2px">
+            We detected duplicate or batch-specific subject cards from an earlier timetable import. Clean them up to match your specific practical batch.
+          </div>
+        </div>
+        <button class="btn btn-sm btn-primary" onclick="showDeclutterDeskModal()" style="font-size:0.82rem;padding:6px 14px;white-space:nowrap">
+          🧹 Clean Up Desk →
+        </button>
+      </div>
+    ` : ''}
 
     ${anyMissingBaseline ? `
       <div class="card" style="padding:14px 18px;margin-bottom:18px;background:var(--surface-2);border-left:3px solid var(--accent);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
@@ -7961,6 +8339,16 @@ function renderSettings() {
       </div>
       <button class="btn-secondary" onclick="showBaselineModal()" style="display:inline-flex;align-items:center;gap:6px;font-size:0.84rem;padding:7px 14px">
         📊 Configure Attendance Baselines →
+      </button>
+    </div>
+
+    <div class="section-heading">🧹 Personalized Desk Optimization</div>
+    <div class="card" style="padding:20px;margin-bottom:20px">
+      <div style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:12px;line-height:1.5">
+        Did an earlier timetable import or photo scan create duplicate, noisy, or other-batch subject cards? Clean up and normalize your Subject Hubs, timetable slots, and attendance records to match your specific practical batch.
+      </div>
+      <button class="btn-primary" onclick="showDeclutterDeskModal()" style="display:inline-flex;align-items:center;gap:6px;font-size:0.84rem;padding:8px 16px">
+        🧹 Declutter my desk →
       </button>
     </div>
 
