@@ -9073,28 +9073,20 @@ const ClarityAssistant = (() => {
       test: /\b(help|what can you|commands|what do you know|how to use|capabilities)\b/i,
     },
     {
-      id: 'today_schedule',
-      test: /\b(today|what do i have|schedule today|classes today|my day|what'?s on|plan for today)\b/i,
+      id: 'setup_gaps',
+      test: /\b(setup|what needs setup|missing setup|setup gaps|what is missing|needs setup|desk setup)\b/i,
     },
     {
       id: 'next_class',
-      test: /\b(next class|next lecture|upcoming class|which class|next period|soon start|starting next)\b/i,
+      test: /\b(next class|next lecture|upcoming class|which class|next period|what'?s next|what is next|\bnext\b|soon start|starting next)\b/i,
     },
     {
-      id: 'classes_left',
-      test: /\b(classes left|remaining (class|today)|how many more|left today)\b/i,
+      id: 'attendance_risk',
+      test: /\b(at risk|risk|attendance risk|which subjects are at risk|attendance at risk|low attendance|below 75|danger)\b/i,
     },
     {
-      id: 'day_schedule',
-      test: /\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun)\b/i,
-    },
-    {
-      id: 'tasks_overdue',
-      test: /\b(overdue|late|missed deadline|past due|behind|not submitted)\b/i,
-    },
-    {
-      id: 'tasks_today',
-      test: /\b(due today|tasks? today|deadline today|submit today|assignment today)\b/i,
+      id: 'tasks_urgent',
+      test: /\b(urgent|overdue|late|missed deadline|past due|behind|urgent tasks|what tasks are urgent|due today|due tomorrow|deadline|deadlines)\b/i,
     },
     {
       id: 'tasks_week',
@@ -9105,12 +9097,20 @@ const ClarityAssistant = (() => {
       test: /\b(all (task|assignment)|pending tasks?|my tasks?|task list|what (task|assignment))\b/i,
     },
     {
-      id: 'attendance_skip',
-      test: /\b(can i (skip|bunk|miss)|safe to (skip|bunk|miss)|how many (can i|more) (skip|miss|bunk)|bunking)\b/i,
+      id: 'today_summary',
+      test: /\b(today|what do i have|schedule today|classes today|my day|show my day|what'?s on|plan for today|focus on today|what should i focus)\b/i,
     },
     {
-      id: 'attendance',
-      test: /\b(attendance|percentage|pct|how many class(es)? (attended|missed)|my record|att(end)?)\b/i,
+      id: 'attendance_general',
+      test: /\b(attendance|percentage|pct|how many class(es)? (attended|missed)|my record|att(end)?|can i skip|safe to skip)\b/i,
+    },
+    {
+      id: 'classes_left',
+      test: /\b(classes left|remaining (class|today)|how many more|left today)\b/i,
+    },
+    {
+      id: 'day_schedule',
+      test: /\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun)\b/i,
     },
     {
       id: 'notices',
@@ -9118,13 +9118,12 @@ const ClarityAssistant = (() => {
     },
     {
       id: 'profile',
-      test: /\b(who am i|my profile|my name|my branch|my year|my roll|my college)\b/i,
+      test: /\b(who am i|my profile|my name|my branch|my year|my roll|my college|my batch)\b/i,
     },
   ];
 
   function matchIntent(q) {
     const lower = q.toLowerCase().trim();
-    // Priority order — more specific first
     for (const intent of INTENTS) {
       if (intent.test.test(lower)) return intent.id;
     }
@@ -9132,10 +9131,6 @@ const ClarityAssistant = (() => {
   }
 
   // ── Data Readers ──────────────────────────────────────────────
-
-  function getAttendanceSummary() {
-    return getOverallAttendance();
-  }
 
   function getTodayClasses() {
     const tt = loadTimetable();
@@ -9166,8 +9161,8 @@ const ClarityAssistant = (() => {
   // ── Response Builders ─────────────────────────────────────────
 
   function buildGreeting() {
-    const profile = loadProfile();
-    const name = profile.name || '';
+    const p = liveProfile || loadProfile() || {};
+    const name = p.name || '';
     const hour = new Date().getHours();
     const greet = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
     const nameStr = name ? `, ${name.split(' ')[0]}` : '';
@@ -9191,44 +9186,242 @@ const ClarityAssistant = (() => {
   }
 
   function buildHelp() {
-    return `I can answer questions about your real desk data. Try:<ul class="cd-list">
-      <li><span class="cd-item-label">Schedule</span><span class="cd-item-meta">"What do I have today?" · "Show Friday's timetable" · "What's my next class?"</span></li>
-      <li><span class="cd-item-label">Tasks</span><span class="cd-item-meta">"Which tasks are overdue?" · "What's due this week?" · "Show all pending tasks"</span></li>
-      <li><span class="cd-item-label">Attendance</span><span class="cd-item-meta">"What is my attendance?" · "Can I skip a class?"</span></li>
-      <li><span class="cd-item-label">Notices</span><span class="cd-item-meta">"Any important notices?"</span></li>
+    return `Ask Desk Phase 1 answers questions grounded in your real desk data:<ul class="cd-list">
+      <li><span class="cd-item-label">Show my day</span><span class="cd-item-meta">"What do I have today?" · "What should I focus on?"</span></li>
+      <li><span class="cd-item-label">What's next</span><span class="cd-item-meta">"What's my next class?" · "Upcoming lecture"</span></li>
+      <li><span class="cd-item-label">Attendance at risk</span><span class="cd-item-meta">"Which subjects are below target?" · "Attendance risk"</span></li>
+      <li><span class="cd-item-label">Urgent tasks</span><span class="cd-item-meta">"What tasks are overdue?" · "Due today"</span></li>
+      <li><span class="cd-item-label">What needs setup</span><span class="cd-item-meta">"Audit missing timetable, baselines, or profile"</span></li>
     </ul>`;
   }
 
-  function buildTodaySchedule() {
+  function buildTodaySummary() {
     const classes = getTodayClasses();
     const dayName = DAY_NAMES[new Date().getDay()];
+    const isSunday = new Date().getDay() === 0;
+    const pendingOverdue = allTasks().filter(t => isTaskOverdue(t));
+    const dueToday = allTasks().filter(t => t.status === 'pending' && !t.noDeadline && t.dueDate === todayISO());
 
-    if (new Date().getDay() === 0) {
-      return `Today is Sunday — no classes. A good day to catch up on pending tasks.`;
+    if (isSunday) {
+      let msg = `Today is <strong>Sunday</strong> — no scheduled classes.`;
+      if (pendingOverdue.length > 0 || dueToday.length > 0) {
+        msg += `<br><br>💡 You have <strong>${pendingOverdue.length + dueToday.length}</strong> urgent/due tasks to catch up on before Monday.`;
+      } else {
+        msg += ` A calm day to relax or plan ahead for the week.`;
+      }
+      return msg;
     }
+
+    const hasAnyTT = Object.values(loadTimetable() || {}).some(arr => arr && arr.some(c => !isBreakEntry(c)));
+    if (!hasAnyTT) {
+      return `<div class="cd-tag" style="background:rgba(245,158,11,0.15);color:var(--yellow);margin-bottom:8px">No Timetable Set</div><br>No timetable imported yet. You can scan your schedule photo or add classes in the <a href="javascript:void(0)" onclick="navigate('timetable')" style="color:var(--accent);font-weight:600">Timetable tab</a>.`;
+    }
+
     if (classes.length === 0) {
-      return `No classes scheduled for today (${dayName}). Enjoy the free time.`;
+      return `<strong>${dayName}</strong>: No classes scheduled today.<br><br>💡 ${pendingOverdue.length > 0 ? `Focus on clearing your <strong>${pendingOverdue.length} overdue task${pendingOverdue.length!==1?'s':''}</strong> today.` : 'Your desk schedule is clear today.'}`;
     }
 
     const items = classes.map(c => {
       const timeStr = `${formatTime(c.time)} – ${formatTime(c.end)}`;
-      const meta = [c.room !== '—' ? c.room : null, c.teacher !== '—' ? c.teacher : null].filter(Boolean).join(' · ');
+      const meta = [c.room && c.room !== '—' ? c.room : null, c.teacher && c.teacher !== '—' ? c.teacher : null].filter(Boolean).join(' · ');
       return `<li><span class="cd-item-label">${escHtml(c.subject)}</span><span class="cd-item-meta">${timeStr}${meta ? ' · ' + escHtml(meta) : ''}</span></li>`;
     }).join('');
 
-    return `<strong>${dayName}</strong> — ${classes.length} class${classes.length !== 1 ? 'es' : ''}:<ul class="cd-list">${items}</ul>`;
+    let guidance = '';
+    const next = getNextClass();
+    if (next) {
+      guidance = `<div style="margin-top:10px;font-size:0.78rem;color:var(--text-secondary);border-top:1px dashed var(--border);padding-top:8px">⏱️ Next up: <strong>${escHtml(next.subject)}</strong> at ${formatTime(next.time)}${next.room ? ' (' + escHtml(next.room) + ')' : ''}</div>`;
+    } else {
+      guidance = `<div style="margin-top:10px;font-size:0.78rem;color:var(--green);border-top:1px dashed var(--border);padding-top:8px">✓ All classes for today completed!</div>`;
+    }
+
+    return `<strong>${dayName}</strong> — ${classes.length} class${classes.length !== 1 ? 'es' : ''}:<ul class="cd-list">${items}</ul>${guidance}`;
   }
 
   function buildNextClass() {
+    const hasAnyTT = Object.values(loadTimetable() || {}).some(arr => arr && arr.some(c => !isBreakEntry(c)));
+    if (!hasAnyTT) {
+      return `No timetable imported yet. Add or scan your schedule in the <a href="javascript:void(0)" onclick="navigate('timetable')" style="color:var(--accent);font-weight:600">Timetable tab</a>.`;
+    }
+
+    const todayClasses = getTodayClasses();
+    if (todayClasses.length === 0) {
+      return `No classes scheduled for today.`;
+    }
+
     const next = getNextClass();
+    const now = currentTimeMinutes();
+
     if (!next) {
       const remaining = getRemainingTodayClasses();
-      if (remaining.length === 0) return `No more classes today. You're done for the day.`;
+      if (remaining.length === 0) {
+        return `🎉 All classes for today are finished! You're done for the day.`;
+      }
       return `No upcoming class found. Check your timetable.`;
     }
+
+    const startMin = timeToMinutes(next.time);
+    const diff = startMin - now;
+    const inStr = diff > 0 ? ` (in ${diff} min)` : '';
     const timeStr = `${formatTime(next.time)} – ${formatTime(next.end)}`;
-    const meta = [next.room !== '—' ? next.room : null, next.teacher !== '—' ? next.teacher : null].filter(Boolean).join(' · ');
-    return `Next up: <strong>${escHtml(next.subject)}</strong> at <strong>${timeStr}</strong>${meta ? ' · ' + escHtml(meta) : ''}.`;
+    const meta = [next.room && next.room !== '—' ? next.room : null, next.teacher && next.teacher !== '—' ? next.teacher : null].filter(Boolean).join(' · ');
+
+    return `Next class: <strong>${escHtml(next.subject)}</strong>${inStr}<br><span style="font-size:0.8rem;color:var(--text-secondary)">🕐 ${timeStr}${meta ? ' · ' + escHtml(meta) : ''}</span>`;
+  }
+
+  function buildAttendanceRisk() {
+    const subjects = (typeof getSubjectList === 'function') ? getSubjectList() : [];
+    if (subjects.length === 0) {
+      return `No subjects found yet. Set up your timetable or attendance baseline to start monitoring attendance health.`;
+    }
+
+    const target = getAttendanceTarget();
+    const atRisk = [];
+    const safe = [];
+    const missingBaseline = [];
+
+    subjects.forEach(s => {
+      const att = getSubjectAttendance(s);
+      if (!att.hasBaseline && att.total === 0) {
+        missingBaseline.push(s);
+      } else if (att.pct !== null && att.pct < target) {
+        atRisk.push({ subject: s, att });
+      } else if (att.pct !== null) {
+        safe.push({ subject: s, att });
+      }
+    });
+
+    if (atRisk.length === 0 && missingBaseline.length === subjects.length) {
+      return `<div class="cd-tag" style="background:rgba(245,158,11,0.15);color:var(--yellow);margin-bottom:8px">No Baseline Set</div><br>No attendance baseline recorded yet. Set your starting attendance counts in <a href="javascript:void(0)" onclick="navigate('subjects')" style="color:var(--accent);font-weight:600">Subject Hubs</a> to track risks.`;
+    }
+
+    if (atRisk.length > 0) {
+      const items = atRisk.map(({ subject, att }) => {
+        const guidance = calculateSmartAttendanceGuidance(att.present, att.absent + att.leave, target);
+        const cleanMsg = guidance.message.replace(/<\/?strong>/g, '');
+        return `<li><span class="cd-tag cd-tag-risk">${att.pct}%</span><span class="cd-item-label">${escHtml(subject.name)}</span><span class="cd-item-meta">${cleanMsg}</span></li>`;
+      }).join('');
+
+      return `<strong>${atRisk.length} subject${atRisk.length!==1?'s':''} below target (${target}%):</strong><ul class="cd-list">${items}</ul>`;
+    }
+
+    const highest = safe.sort((a, b) => b.att.pct - a.att.pct)[0];
+    return `<span class="cd-tag cd-tag-safe">All Safe</span> <strong>All active subjects are safely at or above ${target}%!</strong><br><br>Highest: <strong>${escHtml(highest.subject.name)}</strong> (${highest.att.pct}%). Keep up the good momentum!`;
+  }
+
+  function buildAttendanceGeneral() {
+    const { attended, skipped, total } = getOverallAttendance();
+    if (total === 0) {
+      return `No attendance recorded yet. Enter your portal baseline in Subject Hubs or mark classes in Timetable to start tracking.`;
+    }
+    const pct = Math.round((attended / total) * 100);
+    const target = getAttendanceTarget();
+    const isSafe = pct >= target;
+    const tag = isSafe
+      ? '<span class="cd-tag cd-tag-safe">Safe Zone</span>'
+      : '<span class="cd-tag cd-tag-risk">Risk Zone</span>';
+    const guidance = calculateSmartAttendanceGuidance(attended, skipped, target);
+    const cleanMsg = guidance.message.replace(/<\/?strong>/g, '');
+
+    return `${tag}<strong>${pct}% overall attendance</strong> (${attended}/${total} sessions attended).<br><br>💡 ${cleanMsg}`;
+  }
+
+  function buildTasksUrgent() {
+    const today = todayISO();
+    const tomorrow = nDaysFromNow(1);
+    const tasks = allTasks();
+
+    const overdue = tasks.filter(t => isTaskOverdue(t));
+    const dueToday = tasks.filter(t => t.status === 'pending' && !t.noDeadline && t.dueDate === today);
+    const dueTomorrow = tasks.filter(t => t.status === 'pending' && !t.noDeadline && t.dueDate === tomorrow);
+
+    const urgentTotal = overdue.length + dueToday.length + dueTomorrow.length;
+
+    if (urgentTotal === 0) {
+      return `<span class="cd-tag cd-tag-safe">Clear Desk</span> <strong>No urgent deadlines right now!</strong><br><br>No tasks are overdue or due in the next 24 hours. You're fully on track.`;
+    }
+
+    const items = [];
+    overdue.forEach(t => {
+      items.push(`<li><span class="cd-tag cd-tag-overdue">Overdue</span><span class="cd-item-label">${escHtml(t.title)}</span><span class="cd-item-meta">${escHtml(t.subject || 'Task')} · Due ${fmtDate(t.dueDate)}</span></li>`);
+    });
+    dueToday.forEach(t => {
+      items.push(`<li><span class="cd-tag cd-tag-today">Due Today</span><span class="cd-item-label">${escHtml(t.title)}</span><span class="cd-item-meta">${escHtml(t.subject || 'Task')}</span></li>`);
+    });
+    dueTomorrow.forEach(t => {
+      items.push(`<li><span class="cd-tag" style="background:rgba(59,130,246,0.15);color:var(--accent)">Tomorrow</span><span class="cd-item-label">${escHtml(t.title)}</span><span class="cd-item-meta">${escHtml(t.subject || 'Task')} · Due ${fmtDate(t.dueDate)}</span></li>`);
+    });
+
+    return `<strong>${urgentTotal} urgent task${urgentTotal!==1?'s':''}:</strong><ul class="cd-list">${items.join('')}</ul>`;
+  }
+
+  function buildSetupGaps() {
+    const gaps = [];
+    const tt = loadTimetable();
+    const hasClasses = Object.values(tt || {}).some(arr => Array.isArray(arr) && arr.some(c => !isBreakEntry(c)));
+    const subjects = (typeof getSubjectList === 'function') ? getSubjectList() : [];
+    const baselines = loadAttendanceBaselines();
+    const p = liveProfile || loadProfile() || {};
+
+    // 1. Timetable Check
+    if (!hasClasses) {
+      gaps.push({
+        title: 'Timetable Schedule',
+        desc: 'No classes imported yet. Add or scan your schedule to unlock daily timetable intelligence.',
+        btn: `<button class="btn btn-sm btn-secondary" onclick="navigate('timetable')" style="margin-top:4px;font-size:0.75rem;padding:3px 10px">📷 Scan Timetable →</button>`
+      });
+    }
+
+    // 2. Attendance Baseline Check
+    if (subjects.length > 0) {
+      const missingBaselines = subjects.filter(s => {
+        const codeKey = (s.code || '').trim();
+        const nameKey = (s.name || '').trim();
+        return !baselines[codeKey] && !baselines[nameKey];
+      });
+      if (missingBaselines.length > 0) {
+        gaps.push({
+          title: 'Attendance Baselines',
+          desc: `${missingBaselines.length} of ${subjects.length} subjects missing initial attendance counts.`,
+          btn: `<button class="btn btn-sm btn-secondary" onclick="navigate('subjects')" style="margin-top:4px;font-size:0.75rem;padding:3px 10px">📊 Set Baselines →</button>`
+        });
+      }
+    }
+
+    // 3. Profile & Practical Batch Check
+    const missingProfile = [];
+    if (!p.name) missingProfile.push('Name');
+    if (!p.batch) missingProfile.push('Practical Batch');
+    if (missingProfile.length > 0) {
+      gaps.push({
+        title: 'Student Profile',
+        desc: `Add your ${missingProfile.join(' and ')} for personalized headers and batch filtering.`,
+        btn: `<button class="btn btn-sm btn-secondary" onclick="navigate('settings')" style="margin-top:4px;font-size:0.75rem;padding:3px 10px">⚙️ Profile Settings →</button>`
+      });
+    }
+
+    // 4. Desk Pollution / Decluttering Check
+    if (typeof detectDeskPollution === 'function' && detectDeskPollution()) {
+      gaps.push({
+        title: 'Schedule Decluttering',
+        desc: 'Detected duplicate or other-batch subject cards from an earlier timetable scan.',
+        btn: `<button class="btn btn-sm btn-secondary" onclick="showDeclutterDeskModal()" style="margin-top:4px;font-size:0.75rem;padding:3px 10px">🧹 Declutter Desk →</button>`
+      });
+    }
+
+    if (gaps.length === 0) {
+      return `<div class="cd-tag cd-tag-safe" style="display:inline-flex;margin-bottom:8px">✓ Setup Complete</div><br><strong>Your desk setup is complete!</strong><br><br>Timetable, attendance baselines, and profile are all configured and active.`;
+    }
+
+    const items = gaps.map(g => `
+      <li style="margin-bottom:8px">
+        <div style="font-weight:600;color:var(--text-primary)">${g.title}</div>
+        <div style="font-size:0.78rem;color:var(--text-muted)">${g.desc}</div>
+        ${g.btn}
+      </li>
+    `).join('');
+
+    return `<strong>${gaps.length} desk setup item${gaps.length !== 1 ? 's' : ''} to complete:</strong><ul class="cd-list" style="margin-top:8px">${items}</ul>`;
   }
 
   function buildClassesLeft() {
@@ -9251,7 +9444,7 @@ const ClarityAssistant = (() => {
         break;
       }
     }
-    if (dayNum < 0) return buildTodaySchedule();
+    if (dayNum < 0) return buildTodaySummary();
 
     const classes = getDayClasses(dayNum);
     const dayName = DAY_NAMES[dayNum];
@@ -9267,26 +9460,6 @@ const ClarityAssistant = (() => {
     return `<strong>${dayName}</strong> — ${classes.length} class${classes.length !== 1 ? 'es' : ''}:<ul class="cd-list">${items}</ul>`;
   }
 
-  function buildTasksOverdue() {
-    const overdue = allTasks().filter(t => isTaskOverdue(t));
-    if (overdue.length === 0) return `No overdue tasks. You're on top of things.`;
-
-    const items = overdue.map(t =>
-      `<li><span class="cd-tag cd-tag-overdue">Overdue</span><span class="cd-item-label">${escHtml(t.title)}</span><span class="cd-item-meta">${escHtml(t.subject)} · Due ${fmtDate(t.dueDate)}</span></li>`
-    ).join('');
-    return `<strong>${overdue.length} overdue task${overdue.length !== 1 ? 's' : ''}:</strong><ul class="cd-list">${items}</ul>`;
-  }
-
-  function buildTasksToday() {
-    const today = todayISO();
-    const due = allTasks().filter(t => t.status === 'pending' && !t.noDeadline && t.dueDate === today);
-    if (due.length === 0) return `Nothing due today. Good.`;
-    const items = due.map(t =>
-      `<li><span class="cd-tag cd-tag-today">Due Today</span><span class="cd-item-label">${escHtml(t.title)}</span><span class="cd-item-meta">${escHtml(t.subject)}</span></li>`
-    ).join('');
-    return `<strong>${due.length} task${due.length !== 1 ? 's' : ''} due today:</strong><ul class="cd-list">${items}</ul>`;
-  }
-
   function buildTasksWeek() {
     const today = todayISO();
     const weekEnd = nDaysFromNow(7);
@@ -9295,7 +9468,7 @@ const ClarityAssistant = (() => {
     const items = upcoming.sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || '')).map(t => {
       const isToday = t.dueDate === today;
       const tag = isToday ? '<span class="cd-tag cd-tag-today">Today</span>' : '';
-      return `<li>${tag}<span class="cd-item-label">${escHtml(t.title)}</span><span class="cd-item-meta">${escHtml(t.subject)} · Due ${fmtDate(t.dueDate)}</span></li>`;
+      return `<li>${tag}<span class="cd-item-label">${escHtml(t.title)}</span><span class="cd-item-meta">${escHtml(t.subject || 'Task')} · Due ${fmtDate(t.dueDate)}</span></li>`;
     }).join('');
     return `<strong>${upcoming.length} task${upcoming.length !== 1 ? 's' : ''} in the next 7 days:</strong><ul class="cd-list">${items}</ul>`;
   }
@@ -9317,36 +9490,10 @@ const ClarityAssistant = (() => {
       const tag = isOngoing
         ? '<span class="cd-tag" style="background:rgba(147,51,234,0.14);color:var(--purple)">Mission</span>'
         : isOverdue ? '<span class="cd-tag cd-tag-overdue">Overdue</span>' : '';
-      const meta = isOngoing ? `${escHtml(t.subject)} · Ongoing Mission` : `${escHtml(t.subject)} · Due ${fmtDate(t.dueDate)}`;
+      const meta = isOngoing ? `${escHtml(t.subject || 'Task')} · Ongoing Mission` : `${escHtml(t.subject || 'Task')} · Due ${fmtDate(t.dueDate)}`;
       return `<li>${tag}<span class="cd-item-label">${escHtml(t.title)}</span><span class="cd-item-meta">${meta}</span></li>`;
     }).join('');
     return `<strong>${pending.length} pending task${pending.length !== 1 ? 's' : ''}:</strong><ul class="cd-list">${items}</ul>`;
-  }
-
-  function buildAttendance() {
-    const { attended, skipped, total } = getAttendanceSummary();
-    if (total === 0) {
-      return `No attendance recorded yet. Mark classes as Attended or Skipped in the Timetable to start tracking.`;
-    }
-    const pct = Math.round((attended / total) * 100);
-    const attTgt = getAttendanceTarget();
-    const isSafe = pct >= attTgt;
-    const tag = isSafe
-      ? '<span class="cd-tag cd-tag-safe">Safe Zone</span>'
-      : '<span class="cd-tag cd-tag-risk">Risk Zone</span>';
-    return `${tag}<strong>${pct}% attendance</strong> — ${attended} attended, ${skipped} skipped (${total} total marked).<br><br>${attTgt}% is your target. ${isSafe ? 'You are currently above target.' : 'You are below target.'}`;
-  }
-
-  function buildAttendanceSkip() {
-    const { attended, skipped, total } = getAttendanceSummary();
-    const guidance = calculateSmartAttendanceGuidance(attended, skipped, getAttendanceTarget());
-    if (total === 0) return `No attendance data yet. Start marking classes first.`;
-    // Strip HTML from guidance message for cleaner display
-    const cleanMsg = guidance.message.replace(/<\/?strong>/g, '');
-    const tag = guidance.isSafe
-      ? '<span class="cd-tag cd-tag-safe">Safe Zone</span>'
-      : '<span class="cd-tag cd-tag-risk">Risk Zone</span>';
-    return `${tag}${cleanMsg}`;
   }
 
   function buildNotices() {
@@ -9368,11 +9515,12 @@ const ClarityAssistant = (() => {
   }
 
   function buildProfile() {
-    const p = loadProfile();
-    if (!p.name) return `Your profile isn't set up yet. Go to Settings to add your name, branch, and year.`;
+    const p = liveProfile || loadProfile() || {};
+    if (!p.name) return `Your profile isn't set up yet. Go to <a href="javascript:void(0)" onclick="navigate('settings')" style="color:var(--accent);font-weight:600">Settings</a> to add your name, batch, and branch.`;
     const lines = [
       p.name    ? `<li><span class="cd-item-label">Name</span><span class="cd-item-meta">${escHtml(p.name)}</span></li>` : '',
       p.branch  ? `<li><span class="cd-item-label">Branch</span><span class="cd-item-meta">${escHtml(p.branch)}</span></li>` : '',
+      p.batch   ? `<li><span class="cd-item-label">Batch</span><span class="cd-item-meta">Batch ${escHtml(p.batch)}</span></li>` : '',
       p.year    ? `<li><span class="cd-item-label">Year</span><span class="cd-item-meta">${escHtml(p.year)}</span></li>` : '',
       p.college ? `<li><span class="cd-item-label">College</span><span class="cd-item-meta">${escHtml(p.college)}</span></li>` : '',
       p.rollNo  ? `<li><span class="cd-item-label">Roll No.</span><span class="cd-item-meta">${escHtml(p.rollNo)}</span></li>` : '',
@@ -9381,7 +9529,14 @@ const ClarityAssistant = (() => {
   }
 
   function buildUnknown() {
-    return `I didn't quite get that. I can answer questions about your schedule, tasks, attendance, and notices. Type <strong>help</strong> to see what I understand.`;
+    return `I didn't quite get that. I can answer questions grounded in your real desk data. Try:
+      <ul class="cd-list" style="margin-top:6px">
+        <li><strong>Show my day</strong> — Today's classes &amp; tasks</li>
+        <li><strong>What's next</strong> — Next class &amp; room</li>
+        <li><strong>Attendance at risk</strong> — Subjects needing recovery</li>
+        <li><strong>Urgent tasks</strong> — Overdue &amp; due deadlines</li>
+        <li><strong>What needs setup</strong> — Audit missing timetable or baselines</li>
+      </ul>`;
   }
 
   function escHtml(s) {
@@ -9390,27 +9545,26 @@ const ClarityAssistant = (() => {
 
   // ── Main Respond ──────────────────────────────────────────────
   function respond(query) {
-    // For 'day_schedule', check it's not actually a 'today' query first
     let intent = matchIntent(query);
 
-    // Refinement: if 'today' in query, prefer today_schedule over day_schedule
-    if (intent === 'day_schedule' && /\btoday\b/i.test(query)) intent = 'today_schedule';
+    // Refinement: if 'today' in query, prefer today_summary over day_schedule
+    if (intent === 'day_schedule' && /\btoday\b/i.test(query)) intent = 'today_summary';
 
     switch (intent) {
-      case 'greeting':      return buildGreeting();
-      case 'help':          return buildHelp();
-      case 'today_schedule': return buildTodaySchedule();
-      case 'next_class':    return buildNextClass();
-      case 'classes_left':  return buildClassesLeft();
-      case 'day_schedule':  return buildDaySchedule(query);
-      case 'tasks_overdue': return buildTasksOverdue();
-      case 'tasks_today':   return buildTasksToday();
-      case 'tasks_week':    return buildTasksWeek();
-      case 'tasks_all':     return buildTasksAll();
-      case 'attendance':    return buildAttendance();
-      case 'attendance_skip': return buildAttendanceSkip();
-      case 'notices':       return buildNotices();
-      case 'profile':       return buildProfile();
+      case 'greeting':           return buildGreeting();
+      case 'help':               return buildHelp();
+      case 'today_summary':      return buildTodaySummary();
+      case 'next_class':         return buildNextClass();
+      case 'attendance_risk':    return buildAttendanceRisk();
+      case 'attendance_general': return buildAttendanceGeneral();
+      case 'tasks_urgent':       return buildTasksUrgent();
+      case 'tasks_week':         return buildTasksWeek();
+      case 'tasks_all':          return buildTasksAll();
+      case 'setup_gaps':         return buildSetupGaps();
+      case 'classes_left':       return buildClassesLeft();
+      case 'day_schedule':       return buildDaySchedule(query);
+      case 'notices':            return buildNotices();
+      case 'profile':            return buildProfile();
       default: {
         // Dynamic check against all user subjects
         const subjects = (typeof getSubjectList === 'function') ? getSubjectList() : [];
@@ -9427,11 +9581,15 @@ const ClarityAssistant = (() => {
               });
             });
             const pTasks = allTasks().filter(t => t.subject && t.subject.toLowerCase() === s.name.toLowerCase() && t.status === 'pending');
+            const att = getSubjectAttendance(s);
             let res = `<strong>${escHtml(s.name)}:</strong><br>`;
             if (classes.length) {
               res += `Schedule: ${classes.join(' · ')}<br>`;
             } else {
               res += `No weekly timetable slots scheduled.<br>`;
+            }
+            if (att.pct !== null) {
+              res += `Attendance: <strong>${att.pct}%</strong> (${att.present}/${att.total} attended)<br>`;
             }
             if (pTasks.length) {
               res += `${pTasks.length} pending task${pTasks.length !== 1 ? 's' : ''}: ${pTasks.map(t => escHtml(t.title)).join(', ')}`;
@@ -9456,37 +9614,83 @@ let _assistantOpen = false;
 function renderAssistantWelcome() {
   const thread = document.getElementById('cd-chat-thread');
   if (!thread) return;
-  thread.innerHTML = `
-    <div class="cd-welcome-card">
-      <div class="cd-welcome-badge">
-        <span class="cd-dot-live"></span> Ready with live desk data
+
+  const tt = loadTimetable();
+  const hasTT = Object.values(tt || {}).some(arr => Array.isArray(arr) && arr.some(c => !isBreakEntry(c)));
+  const baselines = loadAttendanceBaselines();
+  const hasBaselines = Object.keys(baselines || {}).length > 0;
+  const isNewUser = !hasTT && !hasBaselines;
+
+  if (isNewUser) {
+    thread.innerHTML = `
+      <div class="cd-welcome-card">
+        <div class="cd-welcome-badge" style="background:rgba(59,130,246,0.15);color:var(--accent)">
+          <span class="cd-dot-live"></span> ✨ Getting Started
+        </div>
+        <div class="cd-welcome-title">Welcome to Ask Desk</div>
+        <div class="cd-welcome-sub">I answer academic questions using your real timetable, tasks, and attendance. Let's get your desk set up!</div>
+        <div class="cd-starter-grid">
+          <button class="cd-starter-btn" onclick="sendAssistantMessage('What needs setup')">
+            <span class="cd-starter-icon">⚙️</span>
+            <strong>What needs setup</strong>
+            <span>Check missing desk setup gaps</span>
+          </button>
+          <button class="cd-starter-btn" onclick="sendAssistantMessage('Show my day')">
+            <span class="cd-starter-icon">📅</span>
+            <strong>Show my day</strong>
+            <span>Check today's class schedule</span>
+          </button>
+          <button class="cd-starter-btn" onclick="sendAssistantMessage('Urgent tasks')">
+            <span class="cd-starter-icon">⚡</span>
+            <strong>Urgent tasks</strong>
+            <span>View deadlines &amp; assignments</span>
+          </button>
+          <button class="cd-starter-btn" onclick="sendAssistantMessage('Attendance at risk')">
+            <span class="cd-starter-icon">🛡️</span>
+            <strong>Attendance at risk</strong>
+            <span>Monitor subject attendance</span>
+          </button>
+        </div>
       </div>
-      <div class="cd-welcome-title">How can I help you today?</div>
-      <div class="cd-welcome-sub">Grounded in your live timetable, task deadlines, attendance logs, and notices.</div>
-      <div class="cd-starter-grid">
-        <button class="cd-starter-btn" onclick="sendAssistantMessage('What do I have today?')">
-          <span class="cd-starter-icon">📅</span>
-          <strong>Today's Classes</strong>
-          <span>View today's lecture schedule</span>
-        </button>
-        <button class="cd-starter-btn" onclick="sendAssistantMessage('What is my next class?')">
-          <span class="cd-starter-icon">⏱️</span>
-          <strong>Next Class</strong>
-          <span>Upcoming lecture &amp; room</span>
-        </button>
-        <button class="cd-starter-btn" onclick="sendAssistantMessage('Which tasks are overdue?')">
-          <span class="cd-starter-icon">🎯</span>
-          <strong>Overdue Tasks</strong>
-          <span>Check pending deadlines</span>
-        </button>
-        <button class="cd-starter-btn" onclick="sendAssistantMessage('What is my attendance situation?')">
-          <span class="cd-starter-icon">🛡️</span>
-          <strong>Attendance %</strong>
-          <span>Safe skips &amp; target buffer</span>
-        </button>
+    `;
+  } else {
+    thread.innerHTML = `
+      <div class="cd-welcome-card">
+        <div class="cd-welcome-badge">
+          <span class="cd-dot-live"></span> Ready with live desk data
+        </div>
+        <div class="cd-welcome-title">How can I help you today?</div>
+        <div class="cd-welcome-sub">Grounded in your real timetable, task deadlines, and attendance logs.</div>
+        <div class="cd-starter-grid">
+          <button class="cd-starter-btn" onclick="sendAssistantMessage('Show my day')">
+            <span class="cd-starter-icon">📅</span>
+            <strong>Show my day</strong>
+            <span>View classes &amp; tasks for today</span>
+          </button>
+          <button class="cd-starter-btn" onclick="sendAssistantMessage('What\\'s next')">
+            <span class="cd-starter-icon">⏱️</span>
+            <strong>What's next</strong>
+            <span>Upcoming lecture &amp; room</span>
+          </button>
+          <button class="cd-starter-btn" onclick="sendAssistantMessage('Attendance at risk')">
+            <span class="cd-starter-icon">🛡️</span>
+            <strong>Attendance at risk</strong>
+            <span>Subjects needing recovery</span>
+          </button>
+          <button class="cd-starter-btn" onclick="sendAssistantMessage('Urgent tasks')">
+            <span class="cd-starter-icon">⚡</span>
+            <strong>Urgent tasks</strong>
+            <span>Deadlines due today or overdue</span>
+          </button>
+          <button class="cd-starter-btn" onclick="sendAssistantMessage('What needs setup')" style="grid-column:span 2">
+            <span class="cd-starter-icon">⚙️</span>
+            <strong>What needs setup</strong>
+            <span>Audit desk health &amp; configuration</span>
+          </button>
+        </div>
       </div>
-    </div>
-  `;
+    `;
+  }
 }
 
 function clearAssistantChat() {

@@ -310,8 +310,8 @@
         </svg>
       </div>
       <div>
-        <div class="cd-assistant-title">Desk Assistant</div>
-        <div class="cd-assistant-subtitle">Answers from live schedule &amp; tasks</div>
+        <div class="cd-assistant-title">Ask Desk</div>
+        <div class="cd-assistant-subtitle">Grounded in your real schedule &amp; tasks</div>
       </div>
     </div>
     <div class="cd-assistant-actions">
@@ -333,12 +333,11 @@
 
   <!-- Suggested quick prompt chips -->
   <div class="cd-chip-row" id="cd-chip-row">
-    <button class="cd-chip" onclick="sendAssistantMessage('What do I have today?')">Today's classes</button>
-    <button class="cd-chip" onclick="sendAssistantMessage('What is my next class?')">Next class</button>
-    <button class="cd-chip" onclick="sendAssistantMessage('Which tasks are overdue?')">Overdue tasks</button>
-    <button class="cd-chip" onclick="sendAssistantMessage('What is my attendance situation?')">Attendance %</button>
-    <button class="cd-chip" onclick="sendAssistantMessage('Are there any important notices?')">Notices</button>
-    <button class="cd-chip" onclick="sendAssistantMessage('What tasks are due this week?')">Due this week</button>
+    <button class="cd-chip" onclick="sendAssistantMessage('Show my day')">📅 Show my day</button>
+    <button class="cd-chip" onclick="sendAssistantMessage('What\'s next')">⏱️ What's next</button>
+    <button class="cd-chip" onclick="sendAssistantMessage('Attendance at risk')">🛡️ Attendance at risk</button>
+    <button class="cd-chip" onclick="sendAssistantMessage('Urgent tasks')">⚡ Urgent tasks</button>
+    <button class="cd-chip" onclick="sendAssistantMessage('What needs setup')">⚙️ What needs setup</button>
   </div>
 
   <!-- Input -->
@@ -370,8 +369,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
 <!-- Firebase Config & App Script -->
-<script src="firebase-config.js?v=100"></script>
-<script type="module" src="app.js?v=100"></script>
+<script src="firebase-config.js?v=101"></script>
+<script type="module" src="app.js?v=101"></script>
 
 </body>
 </html>
