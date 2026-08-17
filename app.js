@@ -9069,8 +9069,24 @@ const ClarityAssistant = (() => {
       test: /\b(hi|hello|hey|good\s*(morning|afternoon|evening)|what'?s up|sup)\b/i,
     },
     {
-      id: 'help',
-      test: /\b(help|what can you|commands|what do you know|how to use|capabilities)\b/i,
+      id: 'import_timetable',
+      test: /\b(import timetable|scan timetable|upload timetable|add timetable|setup timetable|set up timetable|fix timetable|import my timetable)\b/i,
+    },
+    {
+      id: 'setup_attendance',
+      test: /\b(setup attendance|set up attendance|attendance baseline|attendance setup|help me set up attendance|configure attendance|set baseline)\b/i,
+    },
+    {
+      id: 'declutter_desk',
+      test: /\b(clean my desk|clean desk|declutter|declutter desk|declutter my desk|duplicate subjects|find duplicate|fix duplicate|polluted subjects)\b/i,
+    },
+    {
+      id: 'create_task',
+      test: /\b(add task|create task|new task|add a task|remind me to|make a task)\b/i,
+    },
+    {
+      id: 'study_plan',
+      test: /\b(study plan|plan tonight|help me plan tonight|plan today|what should i study|what to study|study schedule|how to study today|plan my evening)\b/i,
     },
     {
       id: 'setup_gaps',
@@ -9119,6 +9135,10 @@ const ClarityAssistant = (() => {
     {
       id: 'profile',
       test: /\b(who am i|my profile|my name|my branch|my year|my roll|my college|my batch)\b/i,
+    },
+    {
+      id: 'help',
+      test: /\b(help|what can you|commands|what do you know|how to use|capabilities)\b/i,
     },
   ];
 
@@ -9186,13 +9206,224 @@ const ClarityAssistant = (() => {
   }
 
   function buildHelp() {
-    return `Ask Desk Phase 1 answers questions grounded in your real desk data:<ul class="cd-list">
-      <li><span class="cd-item-label">Show my day</span><span class="cd-item-meta">"What do I have today?" · "What should I focus on?"</span></li>
-      <li><span class="cd-item-label">What's next</span><span class="cd-item-meta">"What's my next class?" · "Upcoming lecture"</span></li>
-      <li><span class="cd-item-label">Attendance at risk</span><span class="cd-item-meta">"Which subjects are below target?" · "Attendance risk"</span></li>
-      <li><span class="cd-item-label">Urgent tasks</span><span class="cd-item-meta">"What tasks are overdue?" · "Due today"</span></li>
-      <li><span class="cd-item-label">What needs setup</span><span class="cd-item-meta">"Audit missing timetable, baselines, or profile"</span></li>
+    return `Ask Desk can answer questions and trigger helpful actions grounded in your real desk data:<ul class="cd-list">
+      <li><span class="cd-item-label">Timetable Import</span><span class="cd-item-meta">"Import my timetable" · "Scan timetable"</span></li>
+      <li><span class="cd-item-label">Attendance Setup</span><span class="cd-item-meta">"Help me set up attendance" · "Set baseline"</span></li>
+      <li><span class="cd-item-label">Declutter Desk</span><span class="cd-item-meta">"Clean my desk" · "Find duplicate subjects"</span></li>
+      <li><span class="cd-item-label">Create Task</span><span class="cd-item-meta">"Add a task for Data Structures" · "New task"</span></li>
+      <li><span class="cd-item-label">Study Plan</span><span class="cd-item-meta">"Help me plan tonight" · "What should I study today?"</span></li>
+      <li><span class="cd-item-label">Daily Briefing</span><span class="cd-item-meta">"Show my day" · "What's next" · "Attendance at risk" · "Urgent tasks"</span></li>
     </ul>`;
+  }
+
+  function buildImportTimetable() {
+    const tt = loadTimetable();
+    const hasClasses = Object.values(tt || {}).some(arr => Array.isArray(arr) && arr.some(c => !isBreakEntry(c)));
+    let totalSlots = 0;
+    Object.values(tt || {}).forEach(arr => {
+      (arr || []).forEach(c => { if (!isBreakEntry(c)) totalSlots++; });
+    });
+
+    if (!hasClasses) {
+      return `<div class="cd-tag" style="background:rgba(59,130,246,0.15);color:var(--accent);margin-bottom:8px">Timetable Setup</div><br>
+      You don't have a schedule set up yet. You can scan an image of your timetable or load our official sample schedule template.<br><br>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-sm btn-primary" onclick="triggerTimetableImport()" style="font-size:0.78rem;padding:5px 12px">📷 Scan Timetable Photo</button>
+        <button class="btn btn-sm btn-secondary" onclick="loadOfficialAidsTimetable()" style="font-size:0.78rem;padding:5px 12px">📋 Sample Template</button>
+        <button class="btn btn-sm btn-secondary" onclick="navigate('timetable')" style="font-size:0.78rem;padding:5px 12px">Open Timetable →</button>
+      </div>`;
+    }
+
+    return `<div class="cd-tag cd-tag-safe" style="margin-bottom:8px">Timetable Active</div><br>
+    You currently have <strong>${totalSlots} class slot${totalSlots!==1?'s':''}</strong> active on your timetable. You can scan a new photo to replace/update it or add individual classes manually.<br><br>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-sm btn-secondary" onclick="triggerTimetableImport()" style="font-size:0.78rem;padding:5px 12px">📷 Scan New Photo</button>
+      <button class="btn btn-sm btn-secondary" onclick="navigate('timetable')" style="font-size:0.78rem;padding:5px 12px">View Full Schedule →</button>
+    </div>`;
+  }
+
+  function buildSetupAttendance() {
+    const subjects = (typeof getSubjectList === 'function') ? getSubjectList() : [];
+    const baselines = loadAttendanceBaselines();
+    const missing = subjects.filter(s => {
+      const codeKey = (s.code || '').trim();
+      const nameKey = (s.name || '').trim();
+      return !baselines[codeKey] && !baselines[nameKey];
+    });
+
+    if (subjects.length === 0) {
+      return `<div class="cd-tag" style="background:rgba(245,158,11,0.15);color:var(--yellow);margin-bottom:8px">No Subjects Found</div><br>
+      Set up your timetable schedule first so Clarity Desk can automatically create your Subject Hubs for tracking attendance.<br><br>
+      <button class="btn btn-sm btn-primary" onclick="triggerTimetableImport()" style="font-size:0.78rem;padding:5px 12px">📷 Scan Timetable Photo →</button>`;
+    }
+
+    if (missing.length > 0) {
+      return `<div class="cd-tag" style="background:rgba(245,158,11,0.15);color:var(--yellow);margin-bottom:8px">Attendance Baseline</div><br>
+      <strong>${missing.length} of ${subjects.length} subjects</strong> are missing initial attendance counts. Entering your portal counts once gives you instant % calculations and safe skip guidance.<br><br>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-sm btn-primary" onclick="showBaselineModal(null, 'scan')" style="font-size:0.78rem;padding:5px 12px">📷 Scan Portal Screenshot</button>
+        <button class="btn btn-sm btn-secondary" onclick="showBaselineModal(null, 'manual')" style="font-size:0.78rem;padding:5px 12px">✍️ Enter Counts Manually</button>
+        <button class="btn btn-sm btn-secondary" onclick="navigate('subjects')" style="font-size:0.78rem;padding:5px 12px">Subject Hubs →</button>
+      </div>`;
+    }
+
+    return `<div class="cd-tag cd-tag-safe" style="margin-bottom:8px">Baselines Active</div><br>
+    All your active Subject Hubs have baseline counts configured. You can update counts at any time or log daily attendance directly in the timetable.<br><br>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-sm btn-secondary" onclick="showBaselineModal()" style="font-size:0.78rem;padding:5px 12px">📊 Edit Baseline Counts</button>
+      <button class="btn btn-sm btn-secondary" onclick="navigate('subjects')" style="font-size:0.78rem;padding:5px 12px">Subject Hubs →</button>
+    </div>`;
+  }
+
+  function buildDeclutterDesk() {
+    const isPolluted = (typeof detectDeskPollution === 'function') && detectDeskPollution();
+
+    if (isPolluted) {
+      return `<div class="cd-tag" style="background:rgba(245,158,11,0.15);color:var(--yellow);margin-bottom:8px">Declutter Recommended</div><br>
+      We detected duplicate, noisy, or multi-batch subject cards on your desk. Decluttering will:<br>
+      <ul class="cd-list" style="margin:6px 0 8px 0">
+        <li>Filter practical lab sessions to your exact batch (e.g. A2, B1, D1)</li>
+        <li>Merge duplicate variations into clean canonical cards</li>
+        <li>Safely reassign all attendance baselines &amp; tasks without data loss</li>
+      </ul>
+      <button class="btn btn-sm btn-primary" onclick="showDeclutterDeskModal()" style="font-size:0.78rem;padding:6px 14px">🧹 Declutter my desk →</button>`;
+    }
+
+    return `<div class="cd-tag cd-tag-safe" style="margin-bottom:8px">Clean Desk</div><br>
+    Your Subject Hubs and timetable structure are already normalized and clean! If you ever need to change your practical batch or re-filter sessions, you can launch cleanup anytime.<br><br>
+    <button class="btn btn-sm btn-secondary" onclick="showDeclutterDeskModal()" style="font-size:0.78rem;padding:5px 12px">🧹 Open Declutter Tool →</button>`;
+  }
+
+  function buildCreateTask(query) {
+    const subjects = (typeof getSubjectList === 'function') ? getSubjectList() : [];
+    let q = query.replace(/\b(add a task|add task|create task|new task|make a task|remind me to)\b/i, '').trim();
+    let foundSubj = null;
+    let taskTitle = q;
+    let dueDate = '';
+
+    // Date detection
+    if (/\bdue tomorrow\b/i.test(taskTitle) || /\btomorrow\b/i.test(taskTitle)) {
+      const d = new Date();
+      d.setDate(d.getDate() + 1);
+      dueDate = d.toISOString().split('T')[0];
+      taskTitle = taskTitle.replace(/\b(due\s+)?tomorrow\b/i, '').trim();
+    } else if (/\bdue today\b/i.test(taskTitle) || /\btoday\b/i.test(taskTitle)) {
+      const d = new Date();
+      dueDate = d.toISOString().split('T')[0];
+      taskTitle = taskTitle.replace(/\b(due\s+)?today\b/i, '').trim();
+    }
+
+    // Subject matching
+    for (const s of subjects) {
+      const sName = s.name.toLowerCase();
+      const sCode = (s.code || '').toLowerCase();
+      if (taskTitle.toLowerCase().includes(`for ${sName}`) || taskTitle.toLowerCase().includes(`in ${sName}`)) {
+        foundSubj = s;
+        taskTitle = taskTitle.replace(new RegExp(`\\b(for|in)\\s+${s.name}\\b`, 'i'), '').trim();
+        break;
+      }
+      if (sCode && sCode.length >= 2 && (taskTitle.toLowerCase().includes(`for ${sCode}`) || taskTitle.toLowerCase().includes(`in ${sCode}`))) {
+        foundSubj = s;
+        taskTitle = taskTitle.replace(new RegExp(`\\b(for|in)\\s+${s.code}\\b`, 'i'), '').trim();
+        break;
+      }
+    }
+
+    if (!foundSubj) {
+      for (const s of subjects) {
+        if (taskTitle.toLowerCase().includes(s.name.toLowerCase())) {
+          foundSubj = s;
+          taskTitle = taskTitle.replace(new RegExp(`\\b${s.name}\\b`, 'i'), '').trim();
+          break;
+        }
+      }
+    }
+
+    taskTitle = taskTitle.replace(/^(for|to|about)\s+/i, '').trim();
+
+    // If a meaningful task title was extracted, create it immediately!
+    if (taskTitle && taskTitle.length >= 3 && !/^(a task|task)$/i.test(taskTitle)) {
+      const targetSubj = foundSubj || (subjects.length > 0 ? subjects[0] : { name: 'General', code: 'GEN', color: 'var(--accent)' });
+      const targetDueDate = dueDate || todayISO();
+
+      const newTask = {
+        id: 'ct_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+        title: taskTitle,
+        subject: targetSubj.name,
+        code: targetSubj.code || 'GEN',
+        dueDate: targetDueDate,
+        dueTime: '23:59',
+        description: 'Created via Ask Desk',
+        taskType: 'assignment',
+        status: 'pending',
+        priority: 'medium',
+        color: targetSubj.color || 'var(--accent)',
+        createdAt: new Date().toISOString()
+      };
+
+      state.customTasks = state.customTasks || [];
+      state.customTasks.unshift(newTask);
+      saveCustomTasks();
+      updateNavBadges();
+
+      return `<div class="cd-tag cd-tag-safe" style="display:inline-flex;margin-bottom:8px">✓ Task Created</div><br>
+      Created task <strong>${escHtml(taskTitle)}</strong> for <strong>${escHtml(targetSubj.name)}</strong> (Due ${fmtDate(targetDueDate)}).<br><br>
+      <button class="btn btn-sm btn-secondary" onclick="navigate('assignments')" style="font-size:0.76rem;padding:4px 12px">View in Tasks &amp; Deadlines →</button>`;
+    }
+
+    // Otherwise launch interactive modal
+    return `Let's add a task${foundSubj ? ` for <strong>${escHtml(foundSubj.name)}</strong>` : ''}:<br><br>
+    <button class="btn btn-sm btn-primary" onclick="showAddTaskModal(null, ${foundSubj ? `'${foundSubj.name.replace(/'/g, "\\'")}'` : 'null'})" style="font-size:0.78rem;padding:6px 14px">✍️ Open Task Creator →</button>`;
+  }
+
+  function buildStudyPlan() {
+    const today = todayISO();
+    const tomorrow = nDaysFromNow(1);
+    const tasks = allTasks();
+    const urgentTasks = tasks.filter(t => t.status === 'pending' && (isTaskOverdue(t) || t.dueDate === today || t.dueDate === tomorrow));
+    const subjects = (typeof getSubjectList === 'function') ? getSubjectList() : [];
+    const target = getAttendanceTarget();
+    const atRisk = subjects.filter(s => {
+      const att = getSubjectAttendance(s);
+      return att.pct !== null && att.pct < target;
+    });
+
+    const tomorrowDay = (new Date().getDay() + 1) % 7;
+    const tt = loadTimetable();
+    const tomorrowClasses = (tt[tomorrowDay] || []).filter(c => !isBreakEntry(c));
+
+    const planSteps = [];
+
+    // Block 1: Highest Priority / Urgent Work
+    if (urgentTasks.length > 0) {
+      const topTask = urgentTasks[0];
+      const urgencyLabel = isTaskOverdue(topTask) ? 'Overdue' : topTask.dueDate === today ? 'Due Today' : 'Due Tomorrow';
+      planSteps.push(`<strong>1. High-Priority Focus (45 min):</strong> Tackle <em>${escHtml(topTask.title)}</em> for <strong>${escHtml(topTask.subject || 'Task')}</strong> (${urgencyLabel}). Finish this before moving to optional topics.`);
+    } else {
+      planSteps.push(`<strong>1. Course Consolidation (35 min):</strong> No urgent deadlines pending. Review key concepts and lab writeups from today's lectures.`);
+    }
+
+    // Block 2: Attendance Recovery & Weak Topics
+    if (atRisk.length > 0) {
+      const topRisk = atRisk[0];
+      const att = getSubjectAttendance(topRisk);
+      planSteps.push(`<strong>2. Attendance Recovery Study (30 min):</strong> Focus on <strong>${escHtml(topRisk.name)}</strong> (currently at ${att.pct}%). Ensure lecture notes and assignments are up to date so you don't miss future marks.`);
+    } else if (subjects.length > 0) {
+      planSteps.push(`<strong>2. Problem Practice (30 min):</strong> Solve practice questions or read syllabus references for <strong>${escHtml(subjects[0].name)}</strong>.`);
+    } else {
+      planSteps.push(`<strong>2. Desk Review (20 min):</strong> Organize notes, verify upcoming tests, and check campus notices.`);
+    }
+
+    // Block 3: Tomorrow's Schedule Preview
+    if (tomorrowClasses.length > 0) {
+      const firstClass = tomorrowClasses[0];
+      planSteps.push(`<strong>3. Tomorrow's Preview (15 min):</strong> Preview tomorrow's opening lecture: <strong>${escHtml(firstClass.subject)}</strong> at ${formatTime(firstClass.time)}${firstClass.room && firstClass.room !== '—' ? ' in ' + escHtml(firstClass.room) : ''}.`);
+    } else {
+      planSteps.push(`<strong>3. Day Wrap-Up (10 min):</strong> Check off completed tasks and set goals for tomorrow.`);
+    }
+
+    return `<div class="cd-tag" style="background:rgba(59,130,246,0.15);color:var(--accent);margin-bottom:8px">Today's Focus Plan</div><br>
+    Here is a realistic study plan grounded in your live desk data:<ul class="cd-list" style="margin-top:8px">${planSteps.map(s => `<li>${s}</li>`).join('')}</ul>`;
   }
 
   function buildTodaySummary() {
@@ -9529,13 +9760,14 @@ const ClarityAssistant = (() => {
   }
 
   function buildUnknown() {
-    return `I didn't quite get that. I can answer questions grounded in your real desk data. Try:
+    return `I didn't quite get that. I can answer questions and trigger helpful actions grounded in your real desk data. Try:
       <ul class="cd-list" style="margin-top:6px">
+        <li><strong>Import my timetable</strong> — Start photo timetable scan</li>
+        <li><strong>Help me set up attendance</strong> — Configure baseline counts</li>
+        <li><strong>Clean my desk</strong> — Declutter duplicate or other-batch cards</li>
+        <li><strong>Add a task for [Subject]</strong> — Create subject-linked task</li>
+        <li><strong>Help me plan tonight</strong> — Generate grounded 3-block study plan</li>
         <li><strong>Show my day</strong> — Today's classes &amp; tasks</li>
-        <li><strong>What's next</strong> — Next class &amp; room</li>
-        <li><strong>Attendance at risk</strong> — Subjects needing recovery</li>
-        <li><strong>Urgent tasks</strong> — Overdue &amp; due deadlines</li>
-        <li><strong>What needs setup</strong> — Audit missing timetable or baselines</li>
       </ul>`;
   }
 
@@ -9553,6 +9785,11 @@ const ClarityAssistant = (() => {
     switch (intent) {
       case 'greeting':           return buildGreeting();
       case 'help':               return buildHelp();
+      case 'import_timetable':   return buildImportTimetable();
+      case 'setup_attendance':   return buildSetupAttendance();
+      case 'declutter_desk':     return buildDeclutterDesk();
+      case 'create_task':        return buildCreateTask(query);
+      case 'study_plan':         return buildStudyPlan();
       case 'today_summary':      return buildTodaySummary();
       case 'next_class':         return buildNextClass();
       case 'attendance_risk':    return buildAttendanceRisk();
@@ -9635,20 +9872,20 @@ function renderAssistantWelcome() {
             <strong>What needs setup</strong>
             <span>Check missing desk setup gaps</span>
           </button>
+          <button class="cd-starter-btn" onclick="sendAssistantMessage('Import my timetable')">
+            <span class="cd-starter-icon">📷</span>
+            <strong>Import timetable</strong>
+            <span>Scan photo or use template</span>
+          </button>
+          <button class="cd-starter-btn" onclick="sendAssistantMessage('Help me set up attendance')">
+            <span class="cd-starter-icon">📊</span>
+            <strong>Setup attendance</strong>
+            <span>Set portal baseline counts</span>
+          </button>
           <button class="cd-starter-btn" onclick="sendAssistantMessage('Show my day')">
             <span class="cd-starter-icon">📅</span>
             <strong>Show my day</strong>
             <span>Check today's class schedule</span>
-          </button>
-          <button class="cd-starter-btn" onclick="sendAssistantMessage('Urgent tasks')">
-            <span class="cd-starter-icon">⚡</span>
-            <strong>Urgent tasks</strong>
-            <span>View deadlines &amp; assignments</span>
-          </button>
-          <button class="cd-starter-btn" onclick="sendAssistantMessage('Attendance at risk')">
-            <span class="cd-starter-icon">🛡️</span>
-            <strong>Attendance at risk</strong>
-            <span>Monitor subject attendance</span>
           </button>
         </div>
       </div>
@@ -9682,10 +9919,15 @@ function renderAssistantWelcome() {
             <strong>Urgent tasks</strong>
             <span>Deadlines due today or overdue</span>
           </button>
-          <button class="cd-starter-btn" onclick="sendAssistantMessage('What needs setup')" style="grid-column:span 2">
-            <span class="cd-starter-icon">⚙️</span>
-            <strong>What needs setup</strong>
-            <span>Audit desk health &amp; configuration</span>
+          <button class="cd-starter-btn" onclick="sendAssistantMessage('Help me plan tonight')">
+            <span class="cd-starter-icon">🎯</span>
+            <strong>Plan tonight</strong>
+            <span>Grounded 3-block study plan</span>
+          </button>
+          <button class="cd-starter-btn" onclick="sendAssistantMessage('Clean my desk')">
+            <span class="cd-starter-icon">🧹</span>
+            <strong>Clean my desk</strong>
+            <span>Declutter &amp; batch filter</span>
           </button>
         </div>
       </div>
