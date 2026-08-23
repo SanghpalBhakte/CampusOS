@@ -1,411 +1,332 @@
 /* ============================================================
-   Clarity Desk — The Quiet Study Desk Dual-Theme Design System
-   1. Paper Slate     (Clarity Light: Warm Paper Base & Dark Ink)
-   2. Midnight Ink    (Clarity Dark: Roasted Espresso & Sage Accent)
-   3. Espresso Desk   (Cozy Café Dark: Roasted Espresso & Amber Caramel)
-   4. Sandstone Notes (Soft Organic Notebook: Parchment & Terracotta)
-   5. Nordic Frost    (Crisp Glacial Frost: Azure Mist & Deep Navy)
-   6. Misty Mint      (Airy Eucalyptus: Sage Mist & Sea Pine)
+   Clarity Desk — Canonical 2-Theme Semantic Design System
+   1. Paper Slate     (Warm Daylight Desk)
+   2. Midnight Ink    (Focused Night Study)
    ============================================================ */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
 
-/* ── 1) Paper Slate — Clarity Light (Quiet Study Desk Light) ── */
+/* ── 1) Paper Slate — Canonical Daylight Theme ─────────────── */
 :root,
-[data-theme="paper-slate"],
-[data-theme="paper"],
-[data-theme="light"] {
+:root[data-theme="paper-slate"],
+:root[data-theme="sandstone-notes"],
+:root[data-theme="nordic-frost"],
+:root[data-theme="misty-mint"],
+:root[data-theme="paper"],
+:root[data-theme="light"],
+:root[data-theme="stone"] {
+  color-scheme: light;
+
+  /* Layer 1: Primitive Theme Values */
+  --raw-bg-0: #f6f1e8;
+  --raw-bg-1: #fffdfc;
+  --raw-bg-2: #f1e8dc;
+  --raw-bg-3: #e7dccd;
+
+  --raw-ink-1: #2a241f;
+  --raw-ink-2: #5e5449;
+  --raw-ink-3: #8a7e71;
+  --raw-ink-inverse: #f8f4ee;
+
+  --raw-brand-1: #2f4a3d;
+  --raw-brand-2: #3f6352;
+  --raw-brand-3: #dbe7e0;
+
+  --raw-accent-1: #b48852;
+  --raw-accent-2: #8e6940;
+  --raw-accent-3: #efe3d2;
+
+  --raw-success: #4e7a5d;
+  --raw-warning: #b37a2a;
+  --raw-error: #a34b43;
+  --raw-info: #5a6f8f;
+
+  --raw-rule: #d8ccbd;
+  --raw-border-soft: rgba(42, 36, 31, 0.10);
+  --raw-border-strong: rgba(42, 36, 31, 0.18);
+  --raw-shadow-sm: 0 1px 2px rgba(58, 43, 28, 0.05);
+  --raw-shadow-md: 0 8px 24px rgba(58, 43, 28, 0.08);
+  --raw-shadow-lg: 0 16px 40px rgba(58, 43, 28, 0.10);
+
+  /* Layer 2: Semantic Tokens */
+  --color-canvas: var(--raw-bg-0);
+  --color-surface: var(--raw-bg-1);
+  --color-surface-muted: var(--raw-bg-2);
+  --color-surface-sunken: var(--raw-bg-3);
+  --color-surface-overlay: #fffaf4;
+
+  --color-text-primary: var(--raw-ink-1);
+  --color-text-secondary: var(--raw-ink-2);
+  --color-text-tertiary: var(--raw-ink-3);
+  --color-text-inverse: var(--raw-ink-inverse);
+
+  --color-action-primary: var(--raw-brand-1);
+  --color-action-primary-hover: var(--raw-brand-2);
+  --color-action-primary-text: var(--raw-ink-inverse);
+  --color-action-secondary: var(--raw-accent-3);
+  --color-action-secondary-hover: #e7d7c0;
+  --color-action-secondary-text: var(--raw-ink-1);
+
+  --color-accent: var(--raw-accent-1);
+  --color-accent-strong: var(--raw-accent-2);
+  --color-accent-soft: var(--raw-accent-3);
+
+  --color-border-subtle: var(--raw-border-soft);
+  --color-border-default: var(--raw-border-strong);
+  --color-rule: var(--raw-rule);
+  --color-divider: var(--raw-rule);
+
+  --color-success: var(--raw-success);
+  --color-warning: var(--raw-warning);
+  --color-error: var(--raw-error);
+  --color-info: var(--raw-info);
+
+  --color-hover-fill: rgba(47, 74, 61, 0.06);
+  --color-pressed-fill: rgba(47, 74, 61, 0.10);
+  --color-focus-ring: #2f4a3d;
+  --color-selection: rgba(180, 136, 82, 0.24);
+
+  --shadow-sm: var(--raw-shadow-sm);
+  --shadow:    var(--raw-shadow-md);
+  --shadow-md: var(--raw-shadow-md);
+  --shadow-lg: var(--raw-shadow-lg);
+
+  --radius-card: 14px;
+  --radius-btn: 12px;
+  --radius-input: 14px;
+  --radius-chip: 999px;
+  --radius: 14px;
+  --radius-sm: 10px;
+  --radius-xs: 6px;
+  --radius-pill: 999px;
+
+  /* Layer 3: Component Aliases */
+  --card-bg: var(--color-surface);
+  --card-border: var(--color-border-subtle);
+  --input-bg: var(--color-surface);
+  --input-border: var(--color-border-default);
+  --sidebar-bg: var(--color-canvas);
+  --sidebar-active-rail: var(--color-accent);
+  --ledger-row-bg: transparent;
+  --ledger-row-border: var(--color-rule);
+  --hero-rail: var(--color-accent);
+  --status-pill-bg: var(--color-surface-muted);
+  --status-pill-text: var(--color-text-secondary);
+
+  /* Legacy Compatibility Bridges */
+  --bg:             var(--color-canvas);
+  --bg-base:        var(--color-canvas);
+  --bg-surface:     var(--color-surface);
+  --bg-subtle:      var(--color-surface-muted);
+  --bg-hover:       var(--color-surface-muted);
+  --bg-active:      var(--color-surface-sunken);
+
+  --surface:        var(--color-surface);
+  --surface-2:      var(--color-surface-muted);
+  --surface-3:      var(--color-surface-sunken);
+  --surface-well:   var(--color-surface-muted);
+
+  --border:         var(--color-rule);
+  --border-default: var(--color-rule);
+  --border-subtle:  var(--color-border-subtle);
+  --border-light:   var(--color-border-subtle);
+  --border-rule:    var(--color-rule);
+  --border-btn:     var(--raw-rule);
+
+  --text-primary:   var(--color-text-primary);
+  --text-secondary: var(--color-text-secondary);
+  --text-tertiary:  var(--color-text-tertiary);
+  --text-muted:     var(--color-text-tertiary);
+  --text-inverse:   var(--color-text-inverse);
+
+  --brand-primary:      var(--color-action-primary);
+  --brand-primary-text: var(--color-action-primary-text);
+  --brand-secondary:    var(--color-info);
+  --accent-warm:        var(--color-accent);
+
+  --accent:        var(--color-action-primary);
+  --accent-light:  var(--color-action-primary-hover);
+  --accent-dim:    var(--color-hover-fill);
+  --accent-hover:  var(--color-action-primary-hover);
+
+  --status-success:var(--color-success);
+  --status-warning:var(--color-warning);
+  --status-error:  var(--color-error);
+  --status-info:   var(--color-info);
+
+  --green:  var(--color-success);
+  --yellow: var(--color-warning);
+  --red:    var(--color-error);
+  --blue:   var(--color-info);
+  --purple: var(--color-accent);
+  --pink:   var(--color-accent);
+
+  --focus-ring: var(--color-focus-ring);
+
   --font-sans:     'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --font-display:  'Plus Jakarta Sans', var(--font-sans);
   --font-mono:     'JetBrains Mono', 'SF Mono', Consolas, Monaco, monospace;
   --font:          var(--font-sans);
 
-  /* Surfaces — Warm Paper Base with Layered Depth */
-  --bg-base:        #F6F1E8;
-  --bg-surface:     #FFFDFC;
-  --bg-subtle:      #ECE4D7;
-  --bg-hover:       #ECE4D7;
-  --bg-active:      #E2D7C7;
-  
-  --bg:             var(--bg-base);
-  --surface:        var(--bg-surface);
-  --surface-2:      var(--bg-subtle);
-  --surface-3:      #E2D7C7;
-  --surface-well:   var(--bg-subtle);
-  
-  /* Borders & Hairline Rules — Warm Muted Structure */
-  --border-default: #D8CCBD;
-  --border-subtle:  #ECE4D7;
-  --border-light:   #ECE4D7;
-  --border-rule:    #D8CCBD;
-  --border-btn:     #C4B7A5;
-  --border:         var(--border-default);
-
-  /* Text — Dark Ink Typography */
-  --text-primary:   #2A241F;
-  --text-secondary: #5E5449;
-  --text-tertiary:  #8A7E71;
-  --text-muted:     var(--text-tertiary);
-  --text-inverse:   #F8F4EE;
-
-  /* Brand & Accents — Deep Pine & Warm Brass */
-  --brand-primary:      #2F4A3D;
-  --brand-primary-text: #F8F4EE;
-  --brand-secondary:    #394B63;
-  --accent-warm:        #B48852;
-
-  --accent:        var(--brand-primary);
-  --accent-light:  #3F6352;
-  --accent-dim:    rgba(47, 74, 61, 0.09);
-  --accent-hover:  #24392F;
-
-  /* Status Colors */
-  --status-success:#4E7A5D;
-  --status-warning:#B37A2A;
-  --status-error:  #A34B43;
-  --status-info:   #5A6F8F;
-
-  --green:  var(--status-success);
-  --yellow: var(--status-warning);
-  --red:    var(--status-error);
-  --blue:   var(--status-info);
-  --purple: var(--brand-secondary);
-  --pink:   var(--accent-warm);
-
-  --focus-ring: var(--brand-primary);
-
-  /* Banner & Shell Surfaces */
-  --banner-bg:   var(--surface-2);
-  --banner-text: var(--text-primary);
-
-  --topbar-bg:      var(--surface);
-  --topbar-blur:    none;
-  --sidebar-bg:     var(--bg-base);
-  --sidebar-blur:   none;
-  --bottomnav-bg:   var(--surface);
-  --bottomnav-blur:  none;
-  --statcard-bg:    var(--surface);
-  --statcard-blur:  none;
-  --modal-bg:       var(--surface);
-  --modal-blur:     none;
-  --fab-bg:         var(--brand-primary);
-  --fab-blur:       none;
-
-  /* Layout & Radii — Curved Rectangle Controls */
   --sidebar-w: 240px;
   --topbar-h:  56px;
   --nav-h:     60px;
-  --radius-card:14px;
-  --radius-btn: 12px;
-  --radius-pill:999px;
-  --radius:    14px;
-  --radius-sm: 10px;
-  --radius-xs: 6px;
-
-  /* Shadows — Restrained Paper Shadows */
-  --shadow-sm: 0 1px 2px rgba(42, 36, 31, 0.04);
-  --shadow:    0 1px 3px rgba(42, 36, 31, 0.04), 0 4px 12px rgba(42, 36, 31, 0.02);
-  --shadow-md: 0 4px 6px -1px rgba(42, 36, 31, 0.06), 0 10px 20px -3px rgba(42, 36, 31, 0.04);
-
-  /* Transitions */
   --ease: 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* ── 2) Midnight Ink — Clarity Dark (Roasted Espresso & Sage Accent) ── */
-[data-theme="midnight-ink"],
-[data-theme="quiet-dark"] {
-  --bg-base:        #171412;
-  --bg-surface:     #221D19;
-  --bg-subtle:      #2B241F;
-  --bg-hover:       #2B241F;
-  --bg-active:      #362E28;
+/* ── 2) Midnight Ink — Canonical Night Study Theme ─────────── */
+:root[data-theme="midnight-ink"],
+:root[data-theme="espresso-desk"],
+:root[data-theme="quiet-dark"],
+:root[data-theme="dark"],
+:root[data-theme="cafe-night"] {
+  color-scheme: dark;
 
-  --bg:             var(--bg-base);
-  --surface:        var(--bg-surface);
-  --surface-2:      var(--bg-subtle);
-  --surface-3:      #362E28;
-  --surface-well:   var(--bg-subtle);
+  /* Layer 1: Primitive Theme Values */
+  --raw-bg-0: #171412;
+  --raw-bg-1: #221d19;
+  --raw-bg-2: #2b241f;
+  --raw-bg-3: #312923;
 
-  --border-default: #3A312A;
-  --border-subtle:  #2B241F;
-  --border-light:   #2B241F;
-  --border-rule:    #3A312A;
-  --border-btn:     #4D4238;
-  --border:         var(--border-default);
+  --raw-ink-1: #f3ece3;
+  --raw-ink-2: #c8beb1;
+  --raw-ink-3: #9e9387;
+  --raw-ink-inverse: #171412;
 
-  --text-primary:   #F3ECE3;
-  --text-secondary: #C8BEB1;
-  --text-tertiary:  #9E9387;
-  --text-muted:     var(--text-tertiary);
-  --text-inverse:   #171412;
+  --raw-brand-1: #7e9c8d;
+  --raw-brand-2: #97b3a5;
+  --raw-brand-3: #243129;
 
-  --brand-primary:      #7E9C8D;
-  --brand-primary-text: #171412;
-  --brand-secondary:    #90A3BE;
-  --accent-warm:        #D2A56B;
+  --raw-accent-1: #d2a56b;
+  --raw-accent-2: #e0b983;
+  --raw-accent-3: #3a2c20;
 
-  --accent:        var(--brand-primary);
-  --accent-light:  #95B3A4;
-  --accent-dim:    rgba(126, 156, 141, 0.16);
-  --accent-hover:  #698777;
+  --raw-success: #6a9b7b;
+  --raw-warning: #d2a56b;
+  --raw-error: #c9655d;
+  --raw-info: #7e95b8;
 
-  --status-success:#6A9B7B;
-  --status-warning:#D2A56B;
-  --status-error:  #C9655D;
-  --status-info:   #7E95B8;
+  --raw-rule: #3a312a;
+  --raw-border-soft: rgba(243, 236, 227, 0.10);
+  --raw-border-strong: rgba(243, 236, 227, 0.16);
+  --raw-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.28);
+  --raw-shadow-md: 0 10px 28px rgba(0, 0, 0, 0.34);
+  --raw-shadow-lg: 0 18px 44px rgba(0, 0, 0, 0.38);
 
-  --green:  var(--status-success);
-  --yellow: var(--status-warning);
-  --red:    var(--status-error);
-  --blue:   var(--status-info);
-  --purple: var(--brand-secondary);
-  --pink:   var(--accent-warm);
+  /* Layer 2: Semantic Tokens */
+  --color-canvas: var(--raw-bg-0);
+  --color-surface: var(--raw-bg-1);
+  --color-surface-muted: var(--raw-bg-2);
+  --color-surface-sunken: var(--raw-bg-3);
+  --color-surface-overlay: #2f2722;
 
-  --focus-ring: var(--brand-primary);
+  --color-text-primary: var(--raw-ink-1);
+  --color-text-secondary: var(--raw-ink-2);
+  --color-text-tertiary: var(--raw-ink-3);
+  --color-text-inverse: var(--raw-ink-inverse);
 
-  --banner-bg:   var(--surface-2);
-  --banner-text: var(--text-primary);
+  --color-action-primary: var(--raw-brand-1);
+  --color-action-primary-hover: var(--raw-brand-2);
+  --color-action-primary-text: var(--raw-ink-inverse);
+  --color-action-secondary: var(--raw-accent-3);
+  --color-action-secondary-hover: #473526;
+  --color-action-secondary-text: var(--raw-ink-1);
 
-  --topbar-bg:      var(--surface);
-  --sidebar-bg:     var(--bg-base);
-  --bottomnav-bg:   var(--surface);
-  --statcard-bg:    var(--surface);
-  --modal-bg:       var(--surface);
+  --color-accent: var(--raw-accent-1);
+  --color-accent-strong: var(--raw-accent-2);
+  --color-accent-soft: var(--raw-accent-3);
 
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
-  --shadow:    0 2px 8px rgba(0, 0, 0, 0.45);
-  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.65);
-}
+  --color-border-subtle: var(--raw-border-soft);
+  --color-border-default: var(--raw-border-strong);
+  --color-rule: var(--raw-rule);
+  --color-divider: var(--raw-rule);
 
-/* ── 3) Espresso Desk — Warm Premium Café Dark (Dark Roast Mahogany & Amber Caramel) ── */
-[data-theme="espresso-desk"],
-[data-theme="cafe-night"],
-[data-theme="dark"] {
-  --bg-base:        #171412;
-  --bg-surface:     #221D19;
-  --bg-subtle:      #2B241F;
-  --bg-hover:       #2B241F;
-  --bg-active:      #362E28;
+  --color-success: var(--raw-success);
+  --color-warning: var(--raw-warning);
+  --color-error: var(--raw-error);
+  --color-info: var(--raw-info);
 
-  --bg:             var(--bg-base);
-  --surface:        var(--bg-surface);
-  --surface-2:      var(--bg-subtle);
-  --surface-3:      #362E28;
-  --surface-well:   var(--bg-subtle);
+  --color-hover-fill: rgba(126, 156, 141, 0.10);
+  --color-pressed-fill: rgba(126, 156, 141, 0.16);
+  --color-focus-ring: #7e9c8d;
+  --color-selection: rgba(210, 165, 107, 0.26);
 
-  --border-default: #3A312A;
-  --border-subtle:  #2B241F;
-  --border-light:   #2B241F;
-  --border-rule:    #3A312A;
-  --border-btn:     #4D4238;
-  --border:         var(--border-default);
+  --shadow-sm: var(--raw-shadow-sm);
+  --shadow:    var(--raw-shadow-md);
+  --shadow-md: var(--raw-shadow-md);
+  --shadow-lg: var(--raw-shadow-lg);
 
-  --text-primary:   #F3ECE3;
-  --text-secondary: #C8BEB1;
-  --text-tertiary:  #9E9387;
-  --text-muted:     var(--text-tertiary);
-  --text-inverse:   #171412;
+  --radius-card: 14px;
+  --radius-btn: 12px;
+  --radius-input: 14px;
+  --radius-chip: 999px;
+  --radius: 14px;
+  --radius-sm: 10px;
+  --radius-xs: 6px;
+  --radius-pill: 999px;
 
-  --brand-primary:      #7E9C8D;
-  --brand-primary-text: #171412;
-  --brand-secondary:    #90A3BE;
-  --accent-warm:        #D2A56B;
+  /* Layer 3: Component Aliases */
+  --card-bg: var(--color-surface);
+  --card-border: var(--color-border-subtle);
+  --input-bg: var(--color-surface-sunken);
+  --input-border: var(--color-border-default);
+  --sidebar-bg: var(--color-canvas);
+  --sidebar-active-rail: var(--color-accent);
+  --ledger-row-bg: transparent;
+  --ledger-row-border: var(--color-rule);
+  --hero-rail: var(--color-accent);
+  --status-pill-bg: var(--color-surface-muted);
+  --status-pill-text: var(--color-text-secondary);
 
-  --accent:        var(--brand-primary);
-  --accent-light:  #95B3A4;
-  --accent-dim:    rgba(126, 156, 141, 0.16);
-  --accent-hover:  #698777;
+  /* Legacy Compatibility Bridges */
+  --bg:             var(--color-canvas);
+  --bg-base:        var(--color-canvas);
+  --bg-surface:     var(--color-surface);
+  --bg-subtle:      var(--color-surface-muted);
+  --bg-hover:       var(--color-surface-muted);
+  --bg-active:      var(--color-surface-sunken);
 
-  --status-success:#6A9B7B;
-  --status-warning:#D2A56B;
-  --status-error:  #C9655D;
-  --status-info:   #7E95B8;
+  --surface:        var(--color-surface);
+  --surface-2:      var(--color-surface-muted);
+  --surface-3:      var(--color-surface-sunken);
+  --surface-well:   var(--color-surface-muted);
 
-  --green:  var(--status-success);
-  --yellow: var(--status-warning);
-  --red:    var(--status-error);
-  --blue:   var(--status-info);
-  --purple: var(--brand-secondary);
-  --pink:   var(--accent-warm);
+  --border:         var(--color-rule);
+  --border-default: var(--color-rule);
+  --border-subtle:  var(--color-border-subtle);
+  --border-light:   var(--color-border-subtle);
+  --border-rule:    var(--color-rule);
+  --border-btn:     var(--raw-rule);
 
-  --focus-ring: var(--brand-primary);
+  --text-primary:   var(--color-text-primary);
+  --text-secondary: var(--color-text-secondary);
+  --text-tertiary:  var(--color-text-tertiary);
+  --text-muted:     var(--color-text-tertiary);
+  --text-inverse:   var(--color-text-inverse);
 
-  --banner-bg:   var(--surface-2);
-  --banner-text: var(--text-primary);
+  --brand-primary:      var(--color-action-primary);
+  --brand-primary-text: var(--color-action-primary-text);
+  --brand-secondary:    var(--color-info);
+  --accent-warm:        var(--color-accent);
 
-  --topbar-bg:      var(--surface);
-  --sidebar-bg:     var(--bg-base);
-  --bottomnav-bg:   var(--surface);
-  --statcard-bg:    var(--surface);
-  --modal-bg:       var(--surface);
+  --accent:        var(--color-action-primary);
+  --accent-light:  var(--color-action-primary-hover);
+  --accent-dim:    var(--color-hover-fill);
+  --accent-hover:  var(--color-action-primary-hover);
 
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.42);
-  --shadow:    0 2px 8px rgba(0, 0, 0, 0.42);
-  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.60);
-}
+  --status-success:var(--color-success);
+  --status-warning:var(--color-warning);
+  --status-error:  var(--color-error);
+  --status-info:   var(--color-info);
 
-/* ── 4) Sandstone Notes — Soft Organic Notebook (Parchment Linen & Warm Terracotta) ── */
-[data-theme="sandstone-notes"],
-[data-theme="stone"] {
-  --bg-base:        #f5f0e6;
-  --bg-surface:     #fffdfa;
-  --bg-subtle:      #eae3d3;
+  --green:  var(--color-success);
+  --yellow: var(--color-warning);
+  --red:    var(--color-error);
+  --blue:   var(--color-info);
+  --purple: var(--color-accent);
+  --pink:   var(--color-accent);
 
-  --bg:             var(--bg-base);
-  --surface:        var(--bg-surface);
-  --surface-2:      var(--bg-subtle);
-  --surface-3:      #ddd4c1;
-  --surface-well:   var(--bg-subtle);
-
-  --border-default: #d8cdba;
-  --border-subtle:  #eae3d3;
-  --border-light:   #e8dfcd;
-  --border-btn:     #c4b79f;
-  --border:         var(--border-default);
-
-  --text-primary:   #2d241e;
-  --text-secondary: #5e5045;
-  --text-tertiary:  #887768;
-  --text-muted:     var(--text-tertiary);
-
-  --brand-primary:      #B48852;
-  --brand-primary-text: #F8F4EE;
-  --brand-secondary:    #5e5045;
-  --accent-warm:        #c25e2e;
-
-  --accent:        var(--brand-primary);
-  --accent-light:  #c89658;
-  --accent-dim:    rgba(180, 136, 82, 0.12);
-  --accent-hover:  #9c723f;
-
-  --status-success:#4E7A5D;
-  --status-warning:#B37A2A;
-  --status-error:  #A34B43;
-  --status-info:   #5A6F8F;
-
-  --green:  var(--status-success);
-  --yellow: var(--status-warning);
-  --red:    var(--status-error);
-  --blue:   var(--status-info);
-  --purple: #7c3aed;
-  --pink:   #db2777;
-
-  --focus-ring: var(--brand-primary);
-
-  --banner-bg:   var(--surface-2);
-  --banner-text: var(--text-primary);
-
-  --shadow:    0 1px 3px rgba(45, 36, 30, 0.05), 0 4px 12px rgba(45, 36, 30, 0.03);
-  --shadow-md: 0 4px 6px -1px rgba(45, 36, 30, 0.08), 0 12px 24px -4px rgba(45, 36, 30, 0.06);
-}
-
-/* ── 5) Nordic Frost — Crisp Glacial Frost (Glacial Mist & Deep Ocean) ── */
-[data-theme="nordic-frost"],
-[data-theme="forest-study"] {
-  --bg-base:        #eaf0f6;
-  --bg-surface:     #ffffff;
-  --bg-subtle:      #dae6f2;
-
-  --bg:             var(--bg-base);
-  --surface:        var(--bg-surface);
-  --surface-2:      var(--bg-subtle);
-  --surface-3:      #c6d8e8;
-  --surface-well:   var(--bg-subtle);
-
-  --border-default: #b3cde0;
-  --border-subtle:  #dae6f2;
-  --border-light:   #d0e0ed;
-  --border-btn:     #8bb2ce;
-  --border:         var(--border-default);
-
-  --text-primary:   #0b2138;
-  --text-secondary: #2b4965;
-  --text-tertiary:  #527494;
-  --text-muted:     var(--text-tertiary);
-
-  --brand-primary:      #394B63;
-  --brand-primary-text: #ffffff;
-  --brand-secondary:    #5A6F8F;
-  --accent-warm:        #B48852;
-
-  --accent:        var(--brand-primary);
-  --accent-light:  #4a617f;
-  --accent-dim:    rgba(57, 75, 99, 0.12);
-  --accent-hover:  #2c3a4e;
-
-  --status-success:#059669;
-  --status-warning:#d97706;
-  --status-error:  #dc2626;
-  --status-info:   #0284c7;
-
-  --green:  var(--status-success);
-  --yellow: var(--status-warning);
-  --red:    var(--status-error);
-  --blue:   var(--status-info);
-  --purple: #7c3aed;
-  --pink:   #db2777;
-
-  --focus-ring: var(--brand-primary);
-
-  --banner-bg:   var(--surface-2);
-  --banner-text: var(--text-primary);
-
-  --shadow:    0 1px 3px rgba(11, 33, 56, 0.05), 0 4px 12px rgba(11, 33, 56, 0.03);
-  --shadow-md: 0 4px 6px -1px rgba(11, 33, 56, 0.08), 0 12px 24px -4px rgba(11, 33, 56, 0.06);
-}
-
-/* ── 6) Misty Mint — Soft Airy Eucalyptus (Calm Sage Mist & Sea Pine) ── */
-[data-theme="misty-mint"] {
-  --bg-base:        #f0f5f3;
-  --bg-surface:     #ffffff;
-  --bg-subtle:      #e2ebe7;
-
-  --bg:             var(--bg-base);
-  --surface:        var(--bg-surface);
-  --surface-2:      var(--bg-subtle);
-  --surface-3:      #d2dfda;
-  --surface-well:   var(--bg-subtle);
-
-  --border-default: #c4d4ce;
-  --border-subtle:  #e2ebe7;
-  --border-light:   #dbe6e1;
-  --border-btn:     #a3bcb2;
-  --border:         var(--border-default);
-
-  --text-primary:   #182824;
-  --text-secondary: #3e544e;
-  --text-tertiary:  #637b74;
-  --text-muted:     var(--text-tertiary);
-
-  --brand-primary:      #4E7A5D;
-  --brand-primary-text: #ffffff;
-  --brand-secondary:    #394B63;
-  --accent-warm:        #B48852;
-
-  --accent:        var(--brand-primary);
-  --accent-light:  #629373;
-  --accent-dim:    rgba(78, 122, 93, 0.12);
-  --accent-hover:  #3d614a;
-
-  --status-success:#4E7A5D;
-  --status-warning:#d97706;
-  --status-error:  #e11d48;
-  --status-info:   #0284c7;
-
-  --green:  var(--status-success);
-  --yellow: var(--status-warning);
-  --red:    var(--status-error);
-  --blue:   var(--status-info);
-  --purple: #7c3aed;
-  --pink:   #db2777;
-
-  --focus-ring: var(--brand-primary);
-
-  --banner-bg:   var(--surface-2);
-  --banner-text: var(--text-primary);
-
-  --shadow:    0 1px 3px rgba(24, 40, 36, 0.05), 0 4px 12px rgba(24, 40, 36, 0.03);
-  --shadow-md: 0 4px 6px -1px rgba(24, 40, 36, 0.08), 0 12px 24px -4px rgba(24, 40, 36, 0.06);
+  --focus-ring: var(--color-focus-ring);
 }
 
 /* ── Reset & Base ───────────────────────────────────────────── */

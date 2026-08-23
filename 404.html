@@ -7,20 +7,21 @@
     (function() {
       try {
         var t = localStorage.getItem('cos_theme');
+        var m = {
+          'sandstone-notes': 'paper-slate', 'sandstone': 'paper-slate', 'stone': 'paper-slate', 'warm-study': 'paper-slate', 'sunset': 'paper-slate', 'academic-amber': 'paper-slate', 'crimson-bold': 'paper-slate',
+          'nordic-frost': 'paper-slate', 'forest-study': 'paper-slate', 'emerald': 'paper-slate', 'emerald-focus': 'paper-slate',
+          'misty-mint': 'paper-slate', 'mint': 'paper-slate',
+          'espresso-desk': 'midnight-ink', 'espresso-paper': 'midnight-ink', 'cafe': 'midnight-ink', 'cafe-night': 'midnight-ink', 'cocoa-night': 'midnight-ink', 'rose-pine': 'midnight-ink',
+          'paper': 'paper-slate', 'soft-neutral': 'paper-slate', 'light': 'paper-slate', 'cloud': 'paper-slate', 'mist-blue': 'paper-slate', 'glass': 'paper-slate',
+          'quiet-dark': 'midnight-ink', 'dark': 'midnight-ink', 'midnight-executive': 'midnight-ink',
+          'paper-slate': 'paper-slate', 'midnight-ink': 'midnight-ink'
+        };
+        if (t && m[t]) t = m[t];
         if (!t && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
           t = 'midnight-ink';
         }
         t = t || 'paper-slate';
-        var m = {
-          'paper': 'paper-slate', 'soft-neutral': 'paper-slate', 'light': 'paper-slate',
-          'cloud': 'paper-slate', 'mist-blue': 'paper-slate', 'glass': 'paper-slate',
-          'stone': 'sandstone-notes', 'sandstone': 'sandstone-notes', 'warm-study': 'sandstone-notes', 'sunset': 'sandstone-notes',
-          'espresso-paper': 'espresso-desk', 'cafe': 'espresso-desk', 'cafe-night': 'espresso-desk', 'cocoa-night': 'espresso-desk',
-          'quiet-dark': 'midnight-ink', 'dark': 'midnight-ink',
-          'forest-study': 'nordic-frost', 'emerald': 'nordic-frost'
-        };
-        if (m[t]) t = m[t];
-        var valid = ['paper-slate', 'midnight-ink', 'espresso-desk', 'sandstone-notes', 'nordic-frost', 'misty-mint'];
+        var valid = ['paper-slate', 'midnight-ink'];
         if (!valid.includes(t)) t = 'paper-slate';
         document.documentElement.setAttribute('data-theme', t);
       } catch(e) {}
@@ -53,13 +54,13 @@
 
   <!-- Favicon & App Icons -->
   <link rel="icon" href="favicon.ico" sizes="any" />
-  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=105" />
-  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=105" />
-  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png?v=105" />
-  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=105" />
+  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=106" />
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=106" />
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png?v=106" />
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=106" />
 
   <!-- Styles -->
-  <link rel="stylesheet" href="style.css?v=105" />
+  <link rel="stylesheet" href="style.css?v=106" />
 </head>
 <body>
 
@@ -378,8 +379,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
 <!-- Firebase Config & App Script -->
-<script src="firebase-config.js?v=105"></script>
-<script type="module" src="app.js?v=105"></script>
+<script src="firebase-config.js?v=106"></script>
+<script type="module" src="app.js?v=106"></script>
 
 </body>
 </html>

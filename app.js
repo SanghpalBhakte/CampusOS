@@ -2664,17 +2664,33 @@ window.resetAssignmentFilters = function() {
   renderAssignments();
 };
 
-// ── Theme (6 Distinct Environments) ───────────────────────────
+// ── Canonical 2-Theme System ──────────────────────────────────
 const ALL_THEMES = [
   'paper-slate',
-  'midnight-ink',
-  'espresso-desk',
-  'sandstone-notes',
-  'nordic-frost',
-  'misty-mint'
+  'midnight-ink'
 ];
 
 const LEGACY_THEME_MAP = {
+  // Retired theme remapping
+  'sandstone-notes':    'paper-slate',
+  'sandstone':          'paper-slate',
+  'stone':              'paper-slate',
+  'warm-study':         'paper-slate',
+  'sunset':             'paper-slate',
+  'academic-amber':     'paper-slate',
+  'crimson-bold':       'paper-slate',
+  'nordic-frost':       'paper-slate',
+  'forest-study':       'paper-slate',
+  'emerald':            'paper-slate',
+  'emerald-focus':      'paper-slate',
+  'misty-mint':         'paper-slate',
+  'mint':               'paper-slate',
+  'espresso-desk':      'midnight-ink',
+  'espresso-paper':     'midnight-ink',
+  'cafe':               'midnight-ink',
+  'cafe-night':         'midnight-ink',
+  'cocoa-night':        'midnight-ink',
+  'rose-pine':          'midnight-ink',
   'paper':              'paper-slate',
   'soft-neutral':       'paper-slate',
   'light':              'paper-slate',
@@ -2683,28 +2699,17 @@ const LEGACY_THEME_MAP = {
   'glass':              'paper-slate',
   'quiet-dark':         'midnight-ink',
   'dark':               'midnight-ink',
-  'midnight-executive': 'midnight-ink',
-  'cocoa-night':        'espresso-desk',
-  'cafe-night':         'espresso-desk',
-  'cafe':               'espresso-desk',
-  'espresso-paper':     'espresso-desk',
-  'rose-pine':          'espresso-desk',
-  'stone':              'sandstone-notes',
-  'sandstone':          'sandstone-notes',
-  'warm-study':         'sandstone-notes',
-  'sunset':             'sandstone-notes',
-  'academic-amber':     'sandstone-notes',
-  'crimson-bold':       'sandstone-notes',
-  'forest-study':       'nordic-frost',
-  'emerald':            'nordic-frost',
-  'emerald-focus':      'nordic-frost',
-  'mint':               'misty-mint'
+  'midnight-executive': 'midnight-ink'
 };
 
 function initTheme() {
   const saved = localStorage.getItem(KEY_THEME);
-  let theme   = saved || 'paper-slate';
-  if (LEGACY_THEME_MAP[theme]) theme = LEGACY_THEME_MAP[theme];
+  let theme   = saved;
+  if (theme && LEGACY_THEME_MAP[theme]) theme = LEGACY_THEME_MAP[theme];
+  if (!theme && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    theme = 'midnight-ink';
+  }
+  theme = theme || 'paper-slate';
   if (!ALL_THEMES.includes(theme)) theme = 'paper-slate';
   
   if (!saved || saved !== theme) {
@@ -8986,55 +8991,29 @@ function renderSettings() {
     <div class="card" style="padding:20px;margin-bottom:20px">
       <div class="form-group" style="margin-bottom:0">
         <label class="form-label" style="margin-bottom:6px">Workspace Environment &amp; Theme</label>
-        <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:14px">Six curated palettes with distinct atmospheres. Saves automatically and syncs to cloud.</div>
-        <div class="theme-swatch-grid" role="group" aria-label="Theme selection options">
-          <button type="button" class="theme-swatch ${(document.documentElement?.getAttribute('data-theme') || 'paper-slate') === 'paper-slate' ? 'active' : ''}" onclick="setTheme('paper-slate')" aria-pressed="${(document.documentElement?.getAttribute('data-theme') || 'paper-slate') === 'paper-slate'}" aria-label="Paper Slate theme: Clean neutral academic palette">
+        <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:14px">Two curated study atmospheres designed for maximum focus and visual calm. Saves automatically.</div>
+        <div class="theme-swatch-grid" role="group" aria-label="Theme selection options" style="grid-template-columns:repeat(auto-fit, minmax(180px, 1fr))">
+          <button type="button" class="theme-swatch ${(document.documentElement?.getAttribute('data-theme') || 'paper-slate') === 'paper-slate' ? 'active' : ''}" onclick="setTheme('paper-slate')" aria-pressed="${(document.documentElement?.getAttribute('data-theme') || 'paper-slate') === 'paper-slate'}" aria-label="Paper Slate theme: Warm daylight desk">
             <div class="swatch-preview" aria-hidden="true">
               <div class="swatch-bg" style="background:#F6F1E8"></div>
               <div class="swatch-surface" style="background:#FFFDFC"></div>
               <div class="swatch-accent" style="background:#2F4A3D"></div>
             </div>
-            <span class="swatch-name">Paper Slate</span>
+            <div style="display:flex;flex-direction:column;gap:2px;text-align:left">
+              <span class="swatch-name" style="font-weight:600">Paper Slate</span>
+              <span style="font-size:0.72rem;color:var(--text-muted)">Warm daylight desk</span>
+            </div>
           </button>
-          <button type="button" class="theme-swatch ${document.documentElement?.getAttribute('data-theme') === 'midnight-ink' ? 'active' : ''}" onclick="setTheme('midnight-ink')" aria-pressed="${document.documentElement?.getAttribute('data-theme') === 'midnight-ink'}" aria-label="Midnight Ink theme: Obsidian dark with electric indigo">
+          <button type="button" class="theme-swatch ${document.documentElement?.getAttribute('data-theme') === 'midnight-ink' ? 'active' : ''}" onclick="setTheme('midnight-ink')" aria-pressed="${document.documentElement?.getAttribute('data-theme') === 'midnight-ink'}" aria-label="Midnight Ink theme: Focused night study">
             <div class="swatch-preview" aria-hidden="true">
               <div class="swatch-bg" style="background:#171412"></div>
               <div class="swatch-surface" style="background:#221D19"></div>
               <div class="swatch-accent" style="background:#7E9C8D"></div>
             </div>
-            <span class="swatch-name">Midnight Ink</span>
-          </button>
-          <button type="button" class="theme-swatch ${document.documentElement?.getAttribute('data-theme') === 'espresso-desk' ? 'active' : ''}" onclick="setTheme('espresso-desk')" aria-pressed="${document.documentElement?.getAttribute('data-theme') === 'espresso-desk'}" aria-label="Espresso Desk theme: Cozy café dark mahogany and caramel">
-            <div class="swatch-preview" aria-hidden="true">
-              <div class="swatch-bg" style="background:#171310"></div>
-              <div class="swatch-surface" style="background:#221b16"></div>
-              <div class="swatch-accent" style="background:#D2A56B"></div>
+            <div style="display:flex;flex-direction:column;gap:2px;text-align:left">
+              <span class="swatch-name" style="font-weight:600">Midnight Ink</span>
+              <span style="font-size:0.72rem;color:var(--text-muted)">Focused night study</span>
             </div>
-            <span class="swatch-name">Espresso Desk</span>
-          </button>
-          <button type="button" class="theme-swatch ${document.documentElement?.getAttribute('data-theme') === 'sandstone-notes' ? 'active' : ''}" onclick="setTheme('sandstone-notes')" aria-pressed="${document.documentElement?.getAttribute('data-theme') === 'sandstone-notes'}" aria-label="Sandstone Notes theme: Warm parchment and terracotta">
-            <div class="swatch-preview" aria-hidden="true">
-              <div class="swatch-bg" style="background:#f5f0e6"></div>
-              <div class="swatch-surface" style="background:#fffdfa"></div>
-              <div class="swatch-accent" style="background:#B48852"></div>
-            </div>
-            <span class="swatch-name">Sandstone Notes</span>
-          </button>
-          <button type="button" class="theme-swatch ${document.documentElement?.getAttribute('data-theme') === 'nordic-frost' ? 'active' : ''}" onclick="setTheme('nordic-frost')" aria-pressed="${document.documentElement?.getAttribute('data-theme') === 'nordic-frost'}" aria-label="Nordic Frost theme: Crisp glacial ice and azure">
-            <div class="swatch-preview" aria-hidden="true">
-              <div class="swatch-bg" style="background:#eaf0f6"></div>
-              <div class="swatch-surface" style="background:#ffffff"></div>
-              <div class="swatch-accent" style="background:#394B63"></div>
-            </div>
-            <span class="swatch-name">Nordic Frost</span>
-          </button>
-          <button type="button" class="theme-swatch ${document.documentElement?.getAttribute('data-theme') === 'misty-mint' ? 'active' : ''}" onclick="setTheme('misty-mint')" aria-pressed="${document.documentElement?.getAttribute('data-theme') === 'misty-mint'}" aria-label="Misty Mint theme: Light eucalyptus and sage">
-            <div class="swatch-preview" aria-hidden="true">
-              <div class="swatch-bg" style="background:#f0f5f3"></div>
-              <div class="swatch-surface" style="background:#ffffff"></div>
-              <div class="swatch-accent" style="background:#4E7A5D"></div>
-            </div>
-            <span class="swatch-name">Misty Mint</span>
           </button>
         </div>
       </div>
