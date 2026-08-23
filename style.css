@@ -1,60 +1,86 @@
 /* ============================================================
-   Clarity Desk — 6 Distinct Themes Design System
-   1. Paper Slate     (Clean, neutral, readable, academic)
-   2. Midnight Ink    (True near-black obsidian & electric indigo)
-   3. Espresso Desk   (Warm, premium, cozy café dark mahogany & amber)
-   4. Sandstone Notes (Soft, warm, notebook-like parchment & terracotta)
-   5. Nordic Frost    (Crisp glacial frost ice & polar azure)
-   6. Misty Mint      (Soft, airy, light eucalyptus sage mist)
+   Clarity Desk — The Quiet Study Desk Dual-Theme Design System
+   1. Paper Slate     (Clarity Light: Warm Paper Base & Dark Ink)
+   2. Midnight Ink    (Clarity Dark: Roasted Espresso & Sage Accent)
+   3. Espresso Desk   (Cozy Café Dark: Roasted Espresso & Amber Caramel)
+   4. Sandstone Notes (Soft Organic Notebook: Parchment & Terracotta)
+   5. Nordic Frost    (Crisp Glacial Frost: Azure Mist & Deep Navy)
+   6. Misty Mint      (Airy Eucalyptus: Sage Mist & Sea Pine)
    ============================================================ */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
 
-/* ── 1) Paper Slate — Default (Clean, Neutral, Academic Slate) ── */
+/* ── 1) Paper Slate — Clarity Light (Quiet Study Desk Light) ── */
 :root,
 [data-theme="paper-slate"],
-[data-theme="paper"] {
+[data-theme="paper"],
+[data-theme="light"] {
   --font-sans:     'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --font-display:  'Plus Jakarta Sans', var(--font-sans);
   --font-mono:     'JetBrains Mono', 'SF Mono', Consolas, Monaco, monospace;
   --font:          var(--font-sans);
 
-  /* Surfaces — Crisp, Neutral Slate Paper with Layered Depth */
-  --bg:            #f8fafc;
-  --surface:       #ffffff;
-  --surface-2:     #f1f5f9;
-  --surface-3:     #e2e8f0;
-  --surface-well:  #eef2f6;
-  --border:        #cbd5e1;
-  --border-light:  #e2e8f0;
-  --border-btn:    #94a3b8;
+  /* Surfaces — Warm Paper Base with Layered Depth */
+  --bg-base:        #F6F1E8;
+  --bg-surface:     #FFFDFC;
+  --bg-subtle:      #ECE4D7;
+  --bg-hover:       #ECE4D7;
+  --bg-active:      #E2D7C7;
+  
+  --bg:             var(--bg-base);
+  --surface:        var(--bg-surface);
+  --surface-2:      var(--bg-subtle);
+  --surface-3:      #E2D7C7;
+  --surface-well:   var(--bg-subtle);
+  
+  /* Borders & Hairline Rules — Warm Muted Structure */
+  --border-default: #D8CCBD;
+  --border-subtle:  #ECE4D7;
+  --border-light:   #ECE4D7;
+  --border-rule:    #D8CCBD;
+  --border-btn:     #C4B7A5;
+  --border:         var(--border-default);
 
-  /* Text — Deep Charcoal & Slate */
-  --text-primary:  #0f172a;
-  --text-secondary:#334155;
-  --text-muted:    #64748b;
+  /* Text — Dark Ink Typography */
+  --text-primary:   #2A241F;
+  --text-secondary: #5E5449;
+  --text-tertiary:  #8A7E71;
+  --text-muted:     var(--text-tertiary);
+  --text-inverse:   #F8F4EE;
 
-  /* Accent — Academic Royal Slate Blue */
-  --accent:        #2563eb;
-  --accent-light:  #3b82f6;
-  --accent-dim:    rgba(37, 99, 235, 0.08);
-  --accent-hover:  #1d4ed8;
+  /* Brand & Accents — Deep Pine & Warm Brass */
+  --brand-primary:      #2F4A3D;
+  --brand-primary-text: #F8F4EE;
+  --brand-secondary:    #394B63;
+  --accent-warm:        #B48852;
+
+  --accent:        var(--brand-primary);
+  --accent-light:  #3F6352;
+  --accent-dim:    rgba(47, 74, 61, 0.09);
+  --accent-hover:  #24392F;
 
   /* Status Colors */
-  --green:  #10b981;
-  --yellow: #f59e0b;
-  --red:    #ef4444;
-  --blue:   #0284c7;
-  --purple: #8b5cf6;
-  --pink:   #ec4899;
+  --status-success:#4E7A5D;
+  --status-warning:#B37A2A;
+  --status-error:  #A34B43;
+  --status-info:   #5A6F8F;
 
-  /* Banner */
-  --banner-bg: linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%);
-  --banner-text: #ffffff;
+  --green:  var(--status-success);
+  --yellow: var(--status-warning);
+  --red:    var(--status-error);
+  --blue:   var(--status-info);
+  --purple: var(--brand-secondary);
+  --pink:   var(--accent-warm);
+
+  --focus-ring: var(--brand-primary);
+
+  /* Banner & Shell Surfaces */
+  --banner-bg:   var(--surface-2);
+  --banner-text: var(--text-primary);
 
   --topbar-bg:      var(--surface);
   --topbar-blur:    none;
-  --sidebar-bg:     var(--surface);
+  --sidebar-bg:     var(--bg-base);
   --sidebar-blur:   none;
   --bottomnav-bg:   var(--surface);
   --bottomnav-blur:  none;
@@ -62,89 +88,158 @@
   --statcard-blur:  none;
   --modal-bg:       var(--surface);
   --modal-blur:     none;
-  --fab-bg:         var(--accent);
+  --fab-bg:         var(--brand-primary);
   --fab-blur:       none;
 
-  /* Layout */
+  /* Layout & Radii — Curved Rectangle Controls */
   --sidebar-w: 240px;
-  --topbar-h:  60px;
-  --nav-h:     64px;
-  --radius:    12px;
-  --radius-sm: 8px;
+  --topbar-h:  56px;
+  --nav-h:     60px;
+  --radius-card:14px;
+  --radius-btn: 12px;
+  --radius-pill:999px;
+  --radius:    14px;
+  --radius-sm: 10px;
   --radius-xs: 6px;
 
-  /* Shadows */
-  --shadow:    0 1px 3px rgba(15, 23, 42, 0.05), 0 4px 12px rgba(15, 23, 42, 0.03);
-  --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.08), 0 12px 24px -4px rgba(15, 23, 42, 0.06);
+  /* Shadows — Restrained Paper Shadows */
+  --shadow-sm: 0 1px 2px rgba(42, 36, 31, 0.04);
+  --shadow:    0 1px 3px rgba(42, 36, 31, 0.04), 0 4px 12px rgba(42, 36, 31, 0.02);
+  --shadow-md: 0 4px 6px -1px rgba(42, 36, 31, 0.06), 0 10px 20px -3px rgba(42, 36, 31, 0.04);
 
   /* Transitions */
   --ease: 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* ── 2) Midnight Ink — True Near-Black Midnight (Obsidian Dark & Electric Indigo) ── */
+/* ── 2) Midnight Ink — Clarity Dark (Roasted Espresso & Sage Accent) ── */
 [data-theme="midnight-ink"],
 [data-theme="quiet-dark"] {
-  --bg:            #08090d;
-  --surface:       #11131a;
-  --surface-2:     #1a1d27;
-  --surface-3:     #262b3a;
-  --border:        rgba(255, 255, 255, 0.12);
-  --border-light:  rgba(255, 255, 255, 0.06);
-  --border-btn:    rgba(255, 255, 255, 0.24);
+  --bg-base:        #171412;
+  --bg-surface:     #221D19;
+  --bg-subtle:      #2B241F;
+  --bg-hover:       #2B241F;
+  --bg-active:      #362E28;
 
-  --text-primary:  #f8fafc;
-  --text-secondary:#cbd5e1;
-  --text-muted:    #94a3b8;
+  --bg:             var(--bg-base);
+  --surface:        var(--bg-surface);
+  --surface-2:      var(--bg-subtle);
+  --surface-3:      #362E28;
+  --surface-well:   var(--bg-subtle);
 
-  --accent:        #6366f1;
-  --accent-light:  #818cf8;
-  --accent-dim:    rgba(99, 102, 241, 0.18);
-  --accent-hover:  #4f46e5;
+  --border-default: #3A312A;
+  --border-subtle:  #2B241F;
+  --border-light:   #2B241F;
+  --border-rule:    #3A312A;
+  --border-btn:     #4D4238;
+  --border:         var(--border-default);
 
-  --green:  #34d399;
-  --yellow: #fbbf24;
-  --red:    #f87171;
-  --blue:   #38bdf8;
-  --purple: #a78bfa;
-  --pink:   #f472b6;
+  --text-primary:   #F3ECE3;
+  --text-secondary: #C8BEB1;
+  --text-tertiary:  #9E9387;
+  --text-muted:     var(--text-tertiary);
+  --text-inverse:   #171412;
 
-  --banner-bg: linear-gradient(135deg, #181b2a 0%, #08090d 100%);
-  --banner-text: #f8fafc;
+  --brand-primary:      #7E9C8D;
+  --brand-primary-text: #171412;
+  --brand-secondary:    #90A3BE;
+  --accent-warm:        #D2A56B;
 
+  --accent:        var(--brand-primary);
+  --accent-light:  #95B3A4;
+  --accent-dim:    rgba(126, 156, 141, 0.16);
+  --accent-hover:  #698777;
+
+  --status-success:#6A9B7B;
+  --status-warning:#D2A56B;
+  --status-error:  #C9655D;
+  --status-info:   #7E95B8;
+
+  --green:  var(--status-success);
+  --yellow: var(--status-warning);
+  --red:    var(--status-error);
+  --blue:   var(--status-info);
+  --purple: var(--brand-secondary);
+  --pink:   var(--accent-warm);
+
+  --focus-ring: var(--brand-primary);
+
+  --banner-bg:   var(--surface-2);
+  --banner-text: var(--text-primary);
+
+  --topbar-bg:      var(--surface);
+  --sidebar-bg:     var(--bg-base);
+  --bottomnav-bg:   var(--surface);
+  --statcard-bg:    var(--surface);
+  --modal-bg:       var(--surface);
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
   --shadow:    0 2px 8px rgba(0, 0, 0, 0.45);
   --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.65);
 }
 
-/* ── 3) Espresso Desk — Warm Premium Café (Dark Roast Mahogany & Golden Caramel) ── */
+/* ── 3) Espresso Desk — Warm Premium Café Dark (Dark Roast Mahogany & Amber Caramel) ── */
 [data-theme="espresso-desk"],
-[data-theme="cafe-night"] {
-  --bg:            #171310;
-  --surface:       #221b16;
-  --surface-2:     #2d241e;
-  --surface-3:     #3b3028;
-  --border:        rgba(245, 230, 211, 0.13);
-  --border-light:  rgba(245, 230, 211, 0.07);
-  --border-btn:    rgba(245, 230, 211, 0.25);
+[data-theme="cafe-night"],
+[data-theme="dark"] {
+  --bg-base:        #171412;
+  --bg-surface:     #221D19;
+  --bg-subtle:      #2B241F;
+  --bg-hover:       #2B241F;
+  --bg-active:      #362E28;
 
-  --text-primary:  #fbf0e4;
-  --text-secondary:#d8c2ad;
-  --text-muted:    #9e8571;
+  --bg:             var(--bg-base);
+  --surface:        var(--bg-surface);
+  --surface-2:      var(--bg-subtle);
+  --surface-3:      #362E28;
+  --surface-well:   var(--bg-subtle);
 
-  --accent:        #d97706;
-  --accent-light:  #f59e0b;
-  --accent-dim:    rgba(217, 119, 6, 0.18);
-  --accent-hover:  #b45309;
+  --border-default: #3A312A;
+  --border-subtle:  #2B241F;
+  --border-light:   #2B241F;
+  --border-rule:    #3A312A;
+  --border-btn:     #4D4238;
+  --border:         var(--border-default);
 
-  --green:  #34d399;
-  --yellow: #fbbf24;
-  --red:    #f87171;
-  --blue:   #38bdf8;
-  --purple: #c084fc;
-  --pink:   #f472b6;
+  --text-primary:   #F3ECE3;
+  --text-secondary: #C8BEB1;
+  --text-tertiary:  #9E9387;
+  --text-muted:     var(--text-tertiary);
+  --text-inverse:   #171412;
 
-  --banner-bg: linear-gradient(135deg, #321e14 0%, #171310 100%);
-  --banner-text: #fbf0e4;
+  --brand-primary:      #7E9C8D;
+  --brand-primary-text: #171412;
+  --brand-secondary:    #90A3BE;
+  --accent-warm:        #D2A56B;
 
+  --accent:        var(--brand-primary);
+  --accent-light:  #95B3A4;
+  --accent-dim:    rgba(126, 156, 141, 0.16);
+  --accent-hover:  #698777;
+
+  --status-success:#6A9B7B;
+  --status-warning:#D2A56B;
+  --status-error:  #C9655D;
+  --status-info:   #7E95B8;
+
+  --green:  var(--status-success);
+  --yellow: var(--status-warning);
+  --red:    var(--status-error);
+  --blue:   var(--status-info);
+  --purple: var(--brand-secondary);
+  --pink:   var(--accent-warm);
+
+  --focus-ring: var(--brand-primary);
+
+  --banner-bg:   var(--surface-2);
+  --banner-text: var(--text-primary);
+
+  --topbar-bg:      var(--surface);
+  --sidebar-bg:     var(--bg-base);
+  --bottomnav-bg:   var(--surface);
+  --statcard-bg:    var(--surface);
+  --modal-bg:       var(--surface);
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.42);
   --shadow:    0 2px 8px rgba(0, 0, 0, 0.42);
   --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.60);
 }
@@ -152,99 +247,162 @@
 /* ── 4) Sandstone Notes — Soft Organic Notebook (Parchment Linen & Warm Terracotta) ── */
 [data-theme="sandstone-notes"],
 [data-theme="stone"] {
-  --bg:            #f5f0e6;
-  --surface:       #fffdfa;
-  --surface-2:     #eae3d3;
-  --surface-3:     #ddd4c1;
-  --border:        #d8cdba;
-  --border-light:  #e8dfcd;
-  --border-btn:    #c4b79f;
+  --bg-base:        #f5f0e6;
+  --bg-surface:     #fffdfa;
+  --bg-subtle:      #eae3d3;
 
-  --text-primary:  #2d241e;
-  --text-secondary:#5e5045;
-  --text-muted:    #887768;
+  --bg:             var(--bg-base);
+  --surface:        var(--bg-surface);
+  --surface-2:      var(--bg-subtle);
+  --surface-3:      #ddd4c1;
+  --surface-well:   var(--bg-subtle);
 
-  --accent:        #c25e2e;
-  --accent-light:  #d97341;
-  --accent-dim:    rgba(194, 94, 46, 0.10);
-  --accent-hover:  #9e4419;
+  --border-default: #d8cdba;
+  --border-subtle:  #eae3d3;
+  --border-light:   #e8dfcd;
+  --border-btn:     #c4b79f;
+  --border:         var(--border-default);
 
-  --green:  #10b981;
-  --yellow: #d97706;
-  --red:    #dc2626;
-  --blue:   #0284c7;
+  --text-primary:   #2d241e;
+  --text-secondary: #5e5045;
+  --text-tertiary:  #887768;
+  --text-muted:     var(--text-tertiary);
+
+  --brand-primary:      #B48852;
+  --brand-primary-text: #F8F4EE;
+  --brand-secondary:    #5e5045;
+  --accent-warm:        #c25e2e;
+
+  --accent:        var(--brand-primary);
+  --accent-light:  #c89658;
+  --accent-dim:    rgba(180, 136, 82, 0.12);
+  --accent-hover:  #9c723f;
+
+  --status-success:#4E7A5D;
+  --status-warning:#B37A2A;
+  --status-error:  #A34B43;
+  --status-info:   #5A6F8F;
+
+  --green:  var(--status-success);
+  --yellow: var(--status-warning);
+  --red:    var(--status-error);
+  --blue:   var(--status-info);
   --purple: #7c3aed;
   --pink:   #db2777;
 
-  --banner-bg: linear-gradient(135deg, #4a2818 0%, #2d241e 100%);
-  --banner-text: #fffdfa;
+  --focus-ring: var(--brand-primary);
+
+  --banner-bg:   var(--surface-2);
+  --banner-text: var(--text-primary);
 
   --shadow:    0 1px 3px rgba(45, 36, 30, 0.05), 0 4px 12px rgba(45, 36, 30, 0.03);
   --shadow-md: 0 4px 6px -1px rgba(45, 36, 30, 0.08), 0 12px 24px -4px rgba(45, 36, 30, 0.06);
 }
 
-/* ── 5) Nordic Frost — Crisp Glacial Frost (Icy Arctic Mist & Polar Azure) ── */
+/* ── 5) Nordic Frost — Crisp Glacial Frost (Glacial Mist & Deep Ocean) ── */
 [data-theme="nordic-frost"],
 [data-theme="forest-study"] {
-  --bg:            #eaf0f6;
-  --surface:       #ffffff;
-  --surface-2:     #dae6f2;
-  --surface-3:     #c6d8e8;
-  --border:        #b3cde0;
-  --border-light:  #d0e0ed;
-  --border-btn:    #8bb2ce;
+  --bg-base:        #eaf0f6;
+  --bg-surface:     #ffffff;
+  --bg-subtle:      #dae6f2;
 
-  --text-primary:  #0b2138;
-  --text-secondary:#2b4965;
-  --text-muted:    #527494;
+  --bg:             var(--bg-base);
+  --surface:        var(--bg-surface);
+  --surface-2:      var(--bg-subtle);
+  --surface-3:      #c6d8e8;
+  --surface-well:   var(--bg-subtle);
 
-  --accent:        #0284c7;
-  --accent-light:  #38bdf8;
-  --accent-dim:    rgba(2, 132, 199, 0.09);
-  --accent-hover:  #0369a1;
+  --border-default: #b3cde0;
+  --border-subtle:  #dae6f2;
+  --border-light:   #d0e0ed;
+  --border-btn:     #8bb2ce;
+  --border:         var(--border-default);
 
-  --green:  #059669;
-  --yellow: #d97706;
-  --red:    #dc2626;
-  --blue:   #0284c7;
+  --text-primary:   #0b2138;
+  --text-secondary: #2b4965;
+  --text-tertiary:  #527494;
+  --text-muted:     var(--text-tertiary);
+
+  --brand-primary:      #394B63;
+  --brand-primary-text: #ffffff;
+  --brand-secondary:    #5A6F8F;
+  --accent-warm:        #B48852;
+
+  --accent:        var(--brand-primary);
+  --accent-light:  #4a617f;
+  --accent-dim:    rgba(57, 75, 99, 0.12);
+  --accent-hover:  #2c3a4e;
+
+  --status-success:#059669;
+  --status-warning:#d97706;
+  --status-error:  #dc2626;
+  --status-info:   #0284c7;
+
+  --green:  var(--status-success);
+  --yellow: var(--status-warning);
+  --red:    var(--status-error);
+  --blue:   var(--status-info);
   --purple: #7c3aed;
   --pink:   #db2777;
 
-  --banner-bg: linear-gradient(135deg, #0369a1 0%, #0b2138 100%);
-  --banner-text: #ffffff;
+  --focus-ring: var(--brand-primary);
+
+  --banner-bg:   var(--surface-2);
+  --banner-text: var(--text-primary);
 
   --shadow:    0 1px 3px rgba(11, 33, 56, 0.05), 0 4px 12px rgba(11, 33, 56, 0.03);
   --shadow-md: 0 4px 6px -1px rgba(11, 33, 56, 0.08), 0 12px 24px -4px rgba(11, 33, 56, 0.06);
 }
 
-/* ── 6) Misty Mint — Soft Airy Eucalyptus (Calm Sage Mist & Deep Sea-Pine) ── */
+/* ── 6) Misty Mint — Soft Airy Eucalyptus (Calm Sage Mist & Sea Pine) ── */
 [data-theme="misty-mint"] {
-  --bg:            #f0f5f3;
-  --surface:       #ffffff;
-  --surface-2:     #e2ebe7;
-  --surface-3:     #d2dfda;
-  --border:        #c4d4ce;
-  --border-light:  #dbe6e1;
-  --border-btn:    #a3bcb2;
+  --bg-base:        #f0f5f3;
+  --bg-surface:     #ffffff;
+  --bg-subtle:      #e2ebe7;
 
-  --text-primary:  #182824;
-  --text-secondary:#3e544e;
-  --text-muted:    #637b74;
+  --bg:             var(--bg-base);
+  --surface:        var(--bg-surface);
+  --surface-2:      var(--bg-subtle);
+  --surface-3:      #d2dfda;
+  --surface-well:   var(--bg-subtle);
 
-  --accent:        #1b7a6d;
-  --accent-light:  #259687;
-  --accent-dim:    rgba(27, 122, 109, 0.08);
-  --accent-hover:  #135c52;
+  --border-default: #c4d4ce;
+  --border-subtle:  #e2ebe7;
+  --border-light:   #dbe6e1;
+  --border-btn:     #a3bcb2;
+  --border:         var(--border-default);
 
-  --green:  #059669;
-  --yellow: #d97706;
-  --red:    #e11d48;
-  --blue:   #0284c7;
+  --text-primary:   #182824;
+  --text-secondary: #3e544e;
+  --text-tertiary:  #637b74;
+  --text-muted:     var(--text-tertiary);
+
+  --brand-primary:      #4E7A5D;
+  --brand-primary-text: #ffffff;
+  --brand-secondary:    #394B63;
+  --accent-warm:        #B48852;
+
+  --accent:        var(--brand-primary);
+  --accent-light:  #629373;
+  --accent-dim:    rgba(78, 122, 93, 0.12);
+  --accent-hover:  #3d614a;
+
+  --status-success:#4E7A5D;
+  --status-warning:#d97706;
+  --status-error:  #e11d48;
+  --status-info:   #0284c7;
+
+  --green:  var(--status-success);
+  --yellow: var(--status-warning);
+  --red:    var(--status-error);
+  --blue:   var(--status-info);
   --purple: #7c3aed;
   --pink:   #db2777;
 
-  --banner-bg: linear-gradient(135deg, #184e44 0%, #182824 100%);
-  --banner-text: #ffffff;
+  --focus-ring: var(--brand-primary);
+
+  --banner-bg:   var(--surface-2);
+  --banner-text: var(--text-primary);
 
   --shadow:    0 1px 3px rgba(24, 40, 36, 0.05), 0 4px 12px rgba(24, 40, 36, 0.03);
   --shadow-md: 0 4px 6px -1px rgba(24, 40, 36, 0.08), 0 12px 24px -4px rgba(24, 40, 36, 0.06);
@@ -323,27 +481,28 @@ img { display: block; max-width: 100%; }
   display: flex;
   align-items: center;
   gap: 10px;
+  font-family: var(--font-display);
   font-weight: 700;
-  font-size: 1.05rem;
+  font-size: 1.04rem;
   color: var(--text-primary);
-  letter-spacing: -0.3px;
+  letter-spacing: -0.03em;
   flex-shrink: 0;
 }
 
 .topbar-brand .logo-icon {
-  width: 32px; height: 32px;
+  width: 28px; height: 28px;
   background: var(--accent);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-xs);
   display: grid;
   place-items: center;
-  color: white;
+  color: var(--brand-primary-text, #ffffff);
   transition: transform 0.18s ease, box-shadow 0.18s ease;
   flex-shrink: 0;
 }
 
 .topbar-brand .logo-icon:hover {
-  transform: scale(1.07);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent);
+  transform: scale(1.06);
+  box-shadow: 0 0 0 3px var(--accent-dim);
 }
 
 .btn-back {
@@ -418,8 +577,65 @@ img { display: block; max-width: 100%; }
 
 /* .theme-selector-topbar removed — theme picker moved to Settings */
 
-@media (max-width: 600px) {
-  .topbar-brand span { display: none; }
+/* ── Storage / Sync Status Badge in Topbar ────────────────── */
+.storage-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.12s ease;
+  white-space: nowrap;
+  outline: none;
+}
+
+.storage-status-badge:hover {
+  background: var(--surface);
+  border-color: var(--accent);
+  color: var(--text-primary);
+  transform: translateY(-1px);
+}
+
+.storage-status-badge:active {
+  transform: scale(0.96);
+}
+
+.storage-status-badge:focus-visible {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.storage-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  flex-shrink: 0;
+}
+
+.storage-status-icon {
+  font-size: 0.76rem;
+  line-height: 1;
+}
+
+.storage-status-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+@media (max-width: 540px) {
+  .storage-status-label {
+    display: none;
+  }
+  .storage-status-badge {
+    padding: 5px 8px;
+  }
 }
 
 .btn-icon {
@@ -438,12 +654,12 @@ img { display: block; max-width: 100%; }
 }
 
 .avatar {
-  width: 32px; height: 32px;
+  width: 30px; height: 30px;
   border-radius: 50%;
   background: var(--accent);
   display: grid;
   place-items: center;
-  color: white;
+  color: var(--brand-primary-text, #ffffff);
   font-size: 0.8rem;
   font-weight: 700;
   flex-shrink: 0;
@@ -486,26 +702,28 @@ img { display: block; max-width: 100%; }
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 9px 12px;
+  padding: 8px 12px;
   border-radius: var(--radius-sm);
-  font-size: 0.875rem;
+  font-size: 0.86rem;
   font-weight: 500;
   color: var(--text-secondary);
-  transition: background 0.16s ease, color 0.16s ease, padding-left 0.16s ease;
+  transition: background 0.14s ease, color 0.14s ease, transform 0.14s ease;
   cursor: pointer;
   user-select: none;
+  border-left: 2px solid transparent;
 }
 
 .nav-item:hover {
-  background: var(--surface-2);
+  background: var(--bg-hover, var(--surface-2));
   color: var(--text-primary);
-  padding-left: 14px;
+  transform: translateX(2px);
 }
 
 .nav-item.active {
   background: var(--accent-dim);
   color: var(--accent);
   font-weight: 600;
+  border-left-color: var(--accent);
 }
 
 .nav-item .nav-badge {
@@ -717,19 +935,26 @@ a.card:hover,
 
 .desk-greeting {
   font-family: var(--font-display);
-  font-size: 2.1rem;
+  font-size: 2.4rem;
   font-weight: 800;
   color: var(--text-primary);
-  letter-spacing: -0.04em;
-  line-height: 1.12;
+  letter-spacing: -0.05em;
+  line-height: 1.08;
+}
+
+/* Name portion of greeting gets a stronger weight marker */
+.desk-greeting .desk-greeting-name {
+  color: var(--accent);
+  font-weight: 800;
 }
 
 .desk-greeting-sub {
-  font-size: 0.92rem;
-  color: var(--text-muted);
-  margin-top: 6px;
-  line-height: 1.5;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-top: 8px;
+  line-height: 1.52;
   font-weight: 400;
+  max-width: 480px;
 }
 
 /* Separator rule under masthead — single ruled line, not a box */
@@ -737,6 +962,7 @@ a.card:hover,
   height: 1px;
   background: var(--border-light, var(--border));
   width: 100%;
+  margin-top: 4px;
 }
 
 /* Ticker: monospace inline strip — visually subordinate to the heading */
@@ -746,9 +972,8 @@ a.card:hover,
   gap: 10px;
   flex-wrap: wrap;
   font-family: var(--font-mono);
-  font-size: 0.74rem;
+  font-size: 0.73rem;
   color: var(--text-muted);
-  /* No background box — sits directly on the page bg */
   padding: 0;
   border: none;
   width: auto;
@@ -763,15 +988,130 @@ a.card:hover,
 
 .desk-ticker-sep {
   color: var(--border-btn, var(--border));
-  opacity: 0.5;
+  opacity: 0.4;
   font-size: 0.7rem;
+}
+
+/* ── Streamlined Desk Vitals Bar (Quiet Horizontal Strip) ─── */
+.desk-vitals-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-top: 14px;
+  margin-bottom: 20px;
+  font-size: 0.78rem;
+}
+
+.desk-vitals-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border-light, var(--border));
+  color: var(--text-secondary);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--ease);
+  text-decoration: none;
+  user-select: none;
+}
+
+.desk-vitals-pill:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
+  transform: translateY(-0.5px);
+}
+
+.desk-vitals-pill.is-warning {
+  border-color: color-mix(in srgb, var(--yellow) 40%, var(--border));
+  color: var(--yellow);
+}
+
+.desk-vitals-pill.is-critical {
+  border-color: color-mix(in srgb, var(--red) 40%, var(--border));
+  color: var(--red);
+  font-weight: 600;
+}
+
+.desk-vitals-pill.is-safe {
+  border-color: color-mix(in srgb, var(--green) 35%, var(--border));
+  color: var(--green);
+}
+
+/* ── Legacy Vitals Strip (Retained for compact sub-views) ── */
+.vitals-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.vitals-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 16px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+  box-shadow: var(--shadow);
+  position: relative;
+  overflow: hidden;
+}
+
+.vitals-tile:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-btn, var(--border));
+}
+
+.vitals-label {
+  font-size: 0.67rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.vitals-value {
+  font-family: var(--font-mono);
+  font-size: 1.8rem;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  color: var(--text-primary);
+  margin-top: 6px;
+}
+
+.vitals-sub {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-top: 3px;
+  line-height: 1.3;
+}
+
+@media (max-width: 600px) {
+  .vitals-strip { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .vitals-value { font-size: 1.5rem; }
 }
 
 /* ── Signature Layout Moment: The Chrono Beacon ──────────── */
 .chrono-beacon {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-left: 4px solid var(--accent);
+  border-left: 3.5px solid var(--accent-warm);
   border-radius: var(--radius);
   padding: 16px 20px;
   box-shadow: var(--shadow);
@@ -779,7 +1119,7 @@ a.card:hover,
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 20px;
+  margin-bottom: 22px;
   transition: all 0.18s ease;
   position: relative;
   overflow: hidden;
@@ -788,7 +1128,17 @@ a.card:hover,
 .chrono-beacon.is-live {
   border-left-color: var(--green);
   background: color-mix(in srgb, var(--green) 3%, var(--surface));
-  box-shadow: 0 4px 16px -2px rgba(16, 185, 129, 0.12);
+  box-shadow: 0 4px 16px -2px rgba(78, 122, 93, 0.12);
+}
+
+.chrono-beacon.is-finished {
+  border-left-color: var(--accent);
+  background: var(--surface);
+}
+
+.chrono-beacon.is-free {
+  border-left-color: var(--border-btn);
+  background: var(--surface);
 }
 
 .chrono-beacon-badge {
@@ -806,14 +1156,9 @@ a.card:hover,
   color: var(--accent);
 }
 
-.chrono-beacon.is-live .chrono-beacon-badge {
-  background: rgba(16, 185, 129, 0.15);
-  color: var(--green);
-}
-
 .chrono-beacon-time {
   font-family: var(--font-mono);
-  font-size: 1.1rem;
+  font-size: 1.05rem;
   font-weight: 700;
   color: var(--text-primary);
   letter-spacing: -0.02em;
@@ -821,7 +1166,7 @@ a.card:hover,
 
 .chrono-beacon-title {
   font-family: var(--font-display);
-  font-size: 1.1rem;
+  font-size: 1.15rem;
   font-weight: 700;
   color: var(--text-primary);
   letter-spacing: -0.02em;
@@ -833,7 +1178,7 @@ a.card:hover,
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 2px;
+  margin-top: 3px;
 }
 
 /* ── Open Schedule Timeline Ledger ───────────────────────── */
@@ -864,11 +1209,10 @@ a.card:hover,
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 9px 12px 9px 0;
+  padding: 10px 12px 10px 0;
   border-radius: var(--radius-sm);
   background: transparent;
-  transition: background 0.14s ease;
-  /* Subtle separator between slots */
+  transition: background 0.14s ease, padding-left 0.14s ease;
   border-bottom: 1px solid var(--border-light, var(--border));
 }
 
@@ -896,18 +1240,29 @@ a.card:hover,
   transition: all 0.18s ease;
 }
 
+/* ── LIVE Session: pulsing ring on timeline dot ── */
 .schedule-slot.is-now {
   background: color-mix(in srgb, var(--accent) 5%, transparent);
   border-radius: var(--radius-sm);
   border-bottom-color: transparent;
+  border-left: 2px solid var(--accent);
+  padding-left: 8px;
 }
 
 .schedule-slot.is-now::before {
   background: var(--green);
   border-color: var(--green);
-  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
-  width: 10px;
-  height: 10px;
+  width: 11px;
+  height: 11px;
+  left: -25px;
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5);
+  animation: liveSlotPulse 2s ease-in-out infinite;
+}
+
+@keyframes liveSlotPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
+  60%  { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
 }
 
 .schedule-slot.is-past::before {
@@ -1014,20 +1369,14 @@ a.card:hover,
 
 /* ── Desk Command Dock ───────────────────────────────────── */
 .desk-command-dock {
-  display: grid;
-  grid-template-columns: 1.15fr 0.85fr;
+  display: flex;
+  flex-direction: column;
   gap: 8px;
   background: var(--surface-well, var(--surface-2));
   border: 1px solid var(--border);
   padding: 8px;
   border-radius: var(--radius);
   margin-top: 10px;
-}
-
-@media (max-width: 680px) {
-  .desk-command-dock {
-    grid-template-columns: 1fr;
-  }
 }
 
 .command-dock-field {
@@ -1159,7 +1508,7 @@ a.card:hover,
   opacity: 0.55;
 }
 
-/* ── Legacy Stat-Grid Fallback (if referenced) ──────────────── */
+/* ── Stat-Grid (Weekly Review page + fallback) ───────────────── */
 .stat-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -1269,9 +1618,10 @@ a.card:hover,
 
 .tt-tab.active {
   background: var(--accent);
-  color: white;
+  color: var(--brand-primary-text, #ffffff);
   border-color: var(--accent);
-  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.22);
+  box-shadow: var(--shadow-sm);
+  font-weight: 600;
 }
 
 .tt-entry {
@@ -1332,13 +1682,14 @@ a.card:hover,
 .tt-subject:hover { color: var(--accent); }
 .tt-meta { font-size: 0.78rem; color: var(--text-muted); margin-top: 3px; line-height: 1.4; }
 
+/* Type badges use rectangular shape to distinguish from status pills */
 .type-badge {
-  font-size: 0.67rem;
+  font-size: 0.64rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 2px 8px;
-  border-radius: 999px;
+  letter-spacing: 0.06em;
+  padding: 2px 6px;
+  border-radius: 4px;
   flex-shrink: 0;
 }
 
@@ -1379,16 +1730,16 @@ a.card:hover,
   color: var(--text-muted);
 }
 
-.type-lecture    { background: var(--accent-dim); color: var(--accent); }
-.type-lab        { background: rgba(16, 185, 129, 0.12); color: var(--green); }
-.type-project    { background: rgba(14, 165, 233, 0.12); color: #0ea5e9; }
-.type-off        { background: rgba(107, 114, 128, 0.08); color: var(--text-muted); }
+.type-lecture    { background: var(--surface-2); color: var(--text-secondary); }
+.type-lab        { background: color-mix(in srgb, var(--green) 12%, transparent); color: var(--green); }
+.type-project    { background: color-mix(in srgb, var(--brand-secondary) 12%, transparent); color: var(--brand-secondary); }
+.type-off        { background: color-mix(in srgb, var(--text-muted) 8%, transparent); color: var(--text-muted); }
 .type-assignment { background: var(--accent-dim); color: var(--accent); }
-.type-mission    { background: rgba(147, 51, 234, 0.12); color: var(--purple); border: 1px solid rgba(147, 51, 234, 0.22); }
-.type-general    { background: rgba(148, 163, 184, 0.16); color: var(--text-secondary); }
-.type-study      { background: rgba(168, 85, 247, 0.14); color: #a855f7; }
-.type-quiz       { background: rgba(245, 158, 11, 0.12); color: var(--yellow); }
-.type-exam       { background: rgba(239, 68, 68, 0.12); color: var(--red); }
+.type-mission    { background: color-mix(in srgb, var(--brand-secondary) 12%, transparent); color: var(--brand-secondary); border: 1px solid color-mix(in srgb, var(--brand-secondary) 22%, transparent); }
+.type-general    { background: var(--surface-2); color: var(--text-secondary); }
+.type-study      { background: color-mix(in srgb, var(--brand-secondary) 14%, transparent); color: var(--brand-secondary); }
+.type-quiz       { background: color-mix(in srgb, var(--yellow) 12%, transparent); color: var(--yellow); }
+.type-exam       { background: color-mix(in srgb, var(--red) 12%, transparent); color: var(--red); }
 
 /* ── Assignments ────────────────────────────────────────────── */
 .filter-bar {
@@ -1424,10 +1775,10 @@ a.card:hover,
 }
 
 .filter-chip.active {
-  background: var(--accent);
-  color: white !important;
-  border-color: var(--accent);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  background: var(--brand-primary, var(--accent));
+  color: var(--brand-primary-text, #ffffff) !important;
+  border-color: var(--brand-primary, var(--accent));
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
   font-weight: 600;
 }
 
@@ -1819,8 +2170,9 @@ a.card:hover,
 /* Notice & Form Modals — Frosted Glass Panel */
 .modal-backdrop {
   position: fixed; inset: 0;
-  background: rgba(8, 13, 26, 0.55);
-  backdrop-filter: blur(8px) saturate(160%);
+  background: rgba(23, 20, 18, 0.65);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   z-index: 200;
   display: grid;
   place-items: center;
@@ -2014,7 +2366,7 @@ a.card:hover,
 /* ── Attendance Photo Scan & Review ────────────────────────── */
 .attendance-scan-zone {
   border: 2px dashed var(--border);
-  border-radius: var(--radius, 12px);
+  border-radius: var(--radius, 14px);
   padding: 32px 20px;
   text-align: center;
   background: var(--surface-2);
@@ -2507,7 +2859,7 @@ a.card:hover,
   border-radius: 999px;
   font-weight: 600;
   font-size: 0.95rem;
-  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
+  box-shadow: 0 4px 16px rgba(23, 20, 18, 0.22);
   cursor: pointer;
   transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), left 0.25s cubic-bezier(0.4, 0, 0.2, 1), right 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s ease, background 0.25s ease;
   border: 1px solid rgba(255, 255, 255, 0.15);
@@ -2517,12 +2869,12 @@ a.card:hover,
 
 .fab.dragging {
   transition: none !important;
-  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.45);
+  box-shadow: 0 8px 24px rgba(23, 20, 18, 0.35);
   transform: scale(1.02);
 }
 
 .fab:hover {
-  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.45);
+  box-shadow: 0 6px 20px rgba(23, 20, 18, 0.3);
   transform: translateY(-1px);
 }
 
@@ -2700,13 +3052,13 @@ input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
 [tabindex]:focus-visible {
-  outline: 2px solid var(--accent-light, var(--accent)) !important;
+  outline: 2px solid var(--focus-ring, var(--brand-primary)) !important;
   outline-offset: 2px !important;
 }
 
 .btn:disabled,
 button:disabled {
-  opacity: 0.55;
+  opacity: 0.45;
   cursor: not-allowed !important;
   pointer-events: none !important;
   transform: none !important;
@@ -2725,17 +3077,18 @@ button:disabled {
   border-radius: var(--radius-xs, 6px);
 }
 
-/* Tier 1 — PRIMARY: Solid accent, highest prominence */
+/* Tier 1 — PRIMARY: Solid brand primary, highest prominence */
 .btn-primary {
-  background: var(--accent);
-  color: #ffffff !important;
+  background: var(--brand-primary, var(--accent));
+  color: var(--brand-primary-text, #ffffff) !important;
   border-color: transparent;
+  border-radius: var(--radius-btn, 12px);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 3px 8px rgba(0, 0, 0, 0.08);
 }
 
 .btn-primary:hover {
   background: var(--accent-hover);
-  color: #ffffff !important;
+  color: var(--brand-primary-text, #ffffff) !important;
   transform: translateY(-1.5px);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
   filter: brightness(1.04);
@@ -2748,8 +3101,8 @@ button:disabled {
 }
 
 .btn-primary:focus-visible {
-  outline: 2px solid var(--accent-light, var(--accent));
-  outline-offset: 3px;
+  outline: 2px solid var(--focus-ring, var(--brand-primary));
+  outline-offset: 2px;
 }
 
 /* Tier 2 — SECONDARY: Bordered surface, clear but not dominant */
@@ -3260,7 +3613,7 @@ button:disabled {
   padding: 20px 16px;
   background: var(--surface-2);
   border: 1px solid var(--border);
-  border-radius: var(--radius, 12px);
+  border-radius: var(--radius, 14px);
   animation: cdMsgIn 0.24s ease;
 }
 .cd-welcome-badge {
@@ -3397,16 +3750,22 @@ button:disabled {
   align-items: center;
   font-size: 0.72rem;
   font-weight: 600;
-  padding: 2px 7px;
+  padding: 2px 8px;
   border-radius: 999px;
   margin-bottom: 6px;
   letter-spacing: 0.02em;
 }
-.cd-tag-overdue { background: rgba(239, 68, 68, 0.12); color: var(--red); }
-.cd-tag-today   { background: rgba(245, 158, 11, 0.12); color: var(--yellow); }
-.cd-tag-safe    { background: rgba(16, 185, 129, 0.12); color: var(--green); }
-.cd-tag-risk    { background: rgba(239, 68, 68, 0.12); color: var(--red); }
-.cd-tag-notice  { background: rgba(99, 102, 241, 0.12); color: #6366f1; }
+.cd-tag-overdue,
+.cd-tag.is-error   { background: color-mix(in srgb, var(--status-error) 14%, transparent); color: var(--status-error); }
+.cd-tag-today,
+.cd-tag.is-warning { background: color-mix(in srgb, var(--status-warning) 14%, transparent); color: var(--status-warning); }
+.cd-tag-safe,
+.cd-tag.is-success { background: color-mix(in srgb, var(--status-success) 14%, transparent); color: var(--status-success); }
+.cd-tag-risk       { background: color-mix(in srgb, var(--status-error) 14%, transparent); color: var(--status-error); }
+.cd-tag-notice,
+.cd-tag.is-purple  { background: color-mix(in srgb, var(--brand-secondary) 14%, transparent); color: var(--brand-secondary); }
+.cd-tag-accent,
+.cd-tag.is-accent  { background: var(--accent-dim); color: var(--brand-primary); }
 .cd-bubble strong { font-weight: 600; }
 
 .cd-typing {

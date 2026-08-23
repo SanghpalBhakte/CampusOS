@@ -265,18 +265,33 @@ function showToast(msg, type = 'info') {
 
 function updateSyncUI(status = null) {
   const icon = document.getElementById('sync-icon');
+  const text = document.getElementById('sync-text');
+  const dot  = document.querySelector('.storage-status-dot');
   const btn  = document.getElementById('sync-status-btn');
-  if (!icon) return;
+  if (!btn && !icon) return;
+
+  const isOnline = typeof navigator !== 'undefined' && ('onLine' in navigator) ? navigator.onLine : true;
 
   if (status === 'denied') {
-    icon.textContent = '🔒';
-    if (btn) btn.title = 'Access Denied — check Firestore rules';
+    if (icon) icon.textContent = '🔒';
+    if (text) text.textContent = 'Sync denied';
+    if (dot) dot.style.background = 'var(--red)';
+    if (btn) btn.title = 'Access Denied — check cloud Firestore permissions in Settings';
+  } else if (status === 'offline' || !isOnline) {
+    if (icon) icon.textContent = '💾';
+    if (text) text.textContent = 'Offline · Saved';
+    if (dot) dot.style.background = 'var(--yellow)';
+    if (btn) btn.title = 'Working offline · All changes are saved locally to this device';
   } else if (currentUser) {
-    icon.textContent = '⚡';
-    if (btn) btn.title = 'Synced to cloud';
+    if (icon) icon.textContent = '⚡';
+    if (text) text.textContent = 'Cloud synced';
+    if (dot) dot.style.background = 'var(--green)';
+    if (btn) btn.title = 'Cloud sync active · Saved locally & synced to your account';
   } else {
-    icon.textContent = '☁️';
-    if (btn) btn.title = 'Local only — sign in to sync';
+    if (icon) icon.textContent = '💾';
+    if (text) text.textContent = 'Saved locally';
+    if (dot) dot.style.background = 'var(--green)';
+    if (btn) btn.title = 'Local offline storage active · All data is saved automatically on this device';
   }
 }
 
@@ -781,8 +796,8 @@ const TIMETABLE_JUNK_TOKENS = new Set([
 const BATCH_PATTERN = /\b(?:Batch(?:es)?|Sec(?:tion)?|Grp|Group)?\s*[:\-\s]*\b([A-D][1-4]|[A-D](?![a-z])|[1-4](?![0-9]))\b/gi;
 const BRACKETED_BATCH_PATTERN = /\((?:AI-)?([A-D][1-4](?:[\s,/-]+(?:AI-)?[A-D][1-4])*)\)/i;
 const SUBJECT_CODE_PATTERN = /\b([A-Z]{2,8}[0-9]{1,4}[A-Z]{1,4}[0-9]{1,4}[A-Z]?|[A-Z]{2,6}[-\s]?[0-9]{2,5}[A-Z]?|[0-9]{2}[A-Z]{2,6}[0-9]{2,4})\b/i;
-const FACULTY_TITLE_PATTERN = /\b(?:Prof\.?|Dr\.?|Mr\.?|Mrs\.?|Ms\.?|Shri|Smt\.?)\s*[A-Za-z]+(?:\s+[A-Za-z]+)*/gi;
-const ROOM_PATTERN = /\b(?:Room|LT|CR|LH|Lab|Hall|SF|FF|GF|Cabin|WS)[-.\s]*(?:\d+[A-Z]?|[A-D]\b)|\b(?:G|F|S|T)-\d{2,3}\b|\b[A-Z]{1,2}-\d{2,3}\b|\b\d{3}[A-Z]?\b/i;
+const FACULTY_TITLE_PATTERN = /\b(?:Prof\.?|Dr\.?|Mr\.?|Mrs\.?|Ms\.?|Shri|Smt\.?)\s+[A-Za-z]+(?:\s+(?!LH|LT|CR|Room|Lab|Cabin|Hall|Batch|Sec)[A-Za-z]+)?/gi;
+const ROOM_PATTERN = /\b(?:Room|LT|CR|LH|Cabin|Hall|SF|FF|GF|WS)[-.\s]*(?:\d+[A-Z]?|[A-D]\b)|\bLab[-.\s]*\d+[A-Z]?\b|\b(?:G|F|S|T)-\d{2,3}\b|\b[A-Z]{1,2}-\d{2,3}\b/i;
 
 function extractBatchTags(rawText) {
   if (!rawText || typeof rawText !== 'string') return [];
@@ -847,12 +862,23 @@ function normalizeSubjectIdentity(rawText, existingSubjects = [], forceType = nu
     text = text.replace(roomMatch[0], ' ');
   }
 
-  // Strip all bracketed expressions e.g. (AI-A2, B2) or (CE) or (Batch 1)
+  // 4. Extract Course Code (including inside parentheses like (CS401) or (AID21PCL202))
+  let code = '';
+  const codeMatch = text.match(SUBJECT_CODE_PATTERN);
+  if (codeMatch && codeMatch[1].length >= 3) {
+    const candidateCode = codeMatch[1].replace(/\s+/g, '').toUpperCase();
+    if (/[0-9]/.test(candidateCode) || candidateCode.length <= 5) {
+      code = candidateCode;
+      text = text.replace(codeMatch[0], ' ');
+    }
+  }
+
+  // Strip all remaining bracketed expressions e.g. (AI-A2, B2) or (CE) or (Batch 1)
   text = text.replace(/\([^)]*\)/g, ' ');
   text = text.replace(/\[[^\]]*\]/g, ' ');
   text = text.replace(/\b(?:Batch(?:es)?|Sec(?:tion)?)\s*[:\-\s]*[A-D0-9,\s/-]+\b/gi, ' ');
 
-  // 4. Detect Class Type & Lab markers
+  // 5. Detect Class Type & Lab markers
   let classType = forceType || 'lecture';
   const isLabExplicit = /\b(?:lab|practical|workshop|hands-on|pr)\b/i.test(text) || /\b(?:lab|ws)\b/i.test(room);
   const isTutorial = /\b(?:tutorial|tut)\b/i.test(text);
@@ -873,14 +899,15 @@ function normalizeSubjectIdentity(rawText, existingSubjects = [], forceType = nu
     .replace(/\b(?:laboratory|lab|practical|tutorial|tut|lecture|theory|project|seminar|workshop)\b/gi, ' ')
     .replace(/\b(?:credits?|hours?|hrs?|periods?|sem(?:ester)?\s*(?:[1-8]|i{1,3}|iv|v|vi{0,3})?)\b/gi, ' ');
 
-  // 5. Extract Course Code
-  let code = '';
-  const codeMatch = text.match(SUBJECT_CODE_PATTERN);
-  if (codeMatch && codeMatch[1].length >= 3) {
-    const candidateCode = codeMatch[1].replace(/\s+/g, '').toUpperCase();
-    if (/[0-9]/.test(candidateCode) || candidateCode.length <= 5) {
-      code = candidateCode;
-      text = text.replace(codeMatch[0], ' ');
+  // If code was not found earlier, try again on cleaned text
+  if (!code) {
+    const codeMatch2 = text.match(SUBJECT_CODE_PATTERN);
+    if (codeMatch2 && codeMatch2[1].length >= 3) {
+      const candidateCode = codeMatch2[1].replace(/\s+/g, '').toUpperCase();
+      if (/[0-9]/.test(candidateCode) || candidateCode.length <= 5) {
+        code = candidateCode;
+        text = text.replace(codeMatch2[0], ' ');
+      }
     }
   }
 
@@ -1229,7 +1256,7 @@ function reconstructTimetable2DGrid(ocrData, existingSubjects = []) {
     });
   }
 
-  const confidence = Math.min(95, 30 + schedule.length * 10);
+  const confidence = Math.min(98, 75 + schedule.length * 5);
   return { schedule, confidence, ambiguous: schedule.length === 0 };
 }
 
@@ -1671,7 +1698,7 @@ function renderTimetablePreviewModalContent(backdrop) {
   const rowsHtml = visibleSchedule.map(({ item, originalIdx }) => {
     const isRowUncertain = item.isUncertain || !item.subject;
     const batchLabel = (item.batches && item.batches.length > 0)
-      ? `<span class="type-badge" style="font-size:0.7rem;padding:2px 6px;background:rgba(59,130,246,0.15);color:var(--accent)">${item.batches.join(', ')}</span>`
+      ? `<span class="type-badge" style="font-size:0.7rem;padding:2px 6px;background:var(--accent-dim);color:var(--brand-primary)">${item.batches.join(', ')}</span>`
       : `<span style="font-size:0.7rem;color:var(--text-muted)">General</span>`;
 
     return `
@@ -2208,7 +2235,7 @@ function showNoticeChannelModal(targetKey) {
       <div class="modal-header">
         <div style="display:flex;align-items:center;gap:8px">
           <span style="font-size:1.2rem">${isOfficial ? '📢' : '💬'}</span>
-          <span class="modal-title">${isOfficial ? 'Configure Official Notice Source' : 'Configure Class Community / WhatsApp'}</span>
+          <span class="modal-title">${isOfficial ? 'Configure Notice Source' : 'Configure Class Group & Channels'}</span>
         </div>
         <button class="modal-close" onclick="document.getElementById('notice-channel-modal-backdrop')?.remove()">${icons.x()}</button>
       </div>
@@ -2216,11 +2243,11 @@ function showNoticeChannelModal(targetKey) {
         <div style="font-size:0.82rem;color:var(--text-muted);line-height:1.45">
           ${isOfficial 
             ? 'Set your college portal link, class channel, or department notice page URL.' 
-            : 'Add your batch WhatsApp group invite link, community link, or class representative contact URL. Tapping the card opens WhatsApp to preview the group and request or complete access.'}
+            : 'Add your batch community link, group invite URL, or class representative contact. Tapping opens the channel directly for quick access.'}
         </div>
         <div class="form-group" style="margin-bottom:0">
-          <label class="form-label">${isOfficial ? 'Card Title' : 'Community / Group Title'}</label>
-          <input type="text" class="form-input" id="nc-modal-title" value="${(currentTitle || '').replace(/"/g, '&quot;')}" placeholder="${isOfficial ? 'e.g. Official Updates or College Portal' : 'e.g. Class Community or SY-AIDS 2026'}">
+          <label class="form-label">${isOfficial ? 'Card Title' : 'Group or Channel Title'}</label>
+          <input type="text" class="form-input" id="nc-modal-title" value="${(currentTitle || '').replace(/"/g, '&quot;')}" placeholder="${isOfficial ? 'e.g. Official Updates or Department Portal' : 'e.g. Class Community or SY-AIDS 2026'}">
         </div>
         <div class="form-group" style="margin-bottom:0">
           <label class="form-label">${isOfficial ? 'Destination Link / URL' : 'Invite Link or Contact URL'}</label>
@@ -2228,7 +2255,7 @@ function showNoticeChannelModal(targetKey) {
         </div>
         ${!isOfficial ? `
           <div style="font-size:0.75rem;color:var(--text-muted);background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-xs,6px);padding:8px 10px;line-height:1.4">
-            💡 <strong>Note:</strong> WhatsApp group entry depends on your invite link validity and group admin approval settings in WhatsApp.
+            💡 <strong>Note:</strong> Class group access opens directly in WhatsApp based on your batch link and admin settings.
           </div>
         ` : ''}
       </div>
@@ -2648,24 +2675,30 @@ const ALL_THEMES = [
 ];
 
 const LEGACY_THEME_MAP = {
-  'paper':           'paper-slate',
-  'soft-neutral':    'paper-slate',
-  'light':           'paper-slate',
-  'cloud':           'paper-slate',
-  'mist-blue':       'paper-slate',
-  'glass':           'paper-slate',
-  'quiet-dark':      'midnight-ink',
-  'dark':            'midnight-ink',
-  'cocoa-night':     'espresso-desk',
-  'cafe-night':      'espresso-desk',
-  'cafe':            'espresso-desk',
-  'espresso-paper':  'espresso-desk',
-  'stone':           'sandstone-notes',
-  'sandstone':       'sandstone-notes',
-  'warm-study':      'sandstone-notes',
-  'sunset':          'sandstone-notes',
-  'forest-study':    'nordic-frost',
-  'emerald':         'nordic-frost'
+  'paper':              'paper-slate',
+  'soft-neutral':       'paper-slate',
+  'light':              'paper-slate',
+  'cloud':              'paper-slate',
+  'mist-blue':          'paper-slate',
+  'glass':              'paper-slate',
+  'quiet-dark':         'midnight-ink',
+  'dark':               'midnight-ink',
+  'midnight-executive': 'midnight-ink',
+  'cocoa-night':        'espresso-desk',
+  'cafe-night':         'espresso-desk',
+  'cafe':               'espresso-desk',
+  'espresso-paper':     'espresso-desk',
+  'rose-pine':          'espresso-desk',
+  'stone':              'sandstone-notes',
+  'sandstone':          'sandstone-notes',
+  'warm-study':         'sandstone-notes',
+  'sunset':             'sandstone-notes',
+  'academic-amber':     'sandstone-notes',
+  'crimson-bold':       'sandstone-notes',
+  'forest-study':       'nordic-frost',
+  'emerald':            'nordic-frost',
+  'emerald-focus':      'nordic-frost',
+  'mint':               'misty-mint'
 };
 
 function initTheme() {
@@ -3134,7 +3167,6 @@ window.handleQuickAdd = function() {
 
   let dueDate = new Date();
   let dateFound = false;
-  const lowerText = text.toLowerCase();
   
   if (lowerText.includes('today')) {
     dateFound = true;
@@ -3233,7 +3265,7 @@ window.cancelQuickAdd = function() {
     container.innerHTML = `
       <div class="card" style="display:flex;align-items:center;gap:10px;padding:8px 12px">
         <div style="color:var(--accent);opacity:0.8">${icons.plus()}</div>
-        <input type="text" id="quick-add-input" placeholder="Quick add: 'DS assignment due Friday'" style="flex:1;border:none;background:transparent;outline:none;font-size:0.9rem;color:var(--text-primary)" onkeypress="if(event.key==='Enter') handleQuickAdd()">
+        <input type="text" id="quick-add-input" enterkeyhint="done" placeholder="Add task: 'Math problem set due Friday'" style="flex:1;border:none;background:transparent;outline:none;font-size:0.9rem;color:var(--text-primary)" onkeypress="if(event.key==='Enter') handleQuickAdd()">
         <button class="btn btn-sm btn-primary" onclick="handleQuickAdd()" style="padding:4px 12px">Add</button>
       </div>
     `;
@@ -3384,7 +3416,7 @@ function renderReview() {
       <div style="margin-bottom:16px">
         <div style="font-size:0.85rem;font-weight:600;color:var(--text-secondary);margin-bottom:8px;display:flex;align-items:center;gap:8px">
           ${formatDate(dateStr)}
-          ${isBusy ? '<span class="type-badge" style="background:rgba(245,158,11,0.15);color:var(--yellow);padding:2px 6px;font-size:0.65rem">🔥 Busy Day</span>' : ''}
+          ${isBusy ? '<span class="type-badge" style="background:color-mix(in srgb, var(--status-warning) 14%, transparent);color:var(--status-warning);padding:2px 6px;font-size:0.65rem">🔥 Busy Day</span>' : ''}
         </div>
         ${itemsHTML}
       </div>
@@ -3407,12 +3439,12 @@ function renderReview() {
     </div>
     
     <!-- 1. HIGH-VISIBILITY LAST WEEK LOOKBACK BANNER -->
-    <div class="card" style="padding:18px 20px;margin-bottom:22px;background:var(--surface);border-left:4px solid var(--accent)">
+    <div class="card" style="padding:18px 20px;margin-bottom:22px;background:var(--surface);border-left:3px solid var(--accent-warm)">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
         <div>
           <div style="font-size:0.95rem;font-weight:700;color:var(--text-primary);display:flex;align-items:center;gap:8px">
             <span>⏪ Last Week's Reflection</span>
-            <span class="type-badge" style="background:var(--accent-dim);color:var(--accent);font-size:0.7rem;padding:2px 8px">${formatDate(lookbackStr)} – ${formatDate(todayS)}</span>
+            <span class="type-badge" style="background:var(--accent-dim);color:var(--brand-primary);font-size:0.7rem;padding:2px 8px">${formatDate(lookbackStr)} – ${formatDate(todayS)}</span>
           </div>
           <div style="font-size:0.78rem;color:var(--text-muted);margin-top:2px">Lookback summary of completed tasks, rollover items, and study momentum.</div>
         </div>
@@ -3434,7 +3466,7 @@ function renderReview() {
           <div style="font-size:0.76rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--green);margin-bottom:6px">✓ Completed in this period:</div>
           <div style="display:flex;flex-wrap:wrap;gap:6px">
             ${tasksCompleted.map(t => `
-              <span class="filter-chip" style="font-size:0.75rem;padding:3px 10px;background:rgba(16,185,129,0.08);color:var(--green);border:1px solid rgba(16,185,129,0.25)">
+              <span class="filter-chip" style="font-size:0.75rem;padding:3px 10px;background:color-mix(in srgb, var(--status-success) 10%, transparent);color:var(--status-success);border:1px solid color-mix(in srgb, var(--status-success) 25%, transparent)">
                 ✓ ${t.title} (${t.subject || 'Task'})
               </span>
             `).join('')}
@@ -3657,7 +3689,7 @@ function renderWeeklyAttendanceTracker() {
           <div>
             <div style="font-weight:600;font-size:0.88rem;display:flex;align-items:center;gap:6px">
               ${c.subject}
-              <span class="type-badge" style="font-size:0.65rem;padding:2px 6px;background:${isLab ? 'rgba(16,185,129,0.15)' : 'var(--accent-dim)'};color:${isLab ? 'var(--green)' : 'var(--accent)'}">
+              <span class="type-badge" style="font-size:0.65rem;padding:2px 6px;background:${isLab ? 'color-mix(in srgb, var(--status-success) 14%, transparent)' : 'var(--accent-dim)'};color:${isLab ? 'var(--status-success)' : 'var(--brand-primary)'}">
                 ${isLab ? 'Lab' : 'Lecture'}
               </span>
             </div>
@@ -3669,8 +3701,8 @@ function renderWeeklyAttendanceTracker() {
             <button class="btn btn-sm" onclick="setAttendance('${dateStr}', '${classKey}', 'attended')" aria-label="Mark ${c.subject} as attended on ${formatDate(dateStr)}" aria-pressed="${status === 'attended'}" style="padding:5px 12px;font-size:0.75rem;font-weight:700;border-radius:var(--radius-xs,6px);background:${status==='attended'?'var(--green)':'var(--surface-2)'};color:${status==='attended'?'white':'var(--text-primary)'};border:1px solid ${status==='attended'?'var(--green)':'var(--border)'};cursor:pointer;transition:transform 0.1s ease">
               ${status==='attended'?'✓ Attended':'Attended'}
             </button>
-            <button class="btn btn-sm" onclick="setAttendance('${dateStr}', '${classKey}', 'skipped')" aria-label="Mark ${c.subject} as bunked on ${formatDate(dateStr)}" aria-pressed="${status === 'skipped'}" style="padding:5px 12px;font-size:0.75rem;font-weight:700;border-radius:var(--radius-xs,6px);background:${status==='skipped'?'var(--red)':'var(--surface-2)'};color:${status==='skipped'?'white':'var(--text-primary)'};border:1px solid ${status==='skipped'?'var(--red)':'var(--border)'};cursor:pointer;transition:transform 0.1s ease">
-              ${status==='skipped'?'✕ Bunked':'Bunked'}
+            <button class="btn btn-sm" onclick="setAttendance('${dateStr}', '${classKey}', 'skipped')" aria-label="Mark ${c.subject} as skipped on ${formatDate(dateStr)}" aria-pressed="${status === 'skipped'}" style="padding:5px 12px;font-size:0.75rem;font-weight:700;border-radius:var(--radius-xs,6px);background:${status==='skipped'?'var(--red)':'var(--surface-2)'};color:${status==='skipped'?'white':'var(--text-primary)'};border:1px solid ${status==='skipped'?'var(--red)':'var(--border)'};cursor:pointer;transition:transform 0.1s ease">
+              ${status==='skipped'?'✕ Skipped':'Skipped'}
             </button>
           </div>
         </div>
@@ -3731,16 +3763,16 @@ function renderWeeklyAttendanceTracker() {
       ${attendanceDaysHTML}
 
       <!-- Gamified Attendance & Safe Bunk Guidance Card -->
-      <div class="card" style="padding:16px;margin-bottom:16px;background:var(--surface-2);border-left:4px solid ${guidance.isSafe ? 'var(--green)' : 'var(--red)'}">
+      <div class="card" style="padding:16px;margin-bottom:16px;background:var(--surface-2);border-left:3px solid ${guidance.isSafe ? 'var(--green)' : 'var(--red)'}">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap">
           <div>
             <div style="font-weight:700;font-size:0.98rem;color:var(--text-primary);display:flex;align-items:center;gap:8px">
-              <span>Attendance Health &amp; Safe Bunks</span>
-              ${streak > 0 ? `<span class="type-badge" style="background:rgba(245,158,11,0.15);color:var(--yellow);padding:2px 8px;font-size:0.7rem">🔥 ${streak}-Class Streak</span>` : ''}
+              <span>Attendance Health &amp; Safe Skips</span>
+              ${streak > 0 ? `<span class="type-badge" style="background:color-mix(in srgb, var(--status-warning) 14%, transparent);color:var(--status-warning);padding:2px 8px;font-size:0.7rem">🔥 ${streak}-Class Streak</span>` : ''}
             </div>
             <div style="font-size:0.78rem;color:var(--text-muted);margin-top:2px">Target threshold: <strong>75%</strong> minimum required attendance</div>
           </div>
-          <span class="type-badge" style="font-size:0.75rem;padding:3px 9px;background:${guidance.isSafe ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)'};color:${guidance.isSafe ? 'var(--green)' : 'var(--red)'}">
+          <span class="type-badge" style="font-size:0.75rem;padding:3px 9px;background:${guidance.isSafe ? 'color-mix(in srgb, var(--status-success) 14%, transparent)' : 'color-mix(in srgb, var(--status-error) 14%, transparent)'};color:${guidance.isSafe ? 'var(--status-success)' : 'var(--status-error)'}">
             ${guidance.badgeLabel}
           </span>
         </div>
@@ -3808,11 +3840,11 @@ window.showOnboardingModal = function() {
         <h2 style="margin:0 0 6px 0;font-size:1.35rem;font-weight:700;letter-spacing:-0.025em;color:var(--text-primary)">Welcome to Clarity Desk</h2>
         <div style="font-size:0.84rem;font-weight:600;color:var(--accent);margin-bottom:12px;letter-spacing:0.01em">Your calm, unified student workspace</div>
         <div style="font-size:0.88rem;color:var(--text-secondary);line-height:1.6;margin-bottom:24px">
-          Manage your class schedule, monitor attendance safety, track assignments, and access coursework notes with zero clutter.
+          Manage your class schedule, monitor attendance safety, track tasks, and access study notes with zero clutter.
         </div>
         <div style="display:flex;flex-direction:column;gap:10px">
-          <button class="btn-primary" onclick="showOnboardingStep2()" style="width:100%;padding:11px;font-weight:600;justify-content:center;font-size:0.88rem">Set Up My Profile →</button>
-          <button class="btn-secondary" onclick="dismissOnboarding()" style="width:100%;padding:9px;font-size:0.84rem;justify-content:center">Explore First</button>
+          <button class="btn-primary" onclick="showOnboardingStep2()" style="width:100%;padding:11px;font-weight:600;justify-content:center;font-size:0.88rem">Set up profile →</button>
+          <button class="btn-secondary" onclick="dismissOnboarding()" style="width:100%;padding:9px;font-size:0.84rem;justify-content:center">Explore first</button>
         </div>
       </div>
 
@@ -3877,7 +3909,7 @@ window.showOnboardingModal = function() {
               Add your current attended and missed class counts once. Clarity Desk will track continuously from there.
             </div>
             <button type="button" class="btn btn-sm btn-secondary" onclick="showBaselineModal()" style="font-size:0.78rem;padding:5px 12px;display:inline-flex;align-items:center;gap:6px">
-              📊 Set Current Attendance Counts →
+              📊 Set attendance counts →
             </button>
           </div>
 
@@ -3894,11 +3926,11 @@ window.showOnboardingModal = function() {
             </div>
           </div>
 
-          <div id="ob-error" style="color:var(--red);font-size:0.78rem;display:none">Please enter your Full Name and College to finish setup.</div>
+          <div id="ob-error" style="color:var(--red);font-size:0.78rem;display:none">Please enter your name to finish setup.</div>
         </div>
         <div style="display:flex;align-items:center;justify-content:flex-end;gap:10px">
           <button class="btn-secondary" onclick="dismissOnboarding()" style="font-size:0.82rem">Skip</button>
-          <button class="btn-primary" onclick="finishOnboarding()" style="font-size:0.85rem;padding:8px 18px">Finish Setup</button>
+          <button class="btn-primary" onclick="finishOnboarding()" style="font-size:0.85rem;padding:8px 18px">Finish setup</button>
         </div>
       </div>
     </div>
@@ -4168,6 +4200,7 @@ function answerUnknown() {
 function renderDashboard() {
   const el       = document.getElementById('page-dashboard');
   if (!el) return;
+  liveProfile    = loadProfile();
   const now      = new Date();
   const dateStr  = todayStr();
   const currentMin = currentTimeMinutes();
@@ -4229,9 +4262,7 @@ function renderDashboard() {
   const firstName = displayName ? displayName.split(' ')[0] : '';
   const greeting = greetingWord();
   const needsSetup = !displayName;
-  const hasTimetable = isCustomTimetableActive() && dayClasses.length > 0;
   const hasAttendanceData = totalMarked > 0;
-  const hasAnyTask = allTasks().length > 0;
 
   // Exam days left (null if not set)
   const examDaysLeftNum = (liveProfile.examDate && countdownText)
@@ -4251,11 +4282,47 @@ function renderDashboard() {
     dayClasses,
   });
 
-  // Setup completeness — only show steps that are still missing
+  // Setup completeness — recommended 3-step setup order for first-run users
   const setupSteps = [];
-  if (!displayName)    setupSteps.push({ id: 'name', label: 'Add your name', action: `navigateTo('settings')`, icon: '👤' });
-  if (!isCustomTimetableActive() || !hasTimetable) setupSteps.push({ id: 'tt', label: 'Set up your timetable', action: `navigateTo('timetable')`, icon: '🗓' });
-  if (!hasAttendanceData) setupSteps.push({ id: 'att', label: 'Configure attendance', action: `showBaselineModal()`, icon: '📊' });
+  
+  // 1. Set Practical Batch & Profile
+  const currentProf = loadProfile() || liveProfile || {};
+  const hasProfileSetup = !!((currentProf.name && currentProf.name.trim()) || (currentProf.batch && currentProf.batch.trim()));
+  if (!hasProfileSetup) {
+    setupSteps.push({
+      id: 'profile',
+      label: '1. Set Practical Batch & Profile',
+      desc: 'Set your name, semester, and batch for filtered timetable views.',
+      action: `navigateTo('settings')`,
+      icon: '👤'
+    });
+  }
+
+  // 2. Import Timetable
+  const hasCustomTT = isCustomTimetableActive();
+  if (!hasCustomTT) {
+    setupSteps.push({
+      id: 'tt',
+      label: '2. Import Timetable Schedule',
+      desc: 'Scan your schedule photo, add class slots, or load a sample template.',
+      action: `navigateTo('timetable')`,
+      icon: '🗓️'
+    });
+  }
+
+  // 3. Set Attendance Starting Counts
+  const currentBaselines = loadAttendanceBaselines();
+  const hasBaselinesConfigured = Object.keys(currentBaselines).length > 0;
+  if (!hasAttendanceData && !hasBaselinesConfigured) {
+    setupSteps.push({
+      id: 'att',
+      label: '3. Set Attendance Starting Counts',
+      desc: 'Enter your portal baseline once to unlock percentage tracking and safe skips.',
+      action: `showBaselineModal(null, 'manual')`,
+      icon: '📊'
+    });
+  }
+
   const isFullySetup = setupSteps.length === 0;
 
   // Masthead ticker items in monospace ledger strip
@@ -4274,17 +4341,64 @@ function renderDashboard() {
   }
   const tickerHTML = tickerItems.join('<span class="desk-ticker-sep">/</span>');
 
-  // Signature Chrono Beacon (Active lecture or next slot)
+  // Streamlined 1-line desk vitals bar
+  const vitalsPills = [];
+  vitalsPills.push(`
+    <span class="desk-vitals-pill" onclick="navigateTo('timetable')" title="View Today's Schedule">
+      ${icons.calendar()} ${formattedDay}
+    </span>
+  `);
+  if (dayClasses.length > 0) {
+    vitalsPills.push(`
+      <span class="desk-vitals-pill" onclick="navigateTo('timetable')" title="View Today's Schedule">
+        📚 ${classesLeftCount} of ${dayClasses.length} classes left
+      </span>
+    `);
+  } else {
+    vitalsPills.push(`
+      <span class="desk-vitals-pill" onclick="navigateTo('timetable')" title="View Timetable">
+        🏖️ No classes today
+      </span>
+    `);
+  }
+  vitalsPills.push(`
+    <span class="desk-vitals-pill ${overdue > 0 ? 'is-critical' : pending > 0 ? '' : 'is-safe'}" onclick="filterAndNavigateToAssignments('${overdue > 0 ? 'overdue' : 'pending'}')" title="View Tasks">
+      📝 ${pending} task${pending !== 1 ? 's' : ''}${overdue > 0 ? ` (${overdue} overdue)` : ''}
+    </span>
+  `);
+  if (attendancePct !== null) {
+    vitalsPills.push(`
+      <span class="desk-vitals-pill ${isAttendanceAtRisk ? 'is-critical' : 'is-safe'}" onclick="navigateTo('review')" title="View Attendance Guidance">
+        📊 ${attendancePct}% attendance · ${dashGuidance.isSafe ? 'Safe' : 'Needs attention'}
+      </span>
+    `);
+  } else {
+    vitalsPills.push(`
+      <span class="desk-vitals-pill" onclick="showBaselineModal(null, 'manual')" title="Set Attendance Baseline">
+        📊 Attendance: Not set
+      </span>
+    `);
+  }
+  if (countdownText) {
+    vitalsPills.push(`
+      <span class="desk-vitals-pill" onclick="navigateTo('settings')" title="Exam Date Settings">
+        🎯 ${countdownText}
+      </span>
+    `);
+  }
+  const vitalsBarHTML = `<div class="desk-vitals-bar">${vitalsPills.join('')}</div>`;
+
+  // Signature Chrono Beacon (Active lecture, next slot, day complete, or free day)
   let beaconHTML = '';
   if (activeClass) {
     const classKey = `${activeClass.code || activeClass.subject}_${activeClass.time}`.replace(/[^a-zA-Z0-9_]/g, '');
     const status = attendanceData[dateStr]?.[classKey] || 'unset';
     beaconHTML = `
-      <div class="chrono-beacon is-live">
+      <div class="chrono-beacon is-live" role="region" aria-label="Current class in session">
         <div style="flex:1;min-width:180px">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-            <span class="chrono-beacon-badge">
-              <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green)"></span>
+            <span class="chrono-beacon-badge" style="background:color-mix(in srgb, var(--status-success) 15%, transparent);color:var(--status-success)">
+              <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--status-success);box-shadow:0 0 6px var(--status-success)"></span>
               In Session
             </span>
             <span class="chrono-beacon-time">${activeClass.time} → ${activeClass.end || 'end'}</span>
@@ -4299,20 +4413,20 @@ function renderDashboard() {
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-          <button class="btn btn-sm ${status==='attended'?'btn-primary':'btn-secondary'}" onclick="event.stopPropagation(); setAttendance('${dateStr}', '${classKey}', 'attended')" style="padding:5px 11px;font-size:0.76rem;font-weight:600;${status==='attended'?'background:var(--green);border-color:var(--green);color:white;':''}">
+          <button class="btn btn-sm ${status==='attended'?'btn-primary':'btn-secondary'}" onclick="event.stopPropagation(); setAttendance('${dateStr}', '${classKey}', 'attended')" style="padding:5px 12px;font-size:0.76rem;font-weight:600;${status==='attended'?'background:var(--status-success);border-color:var(--status-success);color:white;':''}">
             ${status==='attended'?'Attended ✓':'Mark Attended'}
           </button>
-          <button class="btn btn-sm ${status==='skipped'?'btn-primary':'btn-secondary'}" onclick="event.stopPropagation(); setAttendance('${dateStr}', '${classKey}', 'skipped')" style="padding:5px 11px;font-size:0.76rem;font-weight:600;${status==='skipped'?'background:var(--red);border-color:var(--red);color:white;':''}">
+          <button class="btn btn-sm ${status==='skipped'?'btn-primary':'btn-secondary'}" onclick="event.stopPropagation(); setAttendance('${dateStr}', '${classKey}', 'skipped')" style="padding:5px 12px;font-size:0.76rem;font-weight:600;${status==='skipped'?'background:var(--status-error);border-color:var(--status-error);color:white;':''}">
             ${status==='skipped'?'Skipped':'Skip'}
           </button>
         </div>
       </div>`;
   } else if (nextClass) {
     beaconHTML = `
-      <div class="chrono-beacon">
+      <div class="chrono-beacon" role="region" aria-label="Next upcoming class">
         <div style="flex:1;min-width:180px">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-            <span class="chrono-beacon-badge">⏳ Next Up</span>
+            <span class="chrono-beacon-badge" style="background:color-mix(in srgb, var(--accent-warm) 15%, transparent);color:var(--accent-warm)">⏳ Next Up</span>
             <span class="chrono-beacon-time">${nextClass.time} → ${nextClass.end || 'end'}</span>
           </div>
           <div class="chrono-beacon-title" onclick="openSubjectHub('${nextClass.subject}')" style="cursor:pointer" title="Open Subject Hub">
@@ -4325,7 +4439,41 @@ function renderDashboard() {
           </div>
         </div>
         <button class="btn btn-sm btn-secondary" onclick="openSubjectHub('${nextClass.subject}')" style="font-size:0.75rem;padding:6px 12px">
-          Subject Hub →
+          Open Subject Hub →
+        </button>
+      </div>`;
+  } else if (dayClasses.length > 0 && classesLeftCount === 0) {
+    beaconHTML = `
+      <div class="chrono-beacon is-finished" role="region" aria-label="Classes completed for today">
+        <div style="flex:1;min-width:180px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+            <span class="chrono-beacon-badge" style="background:color-mix(in srgb, var(--status-success) 12%, transparent);color:var(--status-success)">✓ Day Complete</span>
+            <span style="font-size:0.78rem;color:var(--text-muted)">All ${dayClasses.length} classes finished today</span>
+          </div>
+          <div class="chrono-beacon-title">Classes Done for Today</div>
+          <div class="chrono-beacon-meta">
+            <span>${pending > 0 ? `📝 ${pending} task${pending !== 1 ? 's' : ''} pending on your desk` : '🌿 No pending tasks. Enjoy your evening.'}</span>
+          </div>
+        </div>
+        <button class="btn btn-sm btn-secondary" onclick="navigateTo('${pending > 0 ? 'assignments' : 'links'}')" style="font-size:0.75rem;padding:6px 12px">
+          ${pending > 0 ? 'Review Tasks →' : 'Study Vault →'}
+        </button>
+      </div>`;
+  } else {
+    beaconHTML = `
+      <div class="chrono-beacon is-free" role="region" aria-label="Free day">
+        <div style="flex:1;min-width:180px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+            <span class="chrono-beacon-badge" style="background:var(--surface-2);color:var(--text-secondary)">🏖️ Rest Day</span>
+            <span style="font-size:0.78rem;color:var(--text-muted)">${DAY_NAMES[dayIdx]}</span>
+          </div>
+          <div class="chrono-beacon-title">No Classes Today</div>
+          <div class="chrono-beacon-meta">
+            <span>${!isCustomTimetableActive() ? 'Add your class schedule to track daily lectures.' : 'A free day on your study desk.'}</span>
+          </div>
+        </div>
+        <button class="btn btn-sm btn-secondary" onclick="navigateTo('${!isCustomTimetableActive() ? 'timetable' : 'assignments'}')" style="font-size:0.75rem;padding:6px 12px">
+          ${!isCustomTimetableActive() ? 'Set Schedule →' : 'View Tasks →'}
         </button>
       </div>`;
   }
@@ -4334,15 +4482,18 @@ function renderDashboard() {
   const setupBanner = !isFullySetup ? `
     <div class="desk-setup-guide" role="complementary" aria-label="Setup checklist">
       <div class="setup-guide-header">
-        <span class="setup-guide-title">Finish setting up your desk</span>
+        <span class="setup-guide-title">🚀 Welcome · Recommended Setup Order</span>
         <span class="setup-guide-count">${setupSteps.length} step${setupSteps.length !== 1 ? 's' : ''} left</span>
       </div>
       <div class="setup-guide-steps">
-        ${setupSteps.map((s, i) => `
+        ${setupSteps.map((s) => `
           <button class="setup-guide-step" onclick="${s.action}" aria-label="${s.label}">
             <span class="setup-step-icon">${s.icon}</span>
-            <span class="setup-step-label">${s.label}</span>
-            <span class="setup-step-arrow">→</span>
+            <div style="flex:1;min-width:0">
+              <div class="setup-step-label" style="font-weight:600;color:var(--text-primary)">${s.label}</div>
+              <div style="font-size:0.75rem;color:var(--text-muted);margin-top:1px">${s.desc}</div>
+            </div>
+            <span class="setup-step-arrow" style="font-weight:600;font-size:0.8rem">Start →</span>
           </button>
         `).join('')}
       </div>
@@ -4372,25 +4523,27 @@ function renderDashboard() {
   const quickLinksPreview = loadCustomLinks().slice(0, 4);
 
   el.innerHTML = `
-    <!-- 1. ARCHITECTURAL MASTHEAD -->
+    <!-- 1. ARCHITECTURAL MASTHEAD & GREETING -->
     <div class="desk-masthead">
       <div class="desk-masthead-top">
         <div>
-          <div class="desk-greeting">${greeting}${firstName ? `, ${firstName}` : ''}.</div>
+          <div class="desk-greeting">${greeting}${firstName ? `, <span class="desk-greeting-name">${firstName}</span>` : ''}.${needsSetup ? '' : ''}</div>
           <div class="desk-greeting-sub">${contextLine}</div>
         </div>
-        <button class="btn btn-sm btn-secondary" onclick="navigateTo('review')" title="Weekly reflection &amp; guidance" style="font-size:0.76rem;padding:5px 12px;align-self:flex-end;white-space:nowrap">
-          Weekly Review →
-        </button>
+        <div style="display:flex;align-items:center;gap:8px;align-self:flex-end">
+          <button class="btn btn-sm btn-secondary" onclick="navigateTo('review')" title="Weekly reflection &amp; guidance" style="font-size:0.76rem;padding:5px 12px;white-space:nowrap;flex-shrink:0">
+            Weekly Review →
+          </button>
+        </div>
       </div>
-      <div class="desk-ticker-strip">${tickerHTML}</div>
-      <div class="desk-masthead-rule"></div>
+      ${vitalsBarHTML}
     </div>
 
+    <!-- 2. PRIMARY FOCUS ANCHOR (CHRONO BEACON) -->
     ${beaconHTML}
     ${setupBanner}
 
-    <!-- 2. WORKBENCH & AMBIENT PANEL -->
+    <!-- 3. WORKBENCH & AMBIENT PANEL -->
     <div class="dashboard-layout">
 
       <!-- LEFT COLUMN: WORKBENCH -->
@@ -4398,7 +4551,7 @@ function renderDashboard() {
         <!-- SCHEDULE LEDGER -->
         <div class="dashboard-panel">
           <div class="panel-header">
-            <div class="panel-title">Today's Schedule</div>
+            <div class="panel-title">Today's Schedule ${dayClasses.length > 0 ? `<span style="font-family:var(--font-mono);font-size:0.65rem;font-weight:500;color:var(--text-muted);margin-left:4px;letter-spacing:0;text-transform:none">${classesLeftCount}/${dayClasses.length}</span>` : ''}</div>
             <button class="panel-action" onclick="navigateTo('timetable')">Full timetable →</button>
           </div>
           <!-- Open ledger: no card box -->
@@ -4426,6 +4579,7 @@ function renderDashboard() {
           ` : `
             <div style="padding:20px 0;color:var(--text-muted);font-size:0.85rem">${!isCustomTimetableActive() ? 'No timetable set up yet. <button class="setup-inline-link" onclick="navigateTo(\'timetable\')">Add your schedule →</button>' : 'No classes today — a free day on your desk.'}</div>
           `}
+        </div>
 
         <!-- TASKS & DEADLINES -->
         <div class="dashboard-panel">
@@ -4434,8 +4588,8 @@ function renderDashboard() {
             <button class="panel-action" onclick="navigateTo('assignments')">All tasks (${pending}) →</button>
           </div>
 
-          <!-- Progress bar — sits outside any card box -->
-          <div style="margin-bottom:4px">
+          <!-- Progress bar -->
+          <div style="margin-bottom:8px">
             <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px">
               <span style="font-size:0.74rem;color:var(--text-muted)">${submittedCount} of ${total} completed</span>
               <span style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-muted)">${progress}%</span>
@@ -4443,8 +4597,8 @@ function renderDashboard() {
             <div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:${progress}%"></div></div>
           </div>
 
-          <!-- Open task rows — no card container, flat list -->
-          <div style="position:relative;padding-left:12px">
+          <!-- Open task rows -->
+          <div style="position:relative;padding-left:4px">
             ${urgentTasks.length > 0 ? urgentTasks.map(a => {
               const isOngoing = !!a.noDeadline || (a.taskType === 'mission' && !a.dueDate);
               const rel = isOngoing ? { label: 'Ongoing', cls: 'ongoing' } : formatRelativeDueDate(a.dueDate);
@@ -4467,19 +4621,19 @@ function renderDashboard() {
                 </div>`;
             }).join('') : `<div style="padding:12px 0;color:var(--text-muted);font-size:0.84rem">🌿 All caught up. No urgent tasks.</div>`}
           </div>
+
+          <!-- Inline Task Quick Add -->
+          <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+            <input type="text" id="quick-add-input" class="form-input" enterkeyhint="done" placeholder="+ Add a task… e.g. 'Lab report due Friday'" onkeypress="if(event.key==='Enter') handleQuickAdd()" style="font-size:0.82rem;padding:7px 12px;height:36px;flex:1">
+            <button class="btn btn-sm btn-secondary" onclick="handleQuickAdd()" style="padding:6px 12px;font-size:0.78rem;flex-shrink:0">Add</button>
+          </div>
         </div>
 
-        <!-- DESK COMMAND DOCK (DUAL INPUT) -->
-        <div class="desk-command-dock">
-          <div class="command-dock-field">
-            <span style="color:var(--accent);opacity:0.8;font-size:0.8rem">${icons.plus()}</span>
-            <input type="text" id="quick-add-input" placeholder="Add task… e.g. 'Lab report due Friday'" onkeypress="if(event.key==='Enter') handleQuickAdd()">
-            <span class="command-dock-kbd">↵ Enter</span>
-          </div>
-
+        <!-- ASK DESK ASSISTANT DOCK -->
+        <div class="desk-command-dock" style="margin-top:16px">
           <div class="command-dock-field">
             <span style="color:var(--accent);opacity:0.8;font-size:0.8rem">✨</span>
-            <input type="text" id="assistant-input" placeholder="Ask Desk… e.g. 'Classes today?'" onkeypress="if(event.key==='Enter') handleAssistantQuestion()">
+            <input type="text" id="assistant-input" enterkeyhint="send" placeholder="Ask Desk… e.g. 'Classes today?' or 'Safe to miss OS?'" onkeypress="if(event.key==='Enter') handleAssistantQuestion()">
             <span class="command-dock-kbd">Ask</span>
           </div>
         </div>
@@ -4489,30 +4643,33 @@ function renderDashboard() {
       <!-- RIGHT COLUMN: AMBIENT CONTEXT -->
       <div class="dashboard-right-panel">
 
-        <!-- ATTENDANCE: Large stat figure, not a card widget -->
+        <!-- ATTENDANCE: Redesigned ambient right panel -->
         <div class="dashboard-panel">
           <div class="panel-header">
             <div class="panel-title">Attendance</div>
             <button class="panel-action" onclick="navigateTo('review')">Guidance →</button>
           </div>
           <div>
-            <div class="att-stat-figure ${isAttendanceAtRisk ? 'at-risk' : attendancePct !== null ? 'is-safe' : ''}">
+            <div class="att-stat-figure ${isAttendanceAtRisk ? 'at-risk' : attendancePct !== null ? 'is-safe' : ''}" style="margin-bottom:2px">
               ${attendancePct !== null ? `${attendancePct}%` : '—'}
             </div>
-            <div class="att-stat-label">${attendancePct !== null ? (dashGuidance.isSafe ? `Safe · ≥${attTarget}%` : `Action needed · <${attTarget}%`) : 'Not configured'}</div>
-            <div class="att-stat-message">${dashGuidance.message}</div>
+            <div class="att-stat-label">${attendancePct !== null ? (dashGuidance.isSafe ? `Safe · ≥${attTarget}%` : `Needs attention · <${attTarget}%`) : 'Not configured'}</div>
             ${attendancePct !== null ? `
               <div style="margin-top:10px">
                 <div class="att-bar-wrap">
                   <div class="att-bar-seg att-seg-present" style="width:${totalMarked > 0 ? Math.round((totalAttended/totalMarked)*100) : 0}%"></div>
                   <div class="att-bar-seg att-seg-absent" style="width:${totalMarked > 0 ? Math.round((totalSkipped/totalMarked)*100) : 0}%"></div>
                 </div>
-                <div style="display:flex;justify-content:space-between;margin-top:4px;font-family:var(--font-mono);font-size:0.68rem;color:var(--text-muted)">
+                <div style="display:flex;justify-content:space-between;margin-top:5px;font-family:var(--font-mono);font-size:0.67rem;color:var(--text-muted)">
                   <span>${totalAttended} present</span>
                   <span>${totalSkipped} missed</span>
                 </div>
               </div>
-            ` : ''}
+              ${!dashGuidance.isSafe ? `
+              <div style="margin-top:10px;font-size:0.77rem;color:var(--text-secondary);line-height:1.5;padding:8px 10px;background:color-mix(in srgb, var(--red) 5%, var(--surface-2));border-radius:var(--radius-sm);border-left:2px solid var(--red)">
+                ${dashGuidance.message}
+              </div>` : `<div class="att-stat-message" style="margin-top:8px">${dashGuidance.message}</div>`}
+            ` : `<div class="att-stat-message" style="margin-top:8px">${dashGuidance.message}</div>`}
           </div>
         </div>
 
@@ -4617,7 +4774,7 @@ function renderTimetable() {
           </button>
           <button class="btn btn-sm ${isSkipped ? 'btn-primary' : 'btn-secondary'}"
                   onclick="event.stopPropagation(); setAttendance('${dateStr}', '${classKey}', 'skipped')"
-                  title="Mark ${c.subject} Bunked" aria-label="Mark ${c.subject} as bunked" aria-pressed="${isSkipped}"
+                  title="Mark ${c.subject} as skipped" aria-label="Mark ${c.subject} as skipped" aria-pressed="${isSkipped}"
                   style="padding:4px 10px;font-size:0.75rem;font-weight:700;border-radius:6px;min-width:32px;height:28px;
                          ${isSkipped ? 'background:var(--red);border-color:var(--red);color:#ffffff;' : ''}">
             ✕
@@ -4782,6 +4939,20 @@ function getSubjectList() {
     }
   });
 
+  // 4. Collect from Attendance Baselines (KEY_ATTENDANCE_BASELINE)
+  const baselines = loadAttendanceBaselines();
+  Object.entries(baselines || {}).forEach(([k, b]) => {
+    if (b && typeof b === 'object') {
+      const name = (b.subjectName || k || '').trim();
+      const code = (b.subjectCode || '').trim();
+      if (name) {
+        getOrCreateSubject(name, code, b.classType || (b.isLab ? 'lab' : 'lecture'));
+      }
+    } else if (k && typeof k === 'string' && k.trim()) {
+      getOrCreateSubject(k.trim(), '', 'lecture');
+    }
+  });
+
   return Array.from(map.values());
 }
 
@@ -4821,8 +4992,12 @@ function getSubjectBaseline(subjItem) {
   else if (nameKey && baselines[nameKey]) match = baselines[nameKey];
   else {
     for (const [k, v] of Object.entries(baselines)) {
+      if (!v || typeof v !== 'object') continue;
+      const vCode = (v.subjectCode || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+      const vName = (v.subjectName || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
       const cleanK = k.toLowerCase().replace(/[^a-z0-9]/g, '');
-      if ((cleanCode && cleanK === cleanCode) || (cleanName && cleanK === cleanName)) {
+      if ((cleanCode && (cleanK === cleanCode || vCode === cleanCode)) ||
+          (cleanName && (cleanK === cleanName || vName === cleanName))) {
         match = v;
         break;
       }
@@ -4934,7 +5109,7 @@ function getSubjectAttendance(subjItem) {
   Object.values(attendanceData).forEach(dayObj => {
     if (dayObj && typeof dayObj === 'object') {
       Object.entries(dayObj).forEach(([key, status]) => {
-        const cleanKey = key.toLowerCase();
+        const cleanKey = key.toLowerCase().replace(/[^a-zA-Z0-9_]/g, '');
         const matchesCode = targetCode && cleanKey.startsWith(targetCode + '_');
         const matchesName = targetName && cleanKey.startsWith(targetName + '_');
         if (matchesCode || matchesName) {
@@ -4960,7 +5135,9 @@ function getSubjectAttendance(subjItem) {
   const pct = total > 0 ? Math.round((present / total) * 100) : null;
   const exactPct = total > 0 ? parseFloat(((present / total) * 100).toFixed(2)) : null;
 
-  const isSafe = pct !== null ? pct >= 75 : null;
+  const targetPct = getAttendanceTarget();
+  const targetFrac = targetPct / 100;
+  const isSafe = pct !== null ? pct >= targetPct : null;
   const statusLine = pct === null ? 'Attendance not set yet' : isSafe ? 'Safe Zone' : 'Needs Recovery';
 
   let insightMessage = '';
@@ -4969,13 +5146,14 @@ function getSubjectAttendance(subjItem) {
 
   if (pct !== null) {
     if (isSafe) {
-      safeSkips = Math.max(0, Math.floor((present - 0.75 * total) / 0.75));
+      safeSkips = Math.max(0, Math.floor((present - targetFrac * total) / targetFrac));
       insightMessage = safeSkips > 0
-        ? `Can safely miss ${safeSkips} class${safeSkips !== 1 ? 'es' : ''} · Target: 75%`
+        ? `Can safely miss ${safeSkips} class${safeSkips !== 1 ? 'es' : ''} · Target: ${targetPct}%`
         : `On target at ${pct}% · Attend next class to build buffer`;
     } else {
-      classesToAttend = Math.max(1, Math.ceil((0.75 * total - present) / 0.25));
-      insightMessage = `Need to attend ${classesToAttend} class${classesToAttend !== 1 ? 'es' : ''} continuously to reach 75%`;
+      const denom = Math.max(0.01, 1 - targetFrac);
+      classesToAttend = Math.max(1, Math.ceil((targetFrac * total - present) / denom));
+      insightMessage = `Need to attend ${classesToAttend} class${classesToAttend !== 1 ? 'es' : ''} continuously to reach ${targetPct}%`;
     }
   }
 
@@ -4994,6 +5172,7 @@ function getSubjectAttendance(subjItem) {
     insightMessage,
     safeSkips,
     classesToAttend,
+    targetPct,
     baseline,
     liveAdj,
     dailyAttended,
@@ -5034,29 +5213,27 @@ function getOverallAttendance() {
 
 function showBaselineModal(preselectedSubject = null, initialTab = 'manual') {
   const subjects = getSubjectList();
-  if (!subjects.length) {
-    showToast('Set up your weekly timetable or add tasks first to configure subjects.', 'info');
-    return;
-  }
-
   const existingBackdrop = document.getElementById('baseline-modal-backdrop');
   if (existingBackdrop) existingBackdrop.remove();
 
-  let activeSubj = subjects[0];
-  if (preselectedSubject) {
+  let activeSubj = subjects.length > 0 ? subjects[0] : null;
+  if (preselectedSubject && subjects.length > 0) {
     const found = subjects.find(s =>
-      s.code.toLowerCase() === preselectedSubject.toLowerCase() ||
-      s.name.toLowerCase() === preselectedSubject.toLowerCase()
+      (s.code && s.code.toLowerCase() === preselectedSubject.toLowerCase()) ||
+      (s.name && s.name.toLowerCase() === preselectedSubject.toLowerCase())
     );
     if (found) activeSubj = found;
   }
 
-  const optionsHTML = subjects.map(s => {
-    const isSel = (s.code === activeSubj.code || s.name === activeSubj.name);
-    return `<option value="${s.code || s.name}" ${isSel ? 'selected' : ''}>${s.name} (${s.code || 'No Code'})</option>`;
-  }).join('');
+  let optionsHTML = '';
+  if (subjects.length > 0) {
+    optionsHTML = subjects.map(s => {
+      const isSel = activeSubj && (s.code === activeSubj.code || s.name === activeSubj.name);
+      return `<option value="${s.code || s.name}" ${isSel ? 'selected' : ''}>${s.name} (${s.code || 'No Code'})</option>`;
+    }).join('') + `<option value="__new__">+ Add New Subject…</option>`;
+  }
 
-  const baseline = getSubjectBaseline(activeSubj);
+  const baseline = activeSubj ? getSubjectBaseline(activeSubj) : { present: 0, absent: 0, leave: 0, notEntered: 0, totalSessions: 0, totalCount: 0, hasBaseline: false };
 
   const backdrop = document.createElement('div');
   backdrop.className = 'modal-backdrop';
@@ -5089,9 +5266,23 @@ function showBaselineModal(preselectedSubject = null, initialTab = 'manual') {
 
         <div class="form-group" style="margin-bottom:14px">
           <label class="form-label" style="font-weight:600">Subject</label>
-          <select id="ab-subject-select" class="form-select" onchange="onBaselineSubjectChange(this.value)">
-            ${optionsHTML}
-          </select>
+          ${subjects.length > 0 ? `
+            <select id="ab-subject-select" class="form-select" onchange="onBaselineSubjectChange(this.value)">
+              ${optionsHTML}
+            </select>
+            <div id="ab-new-subject-fields" style="display:none;grid-template-columns:1.5fr 1fr;gap:10px;margin-top:8px">
+              <input type="text" id="ab-new-subject-name" class="form-input" placeholder="Subject Name * (e.g. Operating Systems)" oninput="updateBaselinePreview()">
+              <input type="text" id="ab-new-subject-code" class="form-input" placeholder="Code (e.g. CS302)" oninput="updateBaselinePreview()">
+            </div>
+          ` : `
+            <div id="ab-new-subject-fields" style="display:grid;grid-template-columns:1.5fr 1fr;gap:10px">
+              <input type="text" id="ab-new-subject-name" class="form-input" placeholder="Subject Name * (e.g. Operating Systems)" oninput="updateBaselinePreview()">
+              <input type="text" id="ab-new-subject-code" class="form-input" placeholder="Code (e.g. CS302)" oninput="updateBaselinePreview()">
+            </div>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px">
+              No subjects set up yet. Enter your subject name and counts below to begin.
+            </div>
+          `}
         </div>
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
@@ -5129,11 +5320,11 @@ function showBaselineModal(preselectedSubject = null, initialTab = 'manual') {
         <div id="ab-preview-card" style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:16px"></div>
 
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
-          <button type="button" class="btn-secondary" id="ab-clear-btn" onclick="clearSubjectBaseline()" style="color:var(--red);border-color:rgba(239,68,68,0.3);font-size:0.82rem;${baseline.hasBaseline ? '' : 'display:none'}">
+          <button type="button" class="btn btn-sm btn-secondary" id="ab-clear-btn" onclick="clearSubjectBaseline()" style="color:var(--status-error);border-color:color-mix(in srgb, var(--status-error) 30%, transparent);font-size:0.82rem;${baseline.hasBaseline ? '' : 'display:none'}">
             Clear Baseline
           </button>
           <div style="display:flex;align-items:center;gap:10px;margin-left:auto">
-            <button type="button" class="btn-secondary" onclick="document.getElementById('baseline-modal-backdrop')?.remove()" style="font-size:0.84rem">Cancel</button>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="document.getElementById('baseline-modal-backdrop')?.remove()" style="font-size:0.84rem">Cancel</button>
             <button type="button" class="btn-primary" onclick="saveSubjectBaselineFromModal()" style="padding:8px 18px;font-size:0.85rem;font-weight:600">Save Baseline ✓</button>
           </div>
         </div>
@@ -5685,16 +5876,27 @@ function extractColumnIntervalsFromHeader(headerWords) {
 function parseColumnNumberToken(arr) {
   if (!arr || !arr.length) return 0;
   for (const token of arr) {
-    const cleaned = token
-      .replace(/[%]/g, '')
-      .replace(/^[OoQD]$/, '0')
-      .replace(/^[lI|i]$/, '1')
-      .replace(/^[Ss]$/, '5')
-      .replace(/^[Bb]$/, '8');
+    if (!token) continue;
+    let cleaned = String(token).trim()
+      .replace(/[%₹$]/g, '')
+      .replace(/(?<=\d)[OoQD](?=\d|$)/g, '0')
+      .replace(/(?<=\d)[lI|i](?=\d|$)/g, '1')
+      .replace(/^[OoQD@C]$/, '0')
+      .replace(/^[lI|i!\]\[]$/, '1')
+      .replace(/^[Zz?]$/, '2')
+      .replace(/^[Ee]$/, '3')
+      .replace(/^[Ah]$/, '4')
+      .replace(/^[Ss$§]$/, '5')
+      .replace(/^[Gb]$/, '6')
+      .replace(/^[Tt/]$/, '7')
+      .replace(/^[Bb&]$/, '8')
+      .replace(/^[gq]$/, '9')
+      .trim();
+
     const m = cleaned.match(/\b\d+(\.\d+)?\b/);
     if (m) {
       const n = parseFloat(m[0]);
-      if (!isNaN(n)) return Math.round(n);
+      if (!isNaN(n) && n >= 0) return Math.round(n);
     }
   }
   return 0;
@@ -5704,8 +5906,75 @@ function solveAttendanceCounts(numTokens, pctToken = null) {
   const nums = (numTokens || []).filter(n => typeof n === 'number' && !isNaN(n) && n >= 0);
   if (nums.length < 2) return null;
 
-  // 1. Check mathematical consistency: Present + Absent + [Leave + NotEntered] == Total
-  for (let tIdx = 0; tIdx < nums.length; tIdx++) {
+  // 1. Sort candidate totals descending (college attendance rows have total as the largest count)
+  const candidateIndices = [...nums.keys()].sort((a, b) => nums[b] - nums[a]);
+
+  // Try 4-term balance first (P + A + L + N == Total)
+  for (const tIdx of candidateIndices) {
+    const candidateTotal = nums[tIdx];
+    if (candidateTotal < 1) continue;
+
+    for (let pIdx = 0; pIdx < nums.length; pIdx++) {
+      if (pIdx === tIdx) continue;
+      for (let aIdx = 0; aIdx < nums.length; aIdx++) {
+        if (aIdx === tIdx || aIdx === pIdx) continue;
+        for (let lIdx = 0; lIdx < nums.length; lIdx++) {
+          if (lIdx === tIdx || lIdx === pIdx || lIdx === aIdx) continue;
+          for (let nIdx = 0; nIdx < nums.length; nIdx++) {
+            if (nIdx === tIdx || nIdx === pIdx || nIdx === aIdx || nIdx === lIdx) continue;
+
+            const p = nums[pIdx];
+            const a = nums[aIdx];
+            const l = nums[lIdx];
+            const n = nums[nIdx];
+
+            if (p + a + l + n === candidateTotal) {
+              if (pctToken) {
+                const expectedPct = (p / candidateTotal) * 100;
+                if (Math.abs(expectedPct - pctToken) < 1.8) {
+                  return { present: Math.round(p), absent: Math.round(a), leave: Math.round(l), notEntered: Math.round(n), total: Math.round(candidateTotal), confidence: 98 };
+                }
+              }
+              return { present: Math.round(p), absent: Math.round(a), leave: Math.round(l), notEntered: Math.round(n), total: Math.round(candidateTotal), confidence: 95 };
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Try 3-term balance (P + A + L == Total)
+  for (const tIdx of candidateIndices) {
+    const candidateTotal = nums[tIdx];
+    if (candidateTotal < 1) continue;
+
+    for (let pIdx = 0; pIdx < nums.length; pIdx++) {
+      if (pIdx === tIdx) continue;
+      for (let aIdx = 0; aIdx < nums.length; aIdx++) {
+        if (aIdx === tIdx || aIdx === pIdx) continue;
+        for (let lIdx = 0; lIdx < nums.length; lIdx++) {
+          if (lIdx === tIdx || lIdx === pIdx || lIdx === aIdx) continue;
+
+          const p = nums[pIdx];
+          const a = nums[aIdx];
+          const l = nums[lIdx];
+
+          if (p + a + l === candidateTotal) {
+            if (pctToken) {
+              const expectedPct = (p / candidateTotal) * 100;
+              if (Math.abs(expectedPct - pctToken) < 1.8) {
+                return { present: Math.round(p), absent: Math.round(a), leave: Math.round(l), notEntered: 0, total: Math.round(candidateTotal), confidence: 98 };
+              }
+            }
+            return { present: Math.round(p), absent: Math.round(a), leave: Math.round(l), notEntered: 0, total: Math.round(candidateTotal), confidence: 92 };
+          }
+        }
+      }
+    }
+  }
+
+  // Try 2-term balance (P + A == Total)
+  for (const tIdx of candidateIndices) {
     const candidateTotal = nums[tIdx];
     if (candidateTotal < 1) continue;
 
@@ -5717,34 +5986,14 @@ function solveAttendanceCounts(numTokens, pctToken = null) {
         const p = nums[pIdx];
         const a = nums[aIdx];
 
-        // Direct 2-term balance: P + A == Total
         if (p + a === candidateTotal) {
           if (pctToken) {
             const expectedPct = (p / candidateTotal) * 100;
-            if (Math.abs(expectedPct - pctToken) < 1.5) {
-              return { present: Math.round(p), absent: Math.round(a), leave: 0, notEntered: 0, total: Math.round(candidateTotal), confidence: 95 };
-            }
-          } else {
-            return { present: Math.round(p), absent: Math.round(a), leave: 0, notEntered: 0, total: Math.round(candidateTotal), confidence: 85 };
-          }
-        }
-
-        // 3-term balance: P + A + L == Total
-        for (let lIdx = 0; lIdx < nums.length; lIdx++) {
-          if (lIdx === tIdx || lIdx === pIdx || lIdx === aIdx) continue;
-          const l = nums[lIdx];
-          if (p + a + l === candidateTotal) {
-            return { present: Math.round(p), absent: Math.round(a), leave: Math.round(l), notEntered: 0, total: Math.round(candidateTotal), confidence: 90 };
-          }
-
-          // 4-term balance: P + A + L + N == Total
-          for (let nIdx = 0; nIdx < nums.length; nIdx++) {
-            if (nIdx === tIdx || nIdx === pIdx || nIdx === aIdx || nIdx === lIdx) continue;
-            const n = nums[nIdx];
-            if (p + a + l + n === candidateTotal) {
-              return { present: Math.round(p), absent: Math.round(a), leave: Math.round(l), notEntered: Math.round(n), total: Math.round(candidateTotal), confidence: 95 };
+            if (Math.abs(expectedPct - pctToken) < 1.8) {
+              return { present: Math.round(p), absent: Math.round(a), leave: 0, notEntered: 0, total: Math.round(candidateTotal), confidence: 98 };
             }
           }
+          return { present: Math.round(p), absent: Math.round(a), leave: 0, notEntered: 0, total: Math.round(candidateTotal), confidence: 90 };
         }
       }
     }
@@ -5765,7 +6014,7 @@ function solveAttendanceCounts(numTokens, pctToken = null) {
     const absent = Math.round(remaining[1]);
     const leave = remaining.length >= 3 ? Math.round(remaining[2]) : 0;
     const notEntered = remaining.length >= 4 ? Math.round(remaining[3]) : 0;
-    return { present, absent, leave, notEntered, total: present + absent + leave + notEntered, confidence: 70 };
+    return { present, absent, leave, notEntered, total: present + absent + leave + notEntered, confidence: 75 };
   }
 
   return { present: Math.round(nums[0]), absent: Math.round(nums[1]), leave: 0, notEntered: 0, total: Math.round(nums[0] + nums[1]), confidence: 60 };
@@ -5777,6 +6026,8 @@ function cleanSubjectString(s, existingSubjects = []) {
   let text = s.trim();
   // Strip leading serial numbers (e.g. "1.", "02", "1 -")
   text = text.replace(/^\d+[\s.\-–)]+/, '');
+  // Strip room and teacher tokens first before numbers are stripped
+  text = text.replace(/\b(?:prof\.|dr\.|mr\.|ms\.|mrs\.|lh\s*[-–]?\s*\d+|lab\s*[-–]?\s*\d+|room\s*[-–]?\s*\d+)\b/gi, ' ');
   // Strip standalone numeric tokens from subject text
   text = text.replace(/\b\d+(\.\d+)?%?\b/g, ' ');
   // Strip portal table headers & metadata tokens
@@ -5998,6 +6249,7 @@ function matchScannedRowToSubjects(rawRow, existingSubjects = []) {
 
   const finalSubject = bestMatch ? bestMatch.name : (targetName || 'General Subject');
   const finalCode = bestMatch ? bestMatch.code : targetCode;
+  const isSubjectValid = finalSubject && finalSubject !== 'General Subject' && finalSubject.length >= 3;
 
   return {
     subject: finalSubject,
@@ -6007,7 +6259,7 @@ function matchScannedRowToSubjects(rawRow, existingSubjects = []) {
     leave: Math.max(0, parseInt(rawRow.leave) || 0),
     notEntered: Math.max(0, parseInt(rawRow.notEntered) || 0),
     totalSessions: Math.max(0, parseInt(rawRow.totalSessions) || 0),
-    isUncertain: !bestMatch || (rawRow.present + rawRow.absent === 0) || norm.normalization_confidence < 80 || !!rawRow.isUncertain
+    isUncertain: !isSubjectValid || (rawRow.present + rawRow.absent === 0) || !!rawRow.isUncertain
   };
 }
 
@@ -6091,7 +6343,7 @@ function renderReviewRowsHTML(rows, subjects) {
             </select>
           </div>
           <div style="display:flex;align-items:center;gap:8px">
-            <span class="type-badge" id="row-badge-${idx}" style="font-size:0.72rem;padding:3px 8px;background:${isSafe ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)'};color:${isSafe ? 'var(--green)' : 'var(--red)'}">
+            <span class="type-badge" id="row-badge-${idx}" style="font-size:0.72rem;padding:3px 8px;background:${isSafe ? 'color-mix(in srgb, var(--status-success) 14%, transparent)' : 'color-mix(in srgb, var(--status-error) 14%, transparent)'};color:${isSafe ? 'var(--status-success)' : 'var(--status-error)'}">
               ${total > 0 ? `${pct}% · ${isSafe ? 'Safe Zone' : 'Needs Recovery'}` : 'Attendance not set'}
             </span>
             <button type="button" onclick="deleteReviewRow(${idx})" class="btn-icon" style="color:var(--text-muted);font-size:0.9rem" title="Remove row">✕</button>
@@ -6100,15 +6352,15 @@ function renderReviewRowsHTML(rows, subjects) {
 
         <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(80px, 1fr));gap:8px">
           <div>
-            <label class="form-label" style="font-size:0.72rem;margin-bottom:2px;color:var(--green)">Present *</label>
+            <label class="form-label" style="font-size:0.72rem;margin-bottom:2px;color:var(--status-success)">Present *</label>
             <input type="number" min="0" class="form-input review-present" id="row-present-${idx}" value="${r.present}" style="font-size:0.84rem;padding:5px 8px" oninput="onReviewRowInputChange(${idx})">
           </div>
           <div>
-            <label class="form-label" style="font-size:0.72rem;margin-bottom:2px;color:var(--red)">Absent *</label>
+            <label class="form-label" style="font-size:0.72rem;margin-bottom:2px;color:var(--status-error)">Absent *</label>
             <input type="number" min="0" class="form-input review-absent" id="row-absent-${idx}" value="${r.absent}" style="font-size:0.84rem;padding:5px 8px" oninput="onReviewRowInputChange(${idx})">
           </div>
           <div>
-            <label class="form-label" style="font-size:0.72rem;margin-bottom:2px;color:var(--yellow)">Leave</label>
+            <label class="form-label" style="font-size:0.72rem;margin-bottom:2px;color:var(--status-warning)">Leave</label>
             <input type="number" min="0" class="form-input review-leave" id="row-leave-${idx}" value="${r.leave || 0}" style="font-size:0.84rem;padding:5px 8px" oninput="onReviewRowInputChange(${idx})">
           </div>
           <div>
@@ -6135,8 +6387,8 @@ function onReviewRowInputChange(idx) {
   const badgeEl = document.getElementById(`row-badge-${idx}`);
   if (badgeEl) {
     badgeEl.textContent = total > 0 ? `${pct}% · ${isSafe ? 'Safe Zone' : 'Needs Recovery'}` : 'Attendance not set';
-    badgeEl.style.background = isSafe ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)';
-    badgeEl.style.color = isSafe ? 'var(--green)' : 'var(--red)';
+    badgeEl.style.background = isSafe ? 'color-mix(in srgb, var(--status-success) 14%, transparent)' : 'color-mix(in srgb, var(--status-error) 14%, transparent)';
+    badgeEl.style.color = isSafe ? 'var(--status-success)' : 'var(--status-error)';
   }
 }
 
@@ -6268,8 +6520,28 @@ function showAttendanceScanErrorModal(message) {
 }
 
 function onBaselineSubjectChange(subjectKey) {
+  const newFields = document.getElementById('ab-new-subject-fields');
+  if (subjectKey === '__new__') {
+    if (newFields) newFields.style.display = 'grid';
+    const presentEl = document.getElementById('ab-present');
+    const absentEl = document.getElementById('ab-absent');
+    const leaveEl = document.getElementById('ab-leave');
+    const notEnteredEl = document.getElementById('ab-not-entered');
+    const totalSessionsEl = document.getElementById('ab-total-sessions');
+    const clearBtn = document.getElementById('ab-clear-btn');
+    if (presentEl) presentEl.value = '';
+    if (absentEl) absentEl.value = '';
+    if (leaveEl) leaveEl.value = '';
+    if (notEnteredEl) notEnteredEl.value = '';
+    if (totalSessionsEl) totalSessionsEl.value = '';
+    if (clearBtn) clearBtn.style.display = 'none';
+    updateBaselinePreview();
+    return;
+  }
+  if (newFields) newFields.style.display = 'none';
+
   const subjects = getSubjectList();
-  const subj = subjects.find(s => (s.code || s.name) === subjectKey) || subjects[0];
+  const subj = subjects.find(s => (s.code || s.name) === subjectKey || s.name === subjectKey) || subjects[0];
   if (!subj) return;
 
   const baseline = getSubjectBaseline(subj);
@@ -6303,10 +6575,11 @@ function updateBaselinePreview() {
   const notEnteredVal = parseInt(document.getElementById('ab-not-entered')?.value) || 0;
   const totalSessionsVal = parseInt(document.getElementById('ab-total-sessions')?.value) || 0;
 
+  const targetPct = getAttendanceTarget();
   const totalCount = presentVal + absentVal + leaveVal + notEnteredVal;
   const pct = totalCount > 0 ? ((presentVal / totalCount) * 100) : 0;
   const pctFormatted = pct.toFixed(2);
-  const isSafe = pct >= 75;
+  const isSafe = pct >= targetPct;
 
   if (totalCount === 0) {
     previewEl.innerHTML = `
@@ -6317,14 +6590,14 @@ function updateBaselinePreview() {
     return;
   }
 
-  const guidance = calculateSmartAttendanceGuidance(presentVal, absentVal + leaveVal + notEnteredVal, 75);
+  const guidance = calculateSmartAttendanceGuidance(presentVal, absentVal + leaveVal + notEnteredVal, targetPct);
 
   previewEl.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px">
       <div style="font-size:0.82rem;font-weight:600;color:var(--text-primary)">
         Conducted: <strong>${totalCount}</strong> sessions (${presentVal} attended)
       </div>
-      <span class="type-badge" style="font-size:0.75rem;padding:2px 8px;background:${isSafe ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)'};color:${isSafe ? 'var(--green)' : 'var(--red)'}">
+      <span class="type-badge" style="font-size:0.75rem;padding:2px 8px;background:${isSafe ? 'color-mix(in srgb, var(--status-success) 14%, transparent)' : 'color-mix(in srgb, var(--status-error) 14%, transparent)'};color:${isSafe ? 'var(--status-success)' : 'var(--status-error)'}">
         ${isSafe ? 'Safe Zone' : 'Needs Recovery'} · ${pctFormatted}%
       </span>
     </div>
@@ -6341,11 +6614,34 @@ function updateBaselinePreview() {
 
 function saveSubjectBaselineFromModal() {
   const selectEl = document.getElementById('ab-subject-select');
-  const subjectKey = selectEl ? selectEl.value : null;
-  if (!subjectKey) return;
+  const customNameEl = document.getElementById('ab-new-subject-name');
+  const customCodeEl = document.getElementById('ab-new-subject-code');
 
-  const subjects = getSubjectList();
-  const subj = subjects.find(s => (s.code || s.name) === subjectKey) || { name: subjectKey, code: subjectKey };
+  let subjName = '';
+  let subjCode = '';
+
+  if (selectEl && selectEl.value && selectEl.value !== '__new__') {
+    const subjectKey = selectEl.value;
+    const subjects = getSubjectList();
+    const subj = subjects.find(s => (s.code || s.name) === subjectKey || s.name === subjectKey) || { name: subjectKey, code: subjectKey };
+    subjName = subj.name;
+    subjCode = subj.code || '';
+  } else if (customNameEl && customNameEl.value.trim()) {
+    subjName = customNameEl.value.trim();
+    subjCode = (customCodeEl ? customCodeEl.value.trim() : '');
+  }
+
+  if (!subjName) {
+    if (customNameEl) {
+      customNameEl.classList.add('error', 'shake');
+      customNameEl.focus();
+    } else if (selectEl) {
+      selectEl.classList.add('error', 'shake');
+      selectEl.focus();
+    }
+    showToast('Please specify a subject name for this baseline.', 'error');
+    return;
+  }
 
   const present = Math.max(0, parseInt(document.getElementById('ab-present')?.value) || 0);
   const absent = Math.max(0, parseInt(document.getElementById('ab-absent')?.value) || 0);
@@ -6357,11 +6653,11 @@ function saveSubjectBaselineFromModal() {
   const pct = totalCount > 0 ? ((present / totalCount) * 100).toFixed(1) : '0.0';
 
   const baselines = loadAttendanceBaselines();
-  const storageKey = (subj.code || subj.name).trim();
+  const storageKey = (subjCode || subjName).trim();
 
   baselines[storageKey] = {
-    subjectCode: subj.code || '',
-    subjectName: subj.name || '',
+    subjectCode: subjCode,
+    subjectName: subjName,
     present,
     absent,
     leave,
@@ -6372,18 +6668,18 @@ function saveSubjectBaselineFromModal() {
 
   saveAttendanceBaselines(baselines);
   document.getElementById('baseline-modal-backdrop')?.remove();
-  showToast(`Baseline saved for ${subj.name} (${pct}%) ✓`, 'success');
+  showToast(`Baseline saved for ${subjName} (${pct}%) ✓`, 'success');
   renderPage(state.currentPage);
 }
 
 function clearSubjectBaseline() {
   const selectEl = document.getElementById('ab-subject-select');
   const subjectKey = selectEl ? selectEl.value : null;
-  if (!subjectKey) return;
+  if (!subjectKey || subjectKey === '__new__') return;
 
   const baselines = loadAttendanceBaselines();
   const subjects = getSubjectList();
-  const subj = subjects.find(s => (s.code || s.name) === subjectKey) || { name: subjectKey, code: subjectKey };
+  const subj = subjects.find(s => (s.code || s.name) === subjectKey || s.name === subjectKey) || { name: subjectKey, code: subjectKey };
 
   const storageKey = (subj.code || subj.name).trim();
   delete baselines[storageKey];
@@ -6424,12 +6720,17 @@ function detectDeskPollution() {
   return false;
 }
 
+function loadDeclutterBackup() {
+  return safeGetStorage(KEY_CLEANUP_BACKUP, null);
+}
+
 function showDeclutterDeskModal() {
   const existingBackdrop = document.getElementById('declutter-modal-backdrop');
   if (existingBackdrop) existingBackdrop.remove();
 
   const p = liveProfile || loadProfile() || {};
   const currentBatch = p.batch || safeGetStorage(KEY_USER_BATCH, '') || '';
+  const backup = loadDeclutterBackup();
 
   const backdrop = document.createElement('div');
   backdrop.className = 'modal-backdrop';
@@ -6450,7 +6751,7 @@ function showDeclutterDeskModal() {
           <li><strong>General lectures</strong> with no batch markers will be kept for everyone.</li>
           <li><strong>Practical lab sessions</strong> will only be kept if they match your specific batch.</li>
           <li>Duplicate variations and OCR noise will be merged into clean canonical Subject Hub cards.</li>
-          <li>Attendance records, tasks, and timetable slots will be safely remapped.</li>
+          <li>Attendance baselines, daily check-in logs, and tasks will be safely remapped.</li>
         </ul>
       </div>
 
@@ -6462,13 +6763,28 @@ function showDeclutterDeskModal() {
         </div>
       </div>
 
-      <div style="display:flex;align-items:center;justify-content:flex-end;gap:10px;padding-top:10px;border-top:1px solid var(--border)">
-        <button type="button" class="btn-secondary" onclick="document.getElementById('declutter-modal-backdrop')?.remove()" style="font-size:0.84rem">
-          Cancel
-        </button>
-        <button type="button" class="btn-primary" onclick="proceedToDeclutterPreview()" style="font-size:0.85rem;padding:8px 18px;font-weight:600">
-          Preview Cleanup Plan →
-        </button>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:10px;border-top:1px solid var(--border);flex-wrap:wrap">
+        <div>
+          ${backup && backup.timestamp ? `
+            <button type="button" class="btn-secondary" onclick="document.getElementById('declutter-modal-backdrop')?.remove(); showRestoreDeskModal();" style="font-size:0.8rem;padding:6px 12px;color:var(--text-secondary)">
+              ↩ Restore Previous Backup
+            </button>
+          ` : `
+            <button type="button" class="btn-secondary" onclick="document.getElementById('declutter-modal-backdrop')?.remove()" style="font-size:0.84rem">
+              Cancel
+            </button>
+          `}
+        </div>
+        <div style="display:flex;gap:8px">
+          ${backup && backup.timestamp ? `
+            <button type="button" class="btn-secondary" onclick="document.getElementById('declutter-modal-backdrop')?.remove()" style="font-size:0.84rem">
+              Cancel
+            </button>
+          ` : ''}
+          <button type="button" class="btn-primary" onclick="proceedToDeclutterPreview()" style="font-size:0.85rem;padding:8px 18px;font-weight:600">
+            Preview Cleanup Plan →
+          </button>
+        </div>
       </div>
     </div>
   `;
@@ -6544,10 +6860,10 @@ function generateDeclutterPlan(liveTT, liveBaselines, liveTasks, userBatch = 'al
     });
   });
 
-  // 2. Process Attendance Baselines
   const survivingList = Array.from(subjectMap.values());
-  const newBaselines = {};
 
+  // 2. Process Attendance Baselines
+  const newBaselines = {};
   Object.entries(liveBaselines || {}).forEach(([oldKey, oldVal]) => {
     const rawSubj = oldVal.subjectName || oldKey;
     const norm = normalizeSubjectIdentity(rawSubj, survivingList);
@@ -6587,13 +6903,112 @@ function generateDeclutterPlan(liveTT, liveBaselines, liveTasks, userBatch = 'al
     });
   });
 
+  // 3. Process Historical Daily Attendance Logs (KEY_ATTENDANCE)
+  const liveDailyAttendance = safeGetStorage(KEY_ATTENDANCE, {}) || {};
+  const newDailyAttendance = {};
+  const remappedDailyLogs = [];
+  const unmatchedDailyLogs = [];
+  let totalDailyLogsCount = 0;
+
+  Object.entries(liveDailyAttendance).forEach(([dateStr, dayLogs]) => {
+    if (!dayLogs || typeof dayLogs !== 'object') return;
+    newDailyAttendance[dateStr] = {};
+
+    Object.entries(dayLogs).forEach(([oldClassKey, status]) => {
+      totalDailyLogsCount++;
+      const lastUnderscore = oldClassKey.lastIndexOf('_');
+      const rawSubjKey = lastUnderscore > 0 ? oldClassKey.substring(0, lastUnderscore) : oldClassKey;
+      const timeSuffix = lastUnderscore > 0 ? oldClassKey.substring(lastUnderscore) : '';
+
+      const cleanRaw = rawSubjKey.toLowerCase().replace(/[^a-z0-9]/g, '');
+      let matched = survivingList.find(s => {
+        const sCode = (s.code || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        const sName = (s.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        return (sCode && cleanRaw === sCode) || (sName && cleanRaw === sName) || (sCode && cleanRaw.startsWith(sCode)) || (sName && cleanRaw.startsWith(sName));
+      });
+
+      if (!matched) {
+        const norm = normalizeSubjectIdentity(rawSubjKey, survivingList);
+        matched = survivingList.find(s =>
+          s.name.toLowerCase() === norm.canonicalName.toLowerCase() ||
+          (s.code && norm.canonicalCode && s.code.toLowerCase() === norm.canonicalCode.toLowerCase())
+        );
+      }
+
+      if (matched) {
+        const targetId = (matched.code || matched.name).replace(/[^a-zA-Z0-9_]/g, '');
+        const targetTime = timeSuffix.replace(/[^a-zA-Z0-9_]/g, '');
+        const newClassKey = `${targetId}${targetTime}`;
+
+        newDailyAttendance[dateStr][newClassKey] = status;
+
+        if (newClassKey !== oldClassKey) {
+          remappedDailyLogs.push({
+            date: dateStr,
+            oldKey: oldClassKey,
+            newKey: newClassKey,
+            subjectName: matched.name,
+            status
+          });
+        }
+      } else {
+        // Safe retention: Never discard unmatched logs
+        newDailyAttendance[dateStr][oldClassKey] = status;
+        unmatchedDailyLogs.push({
+          date: dateStr,
+          key: oldClassKey,
+          status
+        });
+      }
+    });
+  });
+
+  // 4. Calculate Affected Tasks and Links Count
+  const tasks = safeGetStorage(KEY_CUSTOM_TASKS, []);
+  let affectedTasksCount = 0;
+  if (Array.isArray(tasks)) {
+    tasks.forEach(t => {
+      if (!t.subject) return;
+      const norm = normalizeSubjectIdentity(t.subject, survivingList);
+      const matched = survivingList.find(s => 
+        s.name.toLowerCase() === t.subject.toLowerCase() || 
+        (s.code && s.code.toLowerCase() === t.subject.toLowerCase()) ||
+        s.name.toLowerCase() === norm.canonicalName.toLowerCase() ||
+        (s.code && norm.canonicalCode && s.code.toLowerCase() === norm.canonicalCode.toLowerCase())
+      );
+      if (matched && matched.name !== t.subject) affectedTasksCount++;
+    });
+  }
+
+  const links = safeGetStorage(KEY_CUSTOM_LINKS, []);
+  let affectedLinksCount = 0;
+  if (Array.isArray(links)) {
+    links.forEach(l => {
+      if (!l.subject) return;
+      const norm = normalizeSubjectIdentity(l.subject, survivingList);
+      const matched = survivingList.find(s => 
+        s.name.toLowerCase() === l.subject.toLowerCase() || 
+        (s.code && s.code.toLowerCase() === l.subject.toLowerCase()) ||
+        s.name.toLowerCase() === norm.canonicalName.toLowerCase() ||
+        (s.code && norm.canonicalCode && s.code.toLowerCase() === norm.canonicalCode.toLowerCase())
+      );
+      if (matched && matched.name !== l.subject) affectedLinksCount++;
+    });
+  }
+
   return {
     newTimetable: newTT,
     newBaselines,
+    newDailyAttendance,
     survivingSubjects: survivingList,
     archivedSlots,
     mergedSubjects: Array.from(mergedSubjects.entries()).map(([k, v]) => ({ canonicalName: k, rawSources: Array.from(v) })),
-    remappedBaselines
+    remappedBaselines,
+    remappedDailyLogs,
+    unmatchedDailyLogs,
+    totalDailyLogsCount,
+    affectedTasksCount,
+    affectedLinksCount
   };
 }
 
@@ -6633,12 +7048,32 @@ function renderDeclutterPreviewModal(plan, userBatch) {
         <button class="modal-close" onclick="document.getElementById('declutter-modal-backdrop')?.remove()">${icons.x()}</button>
       </div>
 
+      <!-- Overview Stats Grid -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:8px;margin-bottom:14px">
+        <div style="background:var(--surface-2);padding:8px 10px;border-radius:6px;text-align:center">
+          <div style="font-size:1.15rem;font-weight:800;color:var(--accent)">${plan.survivingSubjects.length}</div>
+          <div style="font-size:0.72rem;color:var(--text-muted)">Canonical Hubs</div>
+        </div>
+        <div style="background:var(--surface-2);padding:8px 10px;border-radius:6px;text-align:center">
+          <div style="font-size:1.15rem;font-weight:800;color:var(--yellow)">${plan.archivedSlots.length}</div>
+          <div style="font-size:0.72rem;color:var(--text-muted)">Other Batches Removed</div>
+        </div>
+        <div style="background:var(--surface-2);padding:8px 10px;border-radius:6px;text-align:center">
+          <div style="font-size:1.15rem;font-weight:800;color:var(--green)">${plan.remappedDailyLogs.length}</div>
+          <div style="font-size:0.72rem;color:var(--text-muted)">Daily Logs Remapped</div>
+        </div>
+        <div style="background:var(--surface-2);padding:8px 10px;border-radius:6px;text-align:center">
+          <div style="font-size:1.15rem;font-weight:800;color:var(--text-primary)">${plan.remappedBaselines.length}</div>
+          <div style="font-size:0.72rem;color:var(--text-muted)">Baselines Merged</div>
+        </div>
+      </div>
+
       <div style="display:flex;align-items:center;justify-content:space-between;background:var(--surface-2);border-radius:6px;padding:8px 12px;margin-bottom:14px;font-size:0.8rem">
         <span>🎓 Practical Batch Filter:</span>
         <strong style="color:var(--accent)">${userBatch === 'all' ? 'All (Keep all batches)' : `Batch ${userBatch.toUpperCase()}`}</strong>
       </div>
 
-      <div style="max-height:50vh;overflow-y:auto;padding-right:4px;margin-bottom:16px">
+      <div style="max-height:48vh;overflow-y:auto;padding-right:4px;margin-bottom:16px">
         <div style="font-weight:700;font-size:0.86rem;margin-bottom:8px;color:var(--text-primary)">
           🟢 Surviving Canonical Subject Hubs (${plan.survivingSubjects.length})
         </div>
@@ -6656,7 +7091,22 @@ function renderDeclutterPreviewModal(plan, userBatch) {
             📊 Attendance Baselines Reassigned (${plan.remappedBaselines.length})
           </div>
           <div style="font-size:0.77rem;color:var(--text-muted);background:var(--surface-2);padding:8px 12px;border-radius:6px">
-            All existing present and absent counts have been remapped to your clean canonical subjects.
+            All existing present and absent counts have been safely mapped to your clean canonical subjects.
+          </div>
+        ` : ''}
+
+        ${plan.remappedDailyLogs.length > 0 ? `
+          <div style="font-weight:700;font-size:0.86rem;margin:14px 0 6px 0;color:var(--text-secondary)">
+            📅 Daily Attendance Logs Remapped (${plan.remappedDailyLogs.length})
+          </div>
+          <div style="font-size:0.77rem;color:var(--text-muted);background:var(--surface-2);padding:8px 12px;border-radius:6px">
+            Past attendance marks from uncleaned subject keys will now link seamlessly to their canonical timetable slots.
+          </div>
+        ` : ''}
+
+        ${plan.unmatchedDailyLogs && plan.unmatchedDailyLogs.length > 0 ? `
+          <div style="font-size:0.74rem;color:var(--text-muted);background:var(--surface-2);padding:6px 10px;border-radius:6px;margin-top:10px">
+            🛡️ <strong>Data Safety:</strong> ${plan.unmatchedDailyLogs.length} unassociated check-in logs were safely retained without modification.
           </div>
         ` : ''}
       </div>
@@ -6686,13 +7136,14 @@ function confirmExecuteDeclutter() {
 }
 
 function executeDeclutterPlan(plan, userBatch) {
-  // 1. Take a safe snapshot before applying changes
+  // 1. Take a safe complete snapshot before applying any destructive writes
   const backup = {
     timestamp: new Date().toISOString(),
     userBatch,
     timetable: loadTimetable(),
     baselines: loadAttendanceBaselines(),
     liveAttendance: loadLiveAttendanceActions(),
+    dailyAttendance: safeGetStorage(KEY_ATTENDANCE, {}) || {},
     tasks: safeGetStorage(KEY_CUSTOM_TASKS, []),
     links: safeGetStorage(KEY_CUSTOM_LINKS, []),
     profile: liveProfile || loadProfile() || {}
@@ -6705,35 +7156,46 @@ function executeDeclutterPlan(plan, userBatch) {
   // 3. Save remapped attendance baselines
   saveAttendanceBaselines(plan.newBaselines);
 
-  // 4. Remap tasks
+  // 4. Save remapped historical daily attendance logs
+  if (plan.newDailyAttendance) {
+    safeSetStorage(KEY_ATTENDANCE, plan.newDailyAttendance);
+  }
+
+  // 5. Remap tasks
   const tasks = safeGetStorage(KEY_CUSTOM_TASKS, []);
   if (Array.isArray(tasks) && tasks.length > 0) {
     const updatedTasks = tasks.map(t => {
       if (!t.subject) return t;
+      const norm = normalizeSubjectIdentity(t.subject, plan.survivingSubjects);
       const matched = plan.survivingSubjects.find(s => 
         s.name.toLowerCase() === t.subject.toLowerCase() || 
-        (s.code && s.code.toLowerCase() === t.subject.toLowerCase())
+        (s.code && s.code.toLowerCase() === t.subject.toLowerCase()) ||
+        s.name.toLowerCase() === norm.canonicalName.toLowerCase() ||
+        (s.code && norm.canonicalCode && s.code.toLowerCase() === norm.canonicalCode.toLowerCase())
       );
       return matched ? { ...t, subject: matched.name } : t;
     });
     safeSetStorage(KEY_CUSTOM_TASKS, updatedTasks);
   }
 
-  // 5. Remap custom links
+  // 6. Remap custom links
   const links = safeGetStorage(KEY_CUSTOM_LINKS, []);
   if (Array.isArray(links) && links.length > 0) {
     const updatedLinks = links.map(l => {
       if (!l.subject) return l;
+      const norm = normalizeSubjectIdentity(l.subject, plan.survivingSubjects);
       const matched = plan.survivingSubjects.find(s => 
         s.name.toLowerCase() === l.subject.toLowerCase() || 
-        (s.code && s.code.toLowerCase() === l.subject.toLowerCase())
+        (s.code && s.code.toLowerCase() === l.subject.toLowerCase()) ||
+        s.name.toLowerCase() === norm.canonicalName.toLowerCase() ||
+        (s.code && norm.canonicalCode && s.code.toLowerCase() === norm.canonicalCode.toLowerCase())
       );
       return matched ? { ...l, subject: matched.name } : l;
     });
     safeSetStorage(KEY_CUSTOM_LINKS, updatedLinks);
   }
 
-  // 6. Update user profile batch
+  // 7. Update user profile batch
   if (userBatch && userBatch.toLowerCase() !== 'all') {
     safeSetStorage(KEY_USER_BATCH, userBatch);
     const p = liveProfile || loadProfile() || {};
@@ -6747,6 +7209,92 @@ function executeDeclutterPlan(plan, userBatch) {
   document.getElementById('declutter-modal-backdrop')?.remove();
   showToast('Your desk is now decluttered and normalized! ✨', 'success');
   renderPage(state.currentPage);
+}
+
+function showRestoreDeskModal() {
+  const backup = loadDeclutterBackup();
+  if (!backup || !backup.timestamp) {
+    showToast('No previous desk cleanup backup found to restore.', 'info');
+    return;
+  }
+
+  const existing = document.getElementById('restore-desk-backdrop');
+  if (existing) existing.remove();
+
+  const formattedDate = new Date(backup.timestamp).toLocaleString();
+  const ttCount = [1, 2, 3, 4, 5, 6, 0].reduce((acc, d) => acc + ((backup.timetable && backup.timetable[d]) ? backup.timetable[d].length : 0), 0);
+  const baseCount = Object.keys(backup.baselines || {}).length;
+  const taskCount = Array.isArray(backup.tasks) ? backup.tasks.length : 0;
+  const linkCount = Array.isArray(backup.links) ? backup.links.length : 0;
+  const dailyCount = Object.values(backup.dailyAttendance || {}).reduce((acc, day) => acc + (typeof day === 'object' ? Object.keys(day).length : 0), 0);
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  backdrop.id = 'restore-desk-backdrop';
+  backdrop.innerHTML = `
+    <div class="modal" onclick="event.stopPropagation()" style="max-width:520px;padding:26px 22px">
+      <div class="modal-header" style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px">
+        <div>
+          <h2 class="modal-title" style="margin:0;font-size:1.24rem;font-weight:700">Restore Previous Desk Setup</h2>
+          <div style="font-size:0.8rem;color:var(--text-muted);margin-top:3px">Roll back your timetable, attendance baselines, and logs to before the last cleanup.</div>
+        </div>
+        <button class="modal-close" onclick="document.getElementById('restore-desk-backdrop')?.remove()">${icons.x()}</button>
+      </div>
+
+      <div style="background:var(--surface-2);border-radius:6px;padding:12px 14px;margin-bottom:16px;font-size:0.82rem">
+        <div style="font-weight:600;color:var(--text-primary);margin-bottom:6px">📦 Snapshot Details:</div>
+        <div style="color:var(--text-secondary);line-height:1.6;font-size:0.79rem">
+          📅 <strong>Backup Created:</strong> ${formattedDate}<br>
+          🎓 <strong>Previous Filter:</strong> ${backup.userBatch && backup.userBatch !== 'all' ? `Batch ${backup.userBatch.toUpperCase()}` : 'All Batches (General)'}<br>
+          📊 <strong>Contents:</strong> ${ttCount} timetable slots · ${baseCount} baselines · ${dailyCount} daily logs · ${taskCount} tasks · ${linkCount} links
+        </div>
+      </div>
+
+      <div style="background:color-mix(in srgb, var(--status-error) 8%, var(--bg-surface));border-left:3px solid var(--status-error);border-radius:var(--radius-xs,6px);padding:10px 12px;margin-bottom:18px;font-size:0.79rem;color:var(--text-secondary)">
+        ⚠️ <strong>Note:</strong> Restoring this backup will replace current timetable slots, attendance baselines, and daily logs with the state saved on ${formattedDate}.
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:12px;border-top:1px solid var(--border)">
+        <button type="button" class="btn btn-sm btn-secondary" onclick="document.getElementById('restore-desk-backdrop')?.remove()" style="font-size:0.84rem">
+          Cancel
+        </button>
+        <button type="button" class="btn btn-sm btn-primary" onclick="confirmExecuteRestore()" style="font-size:0.86rem;padding:8px 20px;font-weight:600;background:var(--status-error);border-color:var(--status-error)">
+          Confirm &amp; Restore Desk ↩
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+}
+
+function confirmExecuteRestore() {
+  const backup = loadDeclutterBackup();
+  if (!backup) {
+    showToast('No backup found to restore.', 'error');
+    return;
+  }
+
+  try {
+    if (backup.timetable) safeSetStorage(KEY_CUSTOM_TIMETABLE, backup.timetable);
+    if (backup.baselines) safeSetStorage(KEY_ATTENDANCE_BASELINE, backup.baselines);
+    if (backup.liveAttendance) safeSetStorage(KEY_ATTENDANCE_LIVE, backup.liveAttendance);
+    if (backup.dailyAttendance) safeSetStorage(KEY_ATTENDANCE, backup.dailyAttendance);
+    if (backup.tasks) safeSetStorage(KEY_CUSTOM_TASKS, backup.tasks);
+    if (backup.links) safeSetStorage(KEY_CUSTOM_LINKS, backup.links);
+    if (backup.userBatch) safeSetStorage(KEY_USER_BATCH, backup.userBatch);
+    if (backup.profile) {
+      safeSetStorage(KEY_PROFILE, backup.profile);
+      liveProfile = backup.profile;
+    }
+
+    syncToCloud();
+    document.getElementById('restore-desk-backdrop')?.remove();
+    showToast('Previous desk setup restored successfully! ↩', 'success');
+    renderPage(state.currentPage);
+  } catch (err) {
+    console.error('[RestoreBackup] Error restoring snapshot:', err);
+    showToast('Failed to restore backup. Your current data is preserved.', 'error');
+  }
 }
 
 function renderSubjects() {
@@ -6773,8 +7321,15 @@ function renderSubjectsOverview(el, subjects) {
           <div class="page-subtitle">Course schedules, attendance baselines, tasks &amp; study resources organized per subject</div>
         </div>
       </div>
-      <div class="card" style="padding:40px;text-align:center;color:var(--text-muted);border-style:dashed">
-        📚 No subjects found yet. Set up your timetable or add tasks to automatically build your subject hubs!
+      <div class="empty-state-card" style="margin-top:16px">
+        <span class="empty-state-icon">📚</span>
+        <div class="empty-state-title">No Subjects Set Up Yet</div>
+        <div class="empty-state-desc">Import your timetable schedule or enter an initial attendance baseline to automatically create your Subject Hubs.</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:10px">
+          <button class="btn-primary" onclick="triggerTimetableImport()" style="font-size:0.82rem;padding:7px 14px">📷 Scan Timetable Photo</button>
+          <button class="btn-secondary" onclick="showBaselineModal(null, 'manual')" style="font-size:0.82rem;padding:7px 14px">📊 Set Attendance Baseline</button>
+          <button class="btn-secondary" onclick="loadOfficialAidsTimetable()" style="font-size:0.82rem;padding:7px 14px">📋 Sample Template</button>
+        </div>
       </div>
     `;
     return;
@@ -6787,7 +7342,7 @@ function renderSubjectsOverview(el, subjects) {
     const tasks = allTasks().filter(t => (t.subject || '').toLowerCase() === s.name.toLowerCase() || (t.subject || '').toLowerCase() === s.code.toLowerCase());
     const pendingTasks = tasks.filter(t => t.status === 'pending');
 
-    const attStatusClass = att.pct === null ? 'muted' : att.pct >= 75 ? 'green' : 'red';
+    const attStatusClass = att.pct === null ? 'muted' : att.isSafe ? 'green' : 'red';
     const attLabel = att.pct !== null ? `${att.exactPct !== null ? att.exactPct : att.pct}%` : 'Attendance not set yet';
 
     return `
@@ -6799,10 +7354,10 @@ function renderSubjectsOverview(el, subjects) {
             <div style="font-size:0.78rem;color:var(--text-muted);margin-top:2px">${s.code} ${s.teacher ? '· Prof. ' + s.teacher : ''} ${s.room ? '· ' + s.room : ''}</div>
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px">
-            <span class="type-badge" style="font-size:0.75rem;padding:3px 9px;background:${attStatusClass==='green'?'rgba(16,185,129,0.15)':attStatusClass==='red'?'rgba(239,68,68,0.15)':'var(--surface-2)'};color:${attStatusClass==='green'?'var(--green)':attStatusClass==='red'?'var(--red)':'var(--text-muted)'}">
+            <span class="type-badge" style="font-size:0.75rem;padding:3px 9px;background:${attStatusClass==='green'?'color-mix(in srgb, var(--status-success) 14%, transparent)':attStatusClass==='red'?'color-mix(in srgb, var(--status-error) 14%, transparent)':'var(--surface-2)'};color:${attStatusClass==='green'?'var(--status-success)':attStatusClass==='red'?'var(--status-error)':'var(--text-muted)'}">
               ${attLabel}
             </span>
-            <span style="font-size:0.68rem;font-weight:600;color:${att.pct===null?'var(--text-muted)':att.pct>=75?'var(--green)':'var(--red)'}">
+            <span style="font-size:0.68rem;font-weight:600;color:${att.pct===null?'var(--text-muted)':att.isSafe?'var(--status-success)':'var(--status-error)'}">
               ${att.statusLine}
             </span>
           </div>
@@ -6837,13 +7392,13 @@ function renderSubjectsOverview(el, subjects) {
 
         <!-- Action Buttons: Present, Missed, Leave, Edit baseline -->
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-          <button class="btn btn-sm btn-secondary attendance-action-btn" onclick="event.stopPropagation(); logSubjectAttendanceAction('${s.code || s.name}', 'present')" title="Log 1 class attended" style="color:var(--green);border-color:rgba(16,185,129,0.3)">
+          <button class="btn btn-sm btn-secondary attendance-action-btn" onclick="event.stopPropagation(); logSubjectAttendanceAction('${s.code || s.name}', 'present')" title="Log 1 class attended" style="color:var(--status-success);border-color:color-mix(in srgb, var(--status-success) 30%, transparent)">
             Present
           </button>
-          <button class="btn btn-sm btn-secondary attendance-action-btn" onclick="event.stopPropagation(); logSubjectAttendanceAction('${s.code || s.name}', 'missed')" title="Log 1 class missed" style="color:var(--red);border-color:rgba(239,68,68,0.3)">
+          <button class="btn btn-sm btn-secondary attendance-action-btn" onclick="event.stopPropagation(); logSubjectAttendanceAction('${s.code || s.name}', 'missed')" title="Log 1 class missed" style="color:var(--status-error);border-color:color-mix(in srgb, var(--status-error) 30%, transparent)">
             Missed
           </button>
-          <button class="btn btn-sm btn-secondary attendance-action-btn" onclick="event.stopPropagation(); logSubjectAttendanceAction('${s.code || s.name}', 'leave')" title="Log 1 leave applied" style="color:var(--yellow);border-color:rgba(245,158,11,0.3)">
+          <button class="btn btn-sm btn-secondary attendance-action-btn" onclick="event.stopPropagation(); logSubjectAttendanceAction('${s.code || s.name}', 'leave')" title="Log 1 leave applied" style="color:var(--status-warning);border-color:color-mix(in srgb, var(--status-warning) 30%, transparent)">
             Leave
           </button>
           <button class="btn btn-sm btn-secondary attendance-action-btn" onclick="event.stopPropagation(); showBaselineModal('${s.code || s.name}')" style="margin-left:auto;font-size:0.74rem">
@@ -6920,7 +7475,17 @@ function renderSingleSubjectHub(el, subj, allSubjects) {
   const pendingTasks = tasks.filter(t => t.status === 'pending');
   const doneTasks = tasks.filter(t => t.status === 'submitted');
 
-  const links = loadCustomLinks().filter(l => (l.subject || '').toLowerCase() === subj.name.toLowerCase() || (l.subject || '').toLowerCase() === subj.code.toLowerCase());
+  const subjectVaults = loadCustomLinks().filter(l => 
+    (l.subject || '').toLowerCase() === subj.name.toLowerCase() || 
+    (subj.code && (l.code || '').toLowerCase() === subj.code.toLowerCase())
+  );
+  
+  const allResources = [];
+  subjectVaults.forEach((v, si) => {
+    if (Array.isArray(v.resources)) {
+      v.resources.forEach((r, ri) => allResources.push({ ...r, vaultSubject: v.subject, vaultIdx: si, resIdx: ri }));
+    }
+  });
 
   // Timetable slots
   const slotsHTML = subj.slots.length > 0 ? subj.slots.map(sl => `
@@ -6955,15 +7520,25 @@ function renderSingleSubjectHub(el, subj, allSubjects) {
   }).join('') : `<div style="font-size:0.82rem;color:var(--text-muted);padding:10px 0">No active tasks for this subject. Tap + Add Task to create one.</div>`;
 
   // Links list
-  const linksHTML = links.length > 0 ? links.map(l => `
+  const linksHTML = allResources.length > 0 ? allResources.map(r => `
     <div class="card card-sm" style="margin-bottom:6px;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px">
       <div style="display:flex;align-items:center;gap:8px;min-width:0;flex:1">
-        <span style="width:8px;height:8px;border-radius:50%;background:${l.color || 'var(--accent)'};flex-shrink:0"></span>
-        <a href="${l.url}" target="_blank" rel="noopener noreferrer" style="font-weight:600;font-size:0.85rem;color:var(--accent);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${l.subject}</a>
+        <span class="r-icon" style="font-size:1.05rem;line-height:1">${getResourceIcon(r.icon || 'book-open')}</span>
+        <div style="min-width:0;flex:1">
+          <div style="font-weight:600;font-size:0.85rem;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.label}</div>
+          ${r.fileSize ? `<div style="font-size:0.7rem;color:var(--text-muted)">${r.fileSize}</div>` : ''}
+        </div>
       </div>
-      <a href="${l.url}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-secondary" style="font-size:0.75rem;padding:3px 8px">Open ↗</a>
+      <a href="${r.url}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-secondary" style="font-size:0.75rem;padding:3px 9px">${r.isUpload ? 'Download 📥' : 'Open ↗'}</a>
     </div>
-  `).join('') : `<div style="font-size:0.82rem;color:var(--text-muted);padding:10px 0">No study links or notes saved for this subject yet.</div>`;
+  `).join('') : `
+    <div class="empty-state-card" style="padding:16px 14px;margin-top:6px;text-align:center">
+      <div style="font-size:1.35rem;margin-bottom:4px">📚</div>
+      <div style="font-weight:600;font-size:0.88rem;color:var(--text-primary);margin-bottom:2px">No Study Links or Notes Yet</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:10px">Attach drive folders, lecture notes, syllabus PDFs, or code repos for ${subj.name}.</div>
+      <button class="btn btn-sm btn-primary" onclick="openAddResourceForSubject('${(subj.name || '').replace(/'/g, "\\'")}', '${(subj.code || '').replace(/'/g, "\\'")}')" style="font-size:0.78rem;padding:5px 14px">+ Add Study Link / Note</button>
+    </div>
+  `;
 
   el.innerHTML = `
     <div style="margin-bottom:16px">
@@ -6982,7 +7557,7 @@ function renderSingleSubjectHub(el, subj, allSubjects) {
             </div>
           </div>
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-            <span class="type-badge" style="font-size:0.8rem;padding:5px 12px;background:${att.pct===null?'var(--surface-2)':att.pct>=75?'rgba(16,185,129,0.15)':'rgba(239,68,68,0.15)'};color:${att.pct===null?'var(--text-muted)':att.pct>=75?'var(--green)':'var(--red)'}">
+            <span class="type-badge" style="font-size:0.8rem;padding:5px 12px;background:${att.pct===null?'var(--surface-2)':att.isSafe?'color-mix(in srgb, var(--status-success) 14%, transparent)':'color-mix(in srgb, var(--status-error) 14%, transparent)'};color:${att.pct===null?'var(--text-muted)':att.isSafe?'var(--status-success)':'var(--status-error)'}">
               ${att.pct !== null ? `${att.exactPct !== null ? att.exactPct : att.pct}% Attendance (${att.attended}/${att.total})` : 'Attendance not set yet'}
             </span>
             <button class="btn btn-sm ${att.hasBaseline ? 'btn-secondary' : 'btn-primary'}" onclick="showBaselineModal('${subj.code || subj.name}')" style="display:inline-flex;align-items:center;gap:6px;font-size:0.78rem;padding:5px 11px">
@@ -7001,13 +7576,13 @@ function renderSingleSubjectHub(el, subj, allSubjects) {
         <!-- Quick Log Action Bar on Subject Hub -->
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
           <span style="font-size:0.74rem;font-weight:600;color:var(--text-muted);letter-spacing:-0.01em">Quick Log:</span>
-          <button class="btn btn-sm btn-secondary attendance-action-btn" onclick="logSubjectAttendanceAction('${subj.code || subj.name}', 'present')" style="color:var(--green);border-color:rgba(16,185,129,0.35)">
+          <button class="btn btn-sm btn-secondary attendance-action-btn" onclick="logSubjectAttendanceAction('${subj.code || subj.name}', 'present')" style="color:var(--status-success);border-color:color-mix(in srgb, var(--status-success) 35%, transparent)">
             Present (+1)
           </button>
-          <button class="btn btn-sm btn-secondary attendance-action-btn" onclick="logSubjectAttendanceAction('${subj.code || subj.name}', 'missed')" style="color:var(--red);border-color:rgba(239,68,68,0.35)">
+          <button class="btn btn-sm btn-secondary attendance-action-btn" onclick="logSubjectAttendanceAction('${subj.code || subj.name}', 'missed')" style="color:var(--status-error);border-color:color-mix(in srgb, var(--status-error) 35%, transparent)">
             Missed (+1)
           </button>
-          <button class="btn btn-sm btn-secondary attendance-action-btn" onclick="logSubjectAttendanceAction('${subj.code || subj.name}', 'leave')" style="color:var(--yellow);border-color:rgba(245,158,11,0.35)">
+          <button class="btn btn-sm btn-secondary attendance-action-btn" onclick="logSubjectAttendanceAction('${subj.code || subj.name}', 'leave')" style="color:var(--status-warning);border-color:color-mix(in srgb, var(--status-warning) 35%, transparent)">
             Leave (+1)
           </button>
           <button class="btn btn-sm btn-secondary attendance-action-btn" onclick="showBaselineModal('${subj.code || subj.name}')" style="margin-left:auto">
@@ -7035,7 +7610,7 @@ function renderSingleSubjectHub(el, subj, allSubjects) {
           </div>
           <div style="background:var(--surface-2);padding:10px 12px;border-radius:8px">
             <div style="font-size:0.75rem;color:var(--text-muted)">Study Resources</div>
-            <div style="font-size:1.1rem;font-weight:700;margin-top:2px">${links.length} link${links.length!==1?'s':''}</div>
+            <div style="font-size:1.1rem;font-weight:700;margin-top:2px">${allResources.length} link${allResources.length!==1?'s':''}</div>
           </div>
         </div>
 
@@ -7073,7 +7648,7 @@ function renderSingleSubjectHub(el, subj, allSubjects) {
     <div style="margin-bottom:20px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
         <div class="section-heading" style="margin-bottom:0">Study Links &amp; Notes</div>
-        <button class="btn btn-sm btn-primary" onclick="addLinkSubject()" style="font-size:0.75rem;padding:3px 9px">+ Add Link</button>
+        <button class="btn btn-sm btn-primary" onclick="openAddResourceForSubject('${(subj.name || '').replace(/'/g, "\\'")}', '${(subj.code || '').replace(/'/g, "\\'")}')" style="font-size:0.75rem;padding:3px 9px">+ Add Link</button>
       </div>
       ${linksHTML}
     </div>
@@ -7381,29 +7956,29 @@ function renderAssignments() {
   }).join('') : (all.length === 0 
     ? `<div class="empty-state-card" style="margin-top:14px">
         <span class="empty-state-icon">📚</span>
-        <div class="empty-state-title">No Academic Tasks Yet</div>
-        <div class="empty-state-desc">Stay ahead of coursework, standing missions, and exam deadlines. Tap Add Task to organize your desk with ease.</div>
-        <button class="btn-primary" onclick="showAddTaskModal()" style="font-size:0.82rem;padding:7px 16px">+ Add Your First Task</button>
+        <div class="empty-state-title">No Tasks Yet</div>
+        <div class="empty-state-desc">Stay on top of coursework, deadlines, and project milestones. Tap Add Task to get started.</div>
+        <button class="btn-primary" onclick="showAddTaskModal()" style="font-size:0.82rem;padding:7px 16px">+ Add Task</button>
       </div>`
     : (state.assignFilter === 'ongoing' || state.assignFilter === 'missions')
     ? `<div class="empty-state-card" style="margin-top:14px">
         <span class="empty-state-icon">🚀</span>
-        <div class="empty-state-title">No Ongoing Missions Active</div>
-        <div class="empty-state-desc">Missions stay visible on your desk without deadlines until you finish them. Tap Add Task to set your first long-term target.</div>
-        <button class="btn-primary" onclick="showAddTaskModal(null, null, 'mission')" style="font-size:0.82rem;padding:7px 16px">+ Create First Mission</button>
+        <div class="empty-state-title">No Standing Missions</div>
+        <div class="empty-state-desc">Missions stay visible on your desk without rigid deadlines until you complete them.</div>
+        <button class="btn-primary" onclick="showAddTaskModal(null, null, 'mission')" style="font-size:0.82rem;padding:7px 16px">+ Create Mission</button>
       </div>`
     : `<div class="empty-state-card" style="margin-top:14px">
         <span class="empty-state-icon">✨</span>
         <div class="empty-state-title">No Matching Tasks</div>
-        <div class="empty-state-desc">No tasks found matching the selected filter. Try switching back to All Tasks or reset your filters.</div>
+        <div class="empty-state-desc">No tasks found matching the selected filter. Try switching back to All Tasks or resetting your filters.</div>
         <button class="btn-secondary" onclick="resetAssignmentFilters()" style="font-size:0.82rem;padding:6px 14px">Reset Filters</button>
       </div>`);
 
   el.innerHTML = `
     <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start">
       <div>
-        <div class="page-title">Tasks &amp; Workload</div>
-        <div class="page-subtitle">${pendingCount()} pending · ${all.filter(a=>a.status==='submitted').length} completed · Academic tasks &amp; standing missions</div>
+        <div class="page-title">Tasks &amp; Deadlines</div>
+        <div class="page-subtitle">${pendingCount()} pending · ${all.filter(a=>a.status==='submitted').length} completed</div>
       </div>
       <button class="btn-primary" onclick="showAddTaskModal()" style="display:flex;align-items:center;gap:6px;flex-shrink:0">${icons.plus()} Add Task</button>
     </div>
@@ -7713,19 +8288,19 @@ function renderNotices() {
       </div>
 
       <!-- Card 2: WhatsApp / Community Group -->
-      <div class="notice-source-card tint-whatsapp" onclick="handleNoticeSourceClick('whatsapp')" title="Open class WhatsApp group invite or community">
+      <div class="notice-source-card tint-whatsapp" onclick="handleNoticeSourceClick('whatsapp')" title="Open class group or channel">
         <div class="notice-source-top">
           <div class="notice-source-icon-wrap notice-source-icon-whatsapp">💬</div>
-          <button class="btn-icon" onclick="event.stopPropagation(); showNoticeChannelModal('whatsapp')" title="Edit WhatsApp community settings" style="width:24px;height:24px;font-size:0.72rem" aria-label="Edit WhatsApp community settings">
+          <button class="btn-icon" onclick="event.stopPropagation(); showNoticeChannelModal('whatsapp')" title="Edit class group link" style="width:24px;height:24px;font-size:0.72rem" aria-label="Edit class group link">
             ✏️
           </button>
         </div>
         <div>
           <div class="notice-source-title">${escHtml_cd(channels.whatsappTitle || 'Class Community')}</div>
-          <div class="notice-source-sub">Open group invite or community in WhatsApp</div>
+          <div class="notice-source-sub">Open batch channel or group invite</div>
         </div>
-        <div class="notice-source-action" style="color:#25D366">
-          <span>${channels.whatsappUrl ? 'Join via WhatsApp ↗' : '+ Set Invite Link'}</span>
+        <div class="notice-source-action" style="color:var(--accent-warm, #25D366)">
+          <span>${channels.whatsappUrl ? 'Open Class Group ↗' : '+ Set Channel Link'}</span>
         </div>
       </div>
 
@@ -7733,7 +8308,7 @@ function renderNotices() {
       <div class="notice-source-card tint-devnotes" onclick="showDevNotesModal()" title="View recent updates and improvements">
         <div class="notice-source-top">
           <div class="notice-source-icon-wrap notice-source-icon-devnotes">🛠️</div>
-          <span style="font-size:0.68rem;font-weight:700;background:rgba(245,158,11,0.15);color:var(--yellow);padding:2px 6px;border-radius:4px">v2.4</span>
+          <span style="font-size:0.68rem;font-weight:700;background:color-mix(in srgb, var(--status-warning) 14%, transparent);color:var(--status-warning);padding:2px 6px;border-radius:var(--radius-xs,4px)">v2.4</span>
         </div>
         <div>
           <div class="notice-source-title">Dev Notes</div>
@@ -7851,7 +8426,7 @@ function renderLinksContent(container) {
   const subjectsHtml = links.map((s, si) => `
     <div class="link-subject-card" id="link-card-${si}">
       <div class="link-subject-header">
-        <span class="link-color-dot" style="background:${s.color || '#6366f1'}"></span>
+        <span class="link-color-dot" style="background:${s.color || '#394B63'}"></span>
         <span class="link-subject-title" title="${s.subject}">${s.subject}</span>
         <span class="link-code">${s.code}</span>
         <div class="link-subject-actions">
@@ -7894,6 +8469,25 @@ function renderLinksContent(container) {
 
 window.addLinkSubject = function() {
   showLinkSubjectModal(null, null);
+};
+
+window.openAddResourceForSubject = function(subjectName, subjectCode = '') {
+  const links = loadCustomLinks();
+  const cleanName = (subjectName || '').trim();
+  const cleanCode = (subjectCode || '').trim();
+  const matchedIdx = links.findIndex(l => 
+    (l.subject || '').toLowerCase() === cleanName.toLowerCase() || 
+    (cleanCode && (l.code || '').toLowerCase() === cleanCode.toLowerCase())
+  );
+
+  if (matchedIdx !== -1) {
+    showLinkResourceModal(matchedIdx, null, null);
+  } else {
+    showLinkSubjectModal(null, {
+      subject: cleanName,
+      code: cleanCode || (cleanName ? cleanName.slice(0, 4).toUpperCase() : '')
+    });
+  }
 };
 
 window.editLinkSubject = function(si) {
@@ -7951,7 +8545,7 @@ function showLinkSubjectModal(si, existing) {
         </div>
         <div>
           <label class="form-label">Color Indicator</label>
-          <input id="lsm-color" type="color" value="${existing?.color || '#6366f1'}" style="width:60px;height:36px;border:none;cursor:pointer;background:none" />
+          <input id="lsm-color" type="color" value="${existing?.color || '#394B63'}" style="width:60px;height:36px;border:none;cursor:pointer;background:none" />
         </div>
       </div>
       <div class="modal-footer">
@@ -7968,7 +8562,7 @@ window.saveLinkSubject = function(si) {
   const nameEl = document.getElementById('lsm-name');
   const name  = nameEl?.value?.trim();
   const code  = document.getElementById('lsm-code')?.value?.trim();
-  const color = document.getElementById('lsm-color')?.value || '#6366f1';
+  const color = document.getElementById('lsm-color')?.value || '#394B63';
   if (!name) {
     if (nameEl) { nameEl.classList.add('error', 'shake'); nameEl.focus(); }
     showToast('Subject name is required.', 'error');
@@ -8168,7 +8762,7 @@ function renderSummaryContent(container) {
       : classes.map(c => {
           const isPast = currentMin >= timeToMinutes(c.end);
           return `<div class="summary-item" style="${isPast?'opacity:0.5':''}">
-            <div class="summary-icon" style="background:rgba(99,102,241,0.12);color:var(--accent)">${icons.timetable()}</div>
+            <div class="summary-icon" style="background:var(--accent-dim);color:var(--brand-primary)">${icons.timetable()}</div>
             <div style="flex:1;min-width:0">
               <div class="summary-text-main" style="display:flex;align-items:center;flex-wrap:wrap;gap:6px">
                 <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.subject}</span>
@@ -8184,7 +8778,7 @@ function renderSummaryContent(container) {
     ${dueTodayItems.length
       ? dueTodayItems.map(a => `
           <div class="summary-item">
-            <div class="summary-icon" style="background:rgba(245,158,11,0.12);color:var(--yellow)">${icons.assignments()}</div>
+            <div class="summary-icon" style="background:color-mix(in srgb, var(--status-warning) 12%, transparent);color:var(--status-warning)">${icons.assignments()}</div>
             <div style="flex:1;min-width:0">
               <div class="summary-text-main">${a.title}</div>
               <div class="summary-text-sub">${a.subject} · ${a.marks > 0 ? a.marks + ' marks' : 'Academic task'}</div>
@@ -8194,10 +8788,10 @@ function renderSummaryContent(container) {
     }
 
     ${ongoingMissions.length ? `
-      <div class="section-heading" style="margin-top:20px;color:var(--purple)">🚀 Ongoing Missions</div>
+      <div class="section-heading" style="margin-top:20px;color:var(--brand-secondary)">🚀 Ongoing Missions</div>
       ${ongoingMissions.map(a => `
-        <div class="summary-item" style="border-left:3px solid var(--purple)">
-          <div class="summary-icon" style="background:rgba(147,51,234,0.12);color:var(--purple)">${icons.target()}</div>
+        <div class="summary-item" style="border-left:3px solid var(--brand-secondary)">
+          <div class="summary-icon" style="background:color-mix(in srgb, var(--brand-secondary) 12%, transparent);color:var(--brand-secondary)">${icons.target()}</div>
           <div style="flex:1;min-width:0">
             <div class="summary-text-main">${a.title}</div>
             <div class="summary-text-sub">${a.subject} · Standing Goal · Active</div>
@@ -8205,10 +8799,10 @@ function renderSummaryContent(container) {
         </div>`).join('')}` : ''}
 
     ${overdueItems.length ? `
-      <div class="section-heading" style="margin-top:20px;color:var(--red)">⚠ Overdue Tasks</div>
+      <div class="section-heading" style="margin-top:20px;color:var(--status-error)">⚠ Overdue Tasks</div>
       ${overdueItems.map(a => `
-        <div class="summary-item" style="border-left:3px solid var(--red)">
-          <div class="summary-icon" style="background:rgba(239,68,68,0.12);color:var(--red)">${icons.alert()}</div>
+        <div class="summary-item" style="border-left:3px solid var(--status-error)">
+          <div class="summary-icon" style="background:color-mix(in srgb, var(--status-error) 12%, transparent);color:var(--status-error)">${icons.alert()}</div>
           <div style="flex:1;min-width:0">
             <div class="summary-text-main">${a.title}</div>
             <div class="summary-text-sub">${a.subject} · ${Math.abs(dueDaysLeft(a.dueDate) || 1)}d overdue</div>
@@ -8219,7 +8813,7 @@ function renderSummaryContent(container) {
     ${importantNotices.length
       ? importantNotices.map(n => `
           <div class="summary-item" onclick="showNotice('${n.id}')" style="cursor:pointer">
-            <div class="summary-icon" style="background:rgba(239,68,68,0.12);color:var(--red)">${icons.notices()}</div>
+            <div class="summary-icon" style="background:color-mix(in srgb, var(--status-error) 12%, transparent);color:var(--status-error)">${icons.notices()}</div>
             <div style="flex:1;min-width:0">
               <div class="summary-text-main">${n.title}</div>
               <div class="summary-text-sub">${formatDate(n.date)} · ${n.category}</div>
@@ -8280,8 +8874,8 @@ function renderSettings() {
         </div>
         <div>
           ${currentUser ? 
-            `<button class="btn-secondary" onclick="logoutUser()" style="color:var(--red);border-color:rgba(239,68,68,0.35)">Sign Out</button>` : 
-            `<button class="btn-primary" onclick="loginWithGoogle()" style="display:flex;align-items:center;gap:6px">🌐 Sign In with Google</button>`
+            `<button class="btn btn-sm btn-secondary" onclick="logoutUser()" style="color:var(--status-error);border-color:color-mix(in srgb, var(--status-error) 35%, transparent)">Sign Out</button>` : 
+            `<button class="btn btn-primary" onclick="loginWithGoogle()" style="display:flex;align-items:center;gap:6px">🌐 Sign In with Google</button>`
           }
         </div>
       </div>
@@ -8326,10 +8920,10 @@ function renderSettings() {
         Manage your schedule template. You can start clean to add or scan classes for any degree/major, or load the sample Sem 3 AI-DS template.
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap">
-        <button class="btn-secondary" onclick="resetTimetableToDefault()" style="display:inline-flex;align-items:center;gap:6px;font-size:0.84rem;padding:7px 14px;color:var(--red);border-color:rgba(239,68,68,0.3)">
+        <button class="btn btn-secondary" onclick="resetTimetableToDefault()" style="display:inline-flex;align-items:center;gap:6px;font-size:0.84rem;padding:7px 14px;color:var(--status-error);border-color:color-mix(in srgb, var(--status-error) 30%, transparent)">
           Clear Timetable (Start Clean)
         </button>
-        <button class="btn-secondary" onclick="loadOfficialAidsTimetable()" style="display:inline-flex;align-items:center;gap:6px;font-size:0.84rem;padding:7px 14px">
+        <button class="btn btn-secondary" onclick="loadOfficialAidsTimetable()" style="display:inline-flex;align-items:center;gap:6px;font-size:0.84rem;padding:7px 14px">
           📋 Load Sample SY AI-DS Template
         </button>
       </div>
@@ -8350,9 +8944,22 @@ function renderSettings() {
       <div style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:12px;line-height:1.5">
         Did an earlier timetable import or photo scan create duplicate, noisy, or other-batch subject cards? Clean up and normalize your Subject Hubs, timetable slots, and attendance records to match your specific practical batch.
       </div>
-      <button class="btn-primary" onclick="showDeclutterDeskModal()" style="display:inline-flex;align-items:center;gap:6px;font-size:0.84rem;padding:8px 16px">
-        🧹 Declutter my desk →
-      </button>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <button class="btn-primary" onclick="showDeclutterDeskModal()" style="display:inline-flex;align-items:center;gap:6px;font-size:0.84rem;padding:8px 16px">
+          🧹 Declutter my desk →
+        </button>
+        ${(() => {
+          const b = loadDeclutterBackup();
+          if (b && b.timestamp) {
+            return `
+              <button class="btn-secondary" onclick="showRestoreDeskModal()" style="display:inline-flex;align-items:center;gap:6px;font-size:0.84rem;padding:8px 16px;color:var(--text-secondary)">
+                ↩ Restore Previous Desk (${new Date(b.timestamp).toLocaleDateString()})
+              </button>
+            `;
+          }
+          return '';
+        })()}
+      </div>
     </div>
 
     <div class="section-heading">${icons.clock()} Academic Goals & Countdown</div>
@@ -8383,17 +8990,17 @@ function renderSettings() {
         <div class="theme-swatch-grid" role="group" aria-label="Theme selection options">
           <button type="button" class="theme-swatch ${(document.documentElement?.getAttribute('data-theme') || 'paper-slate') === 'paper-slate' ? 'active' : ''}" onclick="setTheme('paper-slate')" aria-pressed="${(document.documentElement?.getAttribute('data-theme') || 'paper-slate') === 'paper-slate'}" aria-label="Paper Slate theme: Clean neutral academic palette">
             <div class="swatch-preview" aria-hidden="true">
-              <div class="swatch-bg" style="background:#f8fafc"></div>
-              <div class="swatch-surface" style="background:#ffffff"></div>
-              <div class="swatch-accent" style="background:#2563eb"></div>
+              <div class="swatch-bg" style="background:#F6F1E8"></div>
+              <div class="swatch-surface" style="background:#FFFDFC"></div>
+              <div class="swatch-accent" style="background:#2F4A3D"></div>
             </div>
             <span class="swatch-name">Paper Slate</span>
           </button>
           <button type="button" class="theme-swatch ${document.documentElement?.getAttribute('data-theme') === 'midnight-ink' ? 'active' : ''}" onclick="setTheme('midnight-ink')" aria-pressed="${document.documentElement?.getAttribute('data-theme') === 'midnight-ink'}" aria-label="Midnight Ink theme: Obsidian dark with electric indigo">
             <div class="swatch-preview" aria-hidden="true">
-              <div class="swatch-bg" style="background:#08090d"></div>
-              <div class="swatch-surface" style="background:#11131a"></div>
-              <div class="swatch-accent" style="background:#6366f1"></div>
+              <div class="swatch-bg" style="background:#171412"></div>
+              <div class="swatch-surface" style="background:#221D19"></div>
+              <div class="swatch-accent" style="background:#7E9C8D"></div>
             </div>
             <span class="swatch-name">Midnight Ink</span>
           </button>
@@ -8401,7 +9008,7 @@ function renderSettings() {
             <div class="swatch-preview" aria-hidden="true">
               <div class="swatch-bg" style="background:#171310"></div>
               <div class="swatch-surface" style="background:#221b16"></div>
-              <div class="swatch-accent" style="background:#d97706"></div>
+              <div class="swatch-accent" style="background:#D2A56B"></div>
             </div>
             <span class="swatch-name">Espresso Desk</span>
           </button>
@@ -8409,7 +9016,7 @@ function renderSettings() {
             <div class="swatch-preview" aria-hidden="true">
               <div class="swatch-bg" style="background:#f5f0e6"></div>
               <div class="swatch-surface" style="background:#fffdfa"></div>
-              <div class="swatch-accent" style="background:#c25e2e"></div>
+              <div class="swatch-accent" style="background:#B48852"></div>
             </div>
             <span class="swatch-name">Sandstone Notes</span>
           </button>
@@ -8417,7 +9024,7 @@ function renderSettings() {
             <div class="swatch-preview" aria-hidden="true">
               <div class="swatch-bg" style="background:#eaf0f6"></div>
               <div class="swatch-surface" style="background:#ffffff"></div>
-              <div class="swatch-accent" style="background:#0284c7"></div>
+              <div class="swatch-accent" style="background:#394B63"></div>
             </div>
             <span class="swatch-name">Nordic Frost</span>
           </button>
@@ -8425,7 +9032,7 @@ function renderSettings() {
             <div class="swatch-preview" aria-hidden="true">
               <div class="swatch-bg" style="background:#f0f5f3"></div>
               <div class="swatch-surface" style="background:#ffffff"></div>
-              <div class="swatch-accent" style="background:#1b7a6d"></div>
+              <div class="swatch-accent" style="background:#4E7A5D"></div>
             </div>
             <span class="swatch-name">Misty Mint</span>
           </button>
@@ -8450,7 +9057,7 @@ function renderSettings() {
       </div>
 
       ${isDenied ? `
-      <div style="margin-bottom:16px;font-size:0.78rem;color:var(--red);background:rgba(239,68,68,0.08);padding:10px 12px;border-radius:6px;border:1px solid rgba(239,68,68,0.25);line-height:1.5;display:flex;align-items:flex-start;gap:8px">
+      <div style="margin-bottom:16px;font-size:0.78rem;color:var(--status-error);background:color-mix(in srgb, var(--status-error) 8%, var(--bg-surface));padding:10px 12px;border-radius:var(--radius-xs,6px);border:1px solid color-mix(in srgb, var(--status-error) 25%, transparent);line-height:1.5;display:flex;align-items:flex-start;gap:8px">
         <span style="font-size:0.9rem">🔒</span>
         <div>
           <strong>Notifications are blocked by your browser.</strong> To receive alerts, click the lock or tune icon (🔒) near your browser address bar, set <strong>Notifications</strong> to <strong>Allow</strong>, and click <strong>Re-check Permission</strong>.
@@ -8588,8 +9195,8 @@ function renderSettings() {
           Restore Backup (.json)
         </button>
         <input type="file" id="import-file-input" accept=".json" style="display:none" onchange="importData(event)">
-        <button class="btn-secondary" onclick="confirmClearTasks()"
-          style="color:var(--red);border-color:rgba(239,68,68,0.35)">
+        <button class="btn btn-secondary" onclick="confirmClearTasks()"
+          style="color:var(--status-error);border-color:color-mix(in srgb, var(--status-error) 35%, transparent)">
           Clear All Custom Tasks
         </button>
       </div>
@@ -8657,7 +9264,7 @@ function saveSettings() {
   updateTopbarProfile();
   setupFABDrag();
   syncToCloud();
-  showToast('Settings saved successfully ✓', 'success');
+  showToast('Settings saved ✓', 'success');
 }
 
 function saveNoticeChannelsFromSettings() {
@@ -8680,7 +9287,7 @@ function exportData() {
   a.href = url; a.download = `clarity-desk-backup-${todayStr()}.json`;
   a.click();
   URL.revokeObjectURL(url);
-  showToast('Backup file downloaded ✓', 'success');
+  showToast('Backup downloaded ✓', 'success');
 }
 
 function importData(event) {
@@ -8716,10 +9323,10 @@ function importData(event) {
       updateTopbarProfile();
       setupFABDrag();
       updateNavBadges();
-      showToast('Desk data restored successfully! ✨', 'success');
+      showToast('Desk data restored ✓', 'success');
       renderSettings();
     } catch (err) {
-      showToast('Error parsing backup: ' + err.message, 'error');
+      showToast('Could not read backup file. Please select a valid Clarity Desk JSON backup.', 'error');
     }
   };
   reader.readAsText(file);
@@ -8748,7 +9355,7 @@ function showNotice(id) {
       <div style="margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
         <div>
           <span class="cat-badge cat-${n.category}">${n.category}</span>
-          ${n.important ? '<span class="cat-badge" style="background:rgba(239,68,68,0.12);color:var(--red);margin-left:6px">Important</span>' : ''}
+          ${n.important ? '<span class="cat-badge" style="background:color-mix(in srgb, var(--status-error) 12%, transparent);color:var(--status-error);margin-left:6px">Important</span>' : ''}
         </div>
         <span style="font-size:0.75rem;color:var(--text-muted)">${formatDate(n.date)}</span>
       </div>
@@ -8757,7 +9364,7 @@ function showNotice(id) {
       
       <div class="modal-footer" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding-top:14px;border-top:1px solid var(--border);flex-wrap:wrap">
         <a href="${whatsappUrl}" target="_blank" rel="noopener" class="btn btn-sm" style="background:#25D366;border-color:#25D366;color:#ffffff;display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:var(--radius-xs,6px);font-size:0.8rem;text-decoration:none;font-weight:700">
-          <span>💬</span> Forward to WhatsApp
+          <span>💬</span> Share to Class Group ↗
         </a>
         <button class="btn btn-sm btn-secondary" onclick="navigator.clipboard.writeText('${n.title.replace(/'/g, "\\'")}\\n\\n${n.content.replace(/'/g, "\\'")}').then(() => showToast('Notice copied to clipboard ✓', 'success'))" style="font-size:0.8rem;padding:6px 12px">
           📋 Copy Notice
@@ -9082,19 +9689,23 @@ const ClarityAssistant = (() => {
     },
     {
       id: 'subject_guidance',
-      test: /\b(which subjects? need(s)? (more|the most) attention|where am i falling behind|highest risk subject|undertracked|weak attendance|subject with upcoming pressure|what subject should i focus on|needs? (the )?most attention|needs? more attention)\b|\bwhich (lab|theory|subject|course).*(undertracked|attention|falling behind|pressure)\b/i,
+      test: /\b(which subjects? need(s)? (attention|more attention|the most attention)|where am i falling behind|highest risk subject|undertracked|weak attendance|subject with upcoming pressure|what subject should i focus on|needs? (the )?most attention|needs? more attention)\b|\bwhich (lab|theory|subject|course).*(undertracked|attention|falling behind|pressure)\b/i,
     },
     {
       id: 'import_timetable',
-      test: /\b(import timetable|scan timetable|upload timetable|add timetable|setup timetable|set up timetable|fix timetable|import my timetable)\b/i,
+      test: /\b(import timetable|scan timetable|upload timetable|add timetable|setup timetable|set up timetable|fix timetable|import my timetable|i need to set up my timetable|set up my timetable)\b/i,
     },
     {
       id: 'setup_attendance',
-      test: /\b(setup attendance|set up attendance|attendance baseline|attendance setup|help me set up attendance|configure attendance|set baseline)\b/i,
+      test: /\b(setup attendance|set up attendance|attendance baseline|attendance setup|help me set up attendance|help me set my attendance baseline|configure attendance|set baseline|set my baseline|set attendance baseline)\b/i,
+    },
+    {
+      id: 'subject_hubs',
+      test: /\b(open (my )?subject hubs?|view (my )?subject hubs?|go to subject hubs?|subject hubs?|open subjects?|view subjects?)\b/i,
     },
     {
       id: 'declutter_desk',
-      test: /\b(clean my desk|clean desk|declutter|declutter desk|declutter my desk|duplicate subjects|find duplicate|fix duplicate|polluted subjects)\b/i,
+      test: /\b(clean my desk|clean desk|declutter|declutter desk|declutter my desk|duplicate subjects|find duplicate|fix duplicate|polluted subjects|my subjects look wrong|subjects look wrong|wrong subjects)\b/i,
     },
     {
       id: 'create_task',
@@ -9106,7 +9717,7 @@ const ClarityAssistant = (() => {
     },
     {
       id: 'setup_gaps',
-      test: /\b(setup|what needs setup|missing setup|setup gaps|what is missing|needs setup|desk setup)\b/i,
+      test: /\b(setup|what needs setup|missing setup|setup gaps|what is missing|needs setup|desk setup|is anything missing( from my setup)?|anything missing)\b/i,
     },
     {
       id: 'next_class',
@@ -9118,7 +9729,7 @@ const ClarityAssistant = (() => {
     },
     {
       id: 'tasks_urgent',
-      test: /\b(urgent|overdue|late|missed deadline|past due|behind|urgent tasks|what tasks are urgent|due today|due tomorrow|deadline|deadlines)\b/i,
+      test: /\b(urgent|overdue|late|missed deadline|past due|behind|urgent tasks|show (my )?urgent tasks|what tasks are urgent|due today|due tomorrow|deadline|deadlines)\b/i,
     },
     {
       id: 'tasks_week',
@@ -9197,7 +9808,7 @@ const ClarityAssistant = (() => {
   // ── Response Builders ─────────────────────────────────────────
 
   function buildGreeting() {
-    const p = liveProfile || loadProfile() || {};
+    const p = loadProfile() || liveProfile || {};
     const name = p.name || '';
     const hour = new Date().getHours();
     const greet = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
@@ -9292,17 +9903,17 @@ const ClarityAssistant = (() => {
       </li>
     `).join('');
 
-    return `<div class="cd-tag" style="background:rgba(245,158,11,0.15);color:var(--yellow);margin-bottom:8px">Import Review Status</div><br>
+    return `<div class="cd-tag is-warning" style="margin-bottom:8px">Import Review Status</div><br>
     <strong>${issues.length} item${issues.length !== 1 ? 's' : ''} require confirmation or review:</strong><ul class="cd-list" style="margin-top:8px">${items}</ul>`;
   }
 
   function buildCleanupFollowup() {
     const isPolluted = (typeof detectDeskPollution === 'function') && detectDeskPollution();
     const subjects = (typeof getSubjectList === 'function') ? getSubjectList() : [];
-    const p = liveProfile || loadProfile() || {};
+    const p = loadProfile() || liveProfile || {};
 
     if (isPolluted) {
-      return `<div class="cd-tag" style="background:rgba(245,158,11,0.15);color:var(--yellow);margin-bottom:8px">Cleanup Incomplete</div><br>
+      return `<div class="cd-tag is-warning" style="margin-bottom:8px">Cleanup Incomplete</div><br>
       Your desk still has duplicate cards or mixed practical batches from an earlier timetable scan.<br><br>
       <strong>Next step:</strong> Select your practical batch to remove other-batch classes and merge duplicate cards safely.<br><br>
       <button class="btn btn-sm btn-primary" onclick="showDeclutterDeskModal()" style="font-size:0.78rem;padding:6px 14px">🧹 Run Declutter &amp; Recovery →</button>`;
@@ -9382,7 +9993,7 @@ const ClarityAssistant = (() => {
       sections.push(`<li><strong>💡 Rebalance Strategy:</strong> Review your notes in 25-minute focus intervals after morning lectures.</li>`);
     }
 
-    return `<div class="cd-tag" style="background:rgba(59,130,246,0.15);color:var(--accent);margin-bottom:8px">Weekly Academic Roadmap</div><br>
+    return `<div class="cd-tag is-accent" style="margin-bottom:8px">Weekly Academic Roadmap</div><br>
     Here is your grounded weekly focus summary:<ul class="cd-list" style="margin-top:8px">${sections.join('')}</ul>`;
   }
 
@@ -9441,11 +10052,11 @@ const ClarityAssistant = (() => {
     }
 
     const items = scored.filter(s => s.score > 0).slice(0, 3).map(s => {
-      const typeBadge = s.isLab ? '<span class="cd-tag" style="background:rgba(147,51,234,0.12);color:var(--purple);font-size:0.7rem;padding:1px 5px">Lab</span> ' : '';
+      const typeBadge = s.isLab ? '<span class="cd-tag is-purple" style="font-size:0.7rem;padding:1px 5px">Lab</span> ' : '';
       return `<li>${typeBadge}<strong>${escHtml(s.subject.name)}</strong>: ${s.signals.join(' and ')}.</li>`;
     }).join('');
 
-    return `<div class="cd-tag" style="background:rgba(239,68,68,0.15);color:var(--red);margin-bottom:8px">Academic Focus Radar</div><br>
+    return `<div class="cd-tag is-error" style="margin-bottom:8px">Academic Focus Radar</div><br>
     <strong>${escHtml(top.subject.name)}</strong> needs the most attention right now because ${top.signals.join(' and ')}.<br><br>
     <strong>Priority Breakdown:</strong><ul class="cd-list" style="margin-top:6px">${items}</ul>
     <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
@@ -9463,7 +10074,7 @@ const ClarityAssistant = (() => {
     });
 
     if (!hasClasses) {
-      return `<div class="cd-tag" style="background:rgba(59,130,246,0.15);color:var(--accent);margin-bottom:8px">Timetable Setup</div><br>
+      return `<div class="cd-tag is-accent" style="margin-bottom:8px">Timetable Setup</div><br>
       You don't have a schedule set up yet. You can scan an image of your timetable or load our official sample schedule template.<br><br>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-sm btn-primary" onclick="triggerTimetableImport()" style="font-size:0.78rem;padding:5px 12px">📷 Scan Timetable Photo</button>
@@ -9490,13 +10101,13 @@ const ClarityAssistant = (() => {
     });
 
     if (subjects.length === 0) {
-      return `<div class="cd-tag" style="background:rgba(245,158,11,0.15);color:var(--yellow);margin-bottom:8px">No Subjects Found</div><br>
+      return `<div class="cd-tag is-warning" style="margin-bottom:8px">No Subjects Found</div><br>
       Set up your timetable schedule first so Clarity Desk can automatically create your Subject Hubs for tracking attendance.<br><br>
       <button class="btn btn-sm btn-primary" onclick="triggerTimetableImport()" style="font-size:0.78rem;padding:5px 12px">📷 Scan Timetable Photo →</button>`;
     }
 
     if (missing.length > 0) {
-      return `<div class="cd-tag" style="background:rgba(245,158,11,0.15);color:var(--yellow);margin-bottom:8px">Attendance Baseline</div><br>
+      return `<div class="cd-tag is-warning" style="margin-bottom:8px">Attendance Baseline</div><br>
       <strong>${missing.length} of ${subjects.length} subjects</strong> are missing initial attendance counts. Entering your portal counts once gives you instant % calculations and safe skip guidance.<br><br>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-sm btn-primary" onclick="showBaselineModal(null, 'scan')" style="font-size:0.78rem;padding:5px 12px">📷 Scan Portal Screenshot</button>
@@ -9517,7 +10128,7 @@ const ClarityAssistant = (() => {
     const isPolluted = (typeof detectDeskPollution === 'function') && detectDeskPollution();
 
     if (isPolluted) {
-      return `<div class="cd-tag" style="background:rgba(245,158,11,0.15);color:var(--yellow);margin-bottom:8px">Declutter Recommended</div><br>
+      return `<div class="cd-tag is-warning" style="margin-bottom:8px">Declutter Recommended</div><br>
       We detected duplicate, noisy, or multi-batch subject cards on your desk. Decluttering will:<br>
       <ul class="cd-list" style="margin:6px 0 8px 0">
         <li>Filter practical lab sessions to your exact batch (e.g. A2, B1, D1)</li>
@@ -9532,86 +10143,44 @@ const ClarityAssistant = (() => {
     <button class="btn btn-sm btn-secondary" onclick="showDeclutterDeskModal()" style="font-size:0.78rem;padding:5px 12px">🧹 Open Declutter Tool →</button>`;
   }
 
+  function buildSubjectHubs() {
+    const subjects = (typeof getSubjectList === 'function') ? getSubjectList() : [];
+    if (subjects.length === 0) {
+      return `No Subject Hubs found. Set up your timetable schedule or attendance baseline first.<br><br>
+      <button class="btn btn-sm btn-primary" onclick="navigate('subjects')" style="font-size:0.78rem;padding:5px 12px">Open Subject Hubs →</button>`;
+    }
+    return `You have <strong>${subjects.length} active Subject Hub${subjects.length !== 1 ? 's' : ''}</strong> configured with attendance, course resources, and faculty metadata.<br><br>
+    <button class="btn btn-sm btn-primary" onclick="navigate('subjects')" style="font-size:0.78rem;padding:6px 14px">📚 Open Subject Hubs →</button>`;
+  }
+
   function buildCreateTask(query) {
     const subjects = (typeof getSubjectList === 'function') ? getSubjectList() : [];
     let q = query.replace(/\b(add a task|add task|create task|new task|make a task|remind me to)\b/i, '').trim();
-    let foundSubj = null;
-    let taskTitle = q;
-    let dueDate = '';
+    const cleanQ = q.replace(/^(for|in|about)\s+/i, '').trim().toLowerCase();
 
-    // Date detection
-    if (/\bdue tomorrow\b/i.test(taskTitle) || /\btomorrow\b/i.test(taskTitle)) {
-      const d = new Date();
-      d.setDate(d.getDate() + 1);
-      dueDate = d.toISOString().split('T')[0];
-      taskTitle = taskTitle.replace(/\b(due\s+)?tomorrow\b/i, '').trim();
-    } else if (/\bdue today\b/i.test(taskTitle) || /\btoday\b/i.test(taskTitle)) {
-      const d = new Date();
-      dueDate = d.toISOString().split('T')[0];
-      taskTitle = taskTitle.replace(/\b(due\s+)?today\b/i, '').trim();
-    }
-
-    // Subject matching
-    for (const s of subjects) {
+    // Check matching subjects
+    const matching = subjects.filter(s => {
       const sName = s.name.toLowerCase();
       const sCode = (s.code || '').toLowerCase();
-      if (taskTitle.toLowerCase().includes(`for ${sName}`) || taskTitle.toLowerCase().includes(`in ${sName}`)) {
-        foundSubj = s;
-        taskTitle = taskTitle.replace(new RegExp(`\\b(for|in)\\s+${s.name}\\b`, 'i'), '').trim();
-        break;
-      }
-      if (sCode && sCode.length >= 2 && (taskTitle.toLowerCase().includes(`for ${sCode}`) || taskTitle.toLowerCase().includes(`in ${sCode}`))) {
-        foundSubj = s;
-        taskTitle = taskTitle.replace(new RegExp(`\\b(for|in)\\s+${s.code}\\b`, 'i'), '').trim();
-        break;
-      }
+      if (!cleanQ || cleanQ.length < 3) return false;
+      return (sName && (sName === cleanQ || sName.includes(cleanQ) || cleanQ.includes(sName))) ||
+             (sCode && sCode.length >= 2 && (sCode === cleanQ || sCode.includes(cleanQ) || cleanQ.includes(sCode)));
+    });
+
+    if (matching.length === 1) {
+      const foundSubj = matching[0];
+      return `Open the Task Creator for <strong>${escHtml(foundSubj.name)}</strong> in <a href="javascript:void(0)" onclick="navigate('assignments')" style="color:var(--accent);font-weight:600">Tasks &amp; Deadlines</a>:<br><br>
+      <button class="btn btn-sm btn-primary" onclick="showAddTaskModal(null, '${foundSubj.name.replace(/'/g, "\\'")}')" style="font-size:0.78rem;padding:6px 14px">✍️ Create Task for ${escHtml(foundSubj.name)} →</button>`;
+    } else if (matching.length > 1) {
+      const buttons = matching.map(s =>
+        `<button class="btn btn-sm btn-secondary" onclick="showAddTaskModal(null, '${s.name.replace(/'/g, "\\'")}')" style="font-size:0.75rem;padding:4px 10px">${escHtml(s.name)}</button>`
+      ).join(' ');
+      return `Multiple subjects matched your request. Choose which subject to create a task for:<br><br>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">${buttons}</div>`;
     }
 
-    if (!foundSubj) {
-      for (const s of subjects) {
-        if (taskTitle.toLowerCase().includes(s.name.toLowerCase())) {
-          foundSubj = s;
-          taskTitle = taskTitle.replace(new RegExp(`\\b${s.name}\\b`, 'i'), '').trim();
-          break;
-        }
-      }
-    }
-
-    taskTitle = taskTitle.replace(/^(for|to|about)\s+/i, '').trim();
-
-    // If a meaningful task title was extracted, create it immediately!
-    if (taskTitle && taskTitle.length >= 3 && !/^(a task|task)$/i.test(taskTitle)) {
-      const targetSubj = foundSubj || (subjects.length > 0 ? subjects[0] : { name: 'General', code: 'GEN', color: 'var(--accent)' });
-      const targetDueDate = dueDate || todayISO();
-
-      const newTask = {
-        id: 'ct_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
-        title: taskTitle,
-        subject: targetSubj.name,
-        code: targetSubj.code || 'GEN',
-        dueDate: targetDueDate,
-        dueTime: '23:59',
-        description: 'Created via Ask Desk',
-        taskType: 'assignment',
-        status: 'pending',
-        priority: 'medium',
-        color: targetSubj.color || 'var(--accent)',
-        createdAt: new Date().toISOString()
-      };
-
-      state.customTasks = state.customTasks || [];
-      state.customTasks.unshift(newTask);
-      saveCustomTasks();
-      updateNavBadges();
-
-      return `<div class="cd-tag cd-tag-safe" style="display:inline-flex;margin-bottom:8px">✓ Task Created</div><br>
-      Created task <strong>${escHtml(taskTitle)}</strong> for <strong>${escHtml(targetSubj.name)}</strong> (Due ${fmtDate(targetDueDate)}).<br><br>
-      <button class="btn btn-sm btn-secondary" onclick="navigate('assignments')" style="font-size:0.76rem;padding:4px 12px">View in Tasks &amp; Deadlines →</button>`;
-    }
-
-    // Otherwise launch interactive modal
-    return `Let's add a task${foundSubj ? ` for <strong>${escHtml(foundSubj.name)}</strong>` : ''}:<br><br>
-    <button class="btn btn-sm btn-primary" onclick="showAddTaskModal(null, ${foundSubj ? `'${foundSubj.name.replace(/'/g, "\\'")}'` : 'null'})" style="font-size:0.78rem;padding:6px 14px">✍️ Open Task Creator →</button>`;
+    return `To create or schedule an assignment, open the Task Creator in <a href="javascript:void(0)" onclick="navigate('assignments')" style="color:var(--accent);font-weight:600">Tasks &amp; Deadlines</a>:<br><br>
+    <button class="btn btn-sm btn-primary" onclick="showAddTaskModal()" style="font-size:0.78rem;padding:6px 14px">✍️ Open Task Creator →</button>`;
   }
 
   function buildStudyPlan() {
@@ -9660,7 +10229,7 @@ const ClarityAssistant = (() => {
       planSteps.push(`<strong>3. Day Wrap-Up (10 min):</strong> Check off completed tasks and set goals for tomorrow.`);
     }
 
-    return `<div class="cd-tag" style="background:rgba(59,130,246,0.15);color:var(--accent);margin-bottom:8px">Today's Focus Plan</div><br>
+    return `<div class="cd-tag is-accent" style="margin-bottom:8px">Today's Focus Plan</div><br>
     Here is a realistic study plan grounded in your live desk data:<ul class="cd-list" style="margin-top:8px">${planSteps.map(s => `<li>${s}</li>`).join('')}</ul>`;
   }
 
@@ -9683,7 +10252,7 @@ const ClarityAssistant = (() => {
 
     const hasAnyTT = Object.values(loadTimetable() || {}).some(arr => arr && arr.some(c => !isBreakEntry(c)));
     if (!hasAnyTT) {
-      return `<div class="cd-tag" style="background:rgba(245,158,11,0.15);color:var(--yellow);margin-bottom:8px">No Timetable Set</div><br>No timetable imported yet. You can scan your schedule photo or add classes in the <a href="javascript:void(0)" onclick="navigate('timetable')" style="color:var(--accent);font-weight:600">Timetable tab</a>.`;
+      return `<div class="cd-tag is-warning" style="margin-bottom:8px">No Timetable Set</div><br>No timetable imported yet. You can scan your schedule photo or add classes in the <a href="javascript:void(0)" onclick="navigate('timetable')" style="color:var(--accent);font-weight:600">Timetable tab</a>.`;
     }
 
     if (classes.length === 0) {
@@ -9761,7 +10330,7 @@ const ClarityAssistant = (() => {
     });
 
     if (atRisk.length === 0 && missingBaseline.length === subjects.length) {
-      return `<div class="cd-tag" style="background:rgba(245,158,11,0.15);color:var(--yellow);margin-bottom:8px">No Baseline Set</div><br>No attendance baseline recorded yet. Set your starting attendance counts in <a href="javascript:void(0)" onclick="navigate('subjects')" style="color:var(--accent);font-weight:600">Subject Hubs</a> to track risks.`;
+      return `<div class="cd-tag is-warning" style="margin-bottom:8px">No Baseline Set</div><br>No attendance baseline recorded yet. Set your starting attendance counts in <a href="javascript:void(0)" onclick="navigate('subjects')" style="color:var(--accent);font-weight:600">Subject Hubs</a> to track risks.`;
     }
 
     if (atRisk.length > 0) {
@@ -9781,7 +10350,7 @@ const ClarityAssistant = (() => {
   function buildAttendanceGeneral() {
     const { attended, skipped, total } = getOverallAttendance();
     if (total === 0) {
-      return `No attendance recorded yet. Enter your portal baseline in Subject Hubs or mark classes in Timetable to start tracking.`;
+      return `<div class="cd-tag is-warning" style="margin-bottom:8px">Attendance Setup Incomplete</div><br>No attendance recorded yet. Enter your starting portal baseline counts in <a href="javascript:void(0)" onclick="showBaselineModal(null, 'manual')" style="color:var(--accent);font-weight:600">Subject Hubs</a> to unlock percentage tracking and safe skip guidance.<br><br><button class="btn btn-sm btn-primary" onclick="showBaselineModal(null, 'manual')" style="font-size:0.78rem;padding:5px 12px">📊 Set Baseline Counts →</button>`;
     }
     const pct = Math.round((attended / total) * 100);
     const target = getAttendanceTarget();
@@ -9818,7 +10387,7 @@ const ClarityAssistant = (() => {
       items.push(`<li><span class="cd-tag cd-tag-today">Due Today</span><span class="cd-item-label">${escHtml(t.title)}</span><span class="cd-item-meta">${escHtml(t.subject || 'Task')}</span></li>`);
     });
     dueTomorrow.forEach(t => {
-      items.push(`<li><span class="cd-tag" style="background:rgba(59,130,246,0.15);color:var(--accent)">Tomorrow</span><span class="cd-item-label">${escHtml(t.title)}</span><span class="cd-item-meta">${escHtml(t.subject || 'Task')} · Due ${fmtDate(t.dueDate)}</span></li>`);
+      items.push(`<li><span class="cd-tag is-accent">Tomorrow</span><span class="cd-item-label">${escHtml(t.title)}</span><span class="cd-item-meta">${escHtml(t.subject || 'Task')} · Due ${fmtDate(t.dueDate)}</span></li>`);
     });
 
     return `<strong>${urgentTotal} urgent task${urgentTotal!==1?'s':''}:</strong><ul class="cd-list">${items.join('')}</ul>`;
@@ -9830,7 +10399,7 @@ const ClarityAssistant = (() => {
     const hasClasses = Object.values(tt || {}).some(arr => Array.isArray(arr) && arr.some(c => !isBreakEntry(c)));
     const subjects = (typeof getSubjectList === 'function') ? getSubjectList() : [];
     const baselines = loadAttendanceBaselines();
-    const p = liveProfile || loadProfile() || {};
+    const p = loadProfile() || liveProfile || {};
 
     // 1. Timetable Check
     if (!hasClasses) {
@@ -9957,7 +10526,7 @@ const ClarityAssistant = (() => {
       const isOngoing = !!t.noDeadline || (t.taskType === 'mission' && !t.dueDate);
       const isOverdue = isTaskOverdue(t);
       const tag = isOngoing
-        ? '<span class="cd-tag" style="background:rgba(147,51,234,0.14);color:var(--purple)">Mission</span>'
+        ? '<span class="cd-tag is-purple">Mission</span>'
         : isOverdue ? '<span class="cd-tag cd-tag-overdue">Overdue</span>' : '';
       const meta = isOngoing ? `${escHtml(t.subject || 'Task')} · Ongoing Mission` : `${escHtml(t.subject || 'Task')} · Due ${fmtDate(t.dueDate)}`;
       return `<li>${tag}<span class="cd-item-label">${escHtml(t.title)}</span><span class="cd-item-meta">${meta}</span></li>`;
@@ -9984,7 +10553,7 @@ const ClarityAssistant = (() => {
   }
 
   function buildProfile() {
-    const p = liveProfile || loadProfile() || {};
+    const p = loadProfile() || liveProfile || {};
     if (!p.name) return `Your profile isn't set up yet. Go to <a href="javascript:void(0)" onclick="navigate('settings')" style="color:var(--accent);font-weight:600">Settings</a> to add your name, batch, and branch.`;
     const lines = [
       p.name    ? `<li><span class="cd-item-label">Name</span><span class="cd-item-meta">${escHtml(p.name)}</span></li>` : '',
@@ -10029,6 +10598,7 @@ const ClarityAssistant = (() => {
       case 'subject_guidance':   return buildSubjectGuidance();
       case 'import_timetable':   return buildImportTimetable();
       case 'setup_attendance':   return buildSetupAttendance();
+      case 'subject_hubs':       return buildSubjectHubs();
       case 'declutter_desk':     return buildDeclutterDesk();
       case 'create_task':        return buildCreateTask(query);
       case 'study_plan':         return buildStudyPlan();
@@ -10103,31 +10673,31 @@ function renderAssistantWelcome() {
   if (isNewUser) {
     thread.innerHTML = `
       <div class="cd-welcome-card">
-        <div class="cd-welcome-badge" style="background:rgba(59,130,246,0.15);color:var(--accent)">
+        <div class="cd-welcome-badge" style="background:var(--accent-dim);color:var(--brand-primary)">
           <span class="cd-dot-live"></span> ✨ Getting Started
         </div>
         <div class="cd-welcome-title">Welcome to Ask Desk</div>
-        <div class="cd-welcome-sub">I answer academic questions using your real timetable, tasks, and attendance. Let's get your desk set up!</div>
+        <div class="cd-welcome-sub">I answer academic questions grounded in your real timetable, tasks, and attendance.</div>
         <div class="cd-starter-grid">
-          <button class="cd-starter-btn" onclick="sendAssistantMessage('What needs setup')">
+          <button class="cd-starter-btn" onclick="sendAssistantMessage('Is anything missing from my setup?')">
             <span class="cd-starter-icon">⚙️</span>
-            <strong>What needs setup</strong>
-            <span>Check missing desk setup gaps</span>
+            <strong>Setup Checklist</strong>
+            <span>Check missing setup gaps</span>
           </button>
-          <button class="cd-starter-btn" onclick="sendAssistantMessage('Import my timetable')">
-            <span class="cd-starter-icon">📷</span>
-            <strong>Import timetable</strong>
-            <span>Scan photo or use template</span>
-          </button>
-          <button class="cd-starter-btn" onclick="sendAssistantMessage('Help me set up attendance')">
-            <span class="cd-starter-icon">📊</span>
-            <strong>Setup attendance</strong>
-            <span>Set portal baseline counts</span>
-          </button>
-          <button class="cd-starter-btn" onclick="sendAssistantMessage('Show my day')">
+          <button class="cd-starter-btn" onclick="sendAssistantMessage('What do I have today?')">
             <span class="cd-starter-icon">📅</span>
-            <strong>Show my day</strong>
-            <span>Check today's class schedule</span>
+            <strong>What do I have today?</strong>
+            <span>Today's classes &amp; tasks</span>
+          </button>
+          <button class="cd-starter-btn" onclick="sendAssistantMessage('How is my attendance?')">
+            <span class="cd-starter-icon">📊</span>
+            <strong>How is my attendance?</strong>
+            <span>Overall attendance status</span>
+          </button>
+          <button class="cd-starter-btn" onclick="sendAssistantMessage('What tasks are urgent?')">
+            <span class="cd-starter-icon">⚡</span>
+            <strong>What tasks are urgent?</strong>
+            <span>Check pending deadlines</span>
           </button>
         </div>
       </div>
@@ -10141,35 +10711,35 @@ function renderAssistantWelcome() {
         <div class="cd-welcome-title">How can I help you today?</div>
         <div class="cd-welcome-sub">Grounded in your real timetable, task deadlines, and attendance logs.</div>
         <div class="cd-starter-grid">
-          <button class="cd-starter-btn" onclick="sendAssistantMessage('Show my day')">
+          <button class="cd-starter-btn" onclick="sendAssistantMessage('What do I have today?')">
             <span class="cd-starter-icon">📅</span>
-            <strong>Show my day</strong>
-            <span>View classes &amp; tasks for today</span>
+            <strong>What do I have today?</strong>
+            <span>Today's schedule &amp; tasks</span>
           </button>
-          <button class="cd-starter-btn" onclick="sendAssistantMessage('Plan my week')">
-            <span class="cd-starter-icon">🗓️</span>
-            <strong>Plan my week</strong>
-            <span>Weekly load &amp; academic roadmap</span>
+          <button class="cd-starter-btn" onclick="sendAssistantMessage('What is my next class?')">
+            <span class="cd-starter-icon">⏰</span>
+            <strong>What is my next class?</strong>
+            <span>Next upcoming lecture/lab</span>
           </button>
-          <button class="cd-starter-btn" onclick="sendAssistantMessage('Which subject needs the most attention')">
+          <button class="cd-starter-btn" onclick="sendAssistantMessage('Which subject needs attention?')">
             <span class="cd-starter-icon">🎯</span>
             <strong>Focus Radar</strong>
             <span>Subject risk &amp; priority check</span>
           </button>
-          <button class="cd-starter-btn" onclick="sendAssistantMessage('Attendance at risk')">
-            <span class="cd-starter-icon">🛡️</span>
-            <strong>Attendance at risk</strong>
-            <span>Subjects needing recovery</span>
+          <button class="cd-starter-btn" onclick="sendAssistantMessage('How is my attendance?')">
+            <span class="cd-starter-icon">📊</span>
+            <strong>How is my attendance?</strong>
+            <span>Overall record &amp; safe skips</span>
           </button>
-          <button class="cd-starter-btn" onclick="sendAssistantMessage('Urgent tasks')">
+          <button class="cd-starter-btn" onclick="sendAssistantMessage('What tasks are urgent?')">
             <span class="cd-starter-icon">⚡</span>
-            <strong>Urgent tasks</strong>
+            <strong>What tasks are urgent?</strong>
             <span>Deadlines due today or overdue</span>
           </button>
-          <button class="cd-starter-btn" onclick="sendAssistantMessage('Help me plan tonight')">
-            <span class="cd-starter-icon">✨</span>
-            <strong>Plan tonight</strong>
-            <span>Grounded 3-block study plan</span>
+          <button class="cd-starter-btn" onclick="sendAssistantMessage('Is anything missing from my setup?')">
+            <span class="cd-starter-icon">⚙️</span>
+            <strong>Setup Checklist</strong>
+            <span>Check desk health &amp; gaps</span>
           </button>
         </div>
       </div>
@@ -10329,7 +10899,7 @@ window.showTimetablePreviewModal      = showTimetablePreviewModal;
 window.onTimetablePreviewBatchChange  = onTimetablePreviewBatchChange;
 window.updatePreviewEntry             = updatePreviewEntry;
 window.removePreviewEntry             = removePreviewEntry;
-window.saveExtractedTimetable         = saveExtractedTimetable;
+window.confirmSaveExtractedTimetable  = window.confirmSaveExtractedTimetable;
 window.showTimetableUploadErrorModal  = showTimetableUploadErrorModal;
 
 // Declutter & Subject Recovery Engine
@@ -10338,6 +10908,9 @@ window.proceedToDeclutterPreview      = proceedToDeclutterPreview;
 window.confirmExecuteDeclutter        = confirmExecuteDeclutter;
 window.executeDeclutterPlan           = executeDeclutterPlan;
 window.detectDeskPollution            = detectDeskPollution;
+window.showRestoreDeskModal           = showRestoreDeskModal;
+window.confirmExecuteRestore          = confirmExecuteRestore;
+window.loadDeclutterBackup            = loadDeclutterBackup;
 
 // Desk Assistant
 window.toggleAssistant       = toggleAssistant;

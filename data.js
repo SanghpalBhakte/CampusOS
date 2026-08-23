@@ -99,7 +99,7 @@ export const QUICK_LINKS = [
   {
     subject: "Data Structure",
     code: "DS",
-    color: "#6366f1",
+    color: "#394B63",
     resources: [
       { label: "GFG DSA Sheet",         url: "https://www.geeksforgeeks.org/dsa-sheet-by-love-babbar/", icon: "list" },
       { label: "Striver's SDE Sheet",   url: "https://takeuforward.org/interviews/strivers-sde-sheet-top-coding-interview-problems/", icon: "code" },
@@ -109,7 +109,7 @@ export const QUICK_LINKS = [
   {
     subject: "Digital Electronics & Microprocessor",
     code: "DEMP",
-    color: "#0ea5e9",
+    color: "#5A6F8F",
     resources: [
       { label: "NPTEL Digital Circuits", url: "https://nptel.ac.in/courses/108105132", icon: "video" },
       { label: "8085 Microprocessor Notes", url: "https://www.geeksforgeeks.org/microprocessor-tutorial/", icon: "book-open" },
@@ -119,7 +119,7 @@ export const QUICK_LINKS = [
   {
     subject: "Web Development",
     code: "WD",
-    color: "#10b981",
+    color: "#4E7A5D",
     resources: [
       { label: "MDN Web Docs",          url: "https://developer.mozilla.org/", icon: "book-open" },
       { label: "W3Schools HTML/CSS/JS", url: "https://www.w3schools.com/", icon: "code" },
@@ -129,7 +129,7 @@ export const QUICK_LINKS = [
   {
     subject: "Probability & Statistics",
     code: "PBST",
-    color: "#f59e0b",
+    color: "#B48852",
     resources: [
       { label: "StatQuest (YouTube)",   url: "https://www.youtube.com/@statquest", icon: "video" },
       { label: "Seeing Theory",         url: "https://seeing-theory.brown.edu/", icon: "eye" },
@@ -139,7 +139,7 @@ export const QUICK_LINKS = [
   {
     subject: "Multi Disciplinary Minor",
     code: "MDM",
-    color: "#ec4899",
+    color: "#A34B43",
     resources: [
       { label: "NPTEL DBMS",            url: "https://nptel.ac.in/courses/106105175", icon: "video" },
       { label: "SQLZoo Practice",       url: "https://sqlzoo.net/", icon: "database" },
@@ -149,7 +149,7 @@ export const QUICK_LINKS = [
   {
     subject: "Constitution of India",
     code: "COI",
-    color: "#8b5cf6",
+    color: "#6B5E52",
     resources: [
       { label: "India Code - Constitution", url: "https://www.indiacode.nic.in/constitution", icon: "book-open" },
       { label: "Constitution Notes",        url: "https://www.clearias.com/constitution-of-india/", icon: "list" },
@@ -158,7 +158,7 @@ export const QUICK_LINKS = [
   {
     subject: "Business Management & Financial Account",
     code: "BMFA",
-    color: "#14b8a6",
+    color: "#7E9C8D",
     resources: [
       { label: "Investopedia Basics",   url: "https://www.investopedia.com/financial-accounting-4689738", icon: "book-open" },
       { label: "AccountingCoach",       url: "https://www.accountingcoach.com/", icon: "graduation-cap" },
@@ -167,7 +167,7 @@ export const QUICK_LINKS = [
   {
     subject: "Open Electives (OE-1 / OE-2)",
     code: "OE",
-    color: "#64748b",
+    color: "#90A3BE",
     resources: [
       { label: "NPTEL Online Courses",  url: "https://nptel.ac.in/", icon: "video" },
       { label: "SWAYAM Portal",         url: "https://swayam.gov.in/", icon: "graduation-cap" },
@@ -176,7 +176,7 @@ export const QUICK_LINKS = [
   {
     subject: "Community Engagement",
     code: "CE",
-    color: "#84cc16",
+    color: "#5E5449",
     resources: [
       { label: "Community Service Guidelines", url: "https://nss.gov.in/", icon: "book-open" },
     ],
