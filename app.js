@@ -2717,6 +2717,8 @@ function initTheme() {
   }
   
   document.documentElement.setAttribute('data-theme', theme);
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', theme === 'midnight-ink' ? '#171412' : '#2F4A3D');
   updateThemeSelector(theme);
 }
 
@@ -2732,6 +2734,8 @@ function setTheme(theme) {
   if (LEGACY_THEME_MAP[theme]) theme = LEGACY_THEME_MAP[theme];
   if (!ALL_THEMES.includes(theme)) return;
   document.documentElement.setAttribute('data-theme', theme);
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', theme === 'midnight-ink' ? '#171412' : '#2F4A3D');
   localStorage.setItem(KEY_THEME, theme);
   updateThemeSelector(theme);
   renderPage(state.currentPage);
@@ -4800,14 +4804,14 @@ function renderTimetable() {
                   onclick="event.stopPropagation(); setAttendance('${dateStr}', '${classKey}', 'attended')"
                   title="Mark ${c.subject} Attended" aria-label="Mark ${c.subject} as attended" aria-pressed="${isAttended}"
                   style="padding:4px 10px;font-size:0.75rem;font-weight:700;border-radius:6px;min-width:32px;height:28px;
-                         ${isAttended ? 'background:var(--green);border-color:var(--green);color:#ffffff;' : ''}">
+                         ${isAttended ? 'background:var(--green);border-color:var(--green);color:var(--text-inverse);' : ''}">
             ✓
           </button>
           <button class="btn btn-sm ${isSkipped ? 'btn-primary' : 'btn-secondary'}"
                   onclick="event.stopPropagation(); setAttendance('${dateStr}', '${classKey}', 'skipped')"
                   title="Mark ${c.subject} as skipped" aria-label="Mark ${c.subject} as skipped" aria-pressed="${isSkipped}"
                   style="padding:4px 10px;font-size:0.75rem;font-weight:700;border-radius:6px;min-width:32px;height:28px;
-                         ${isSkipped ? 'background:var(--red);border-color:var(--red);color:#ffffff;' : ''}">
+                         ${isSkipped ? 'background:var(--red);border-color:var(--red);color:var(--text-inverse);' : ''}">
             ✕
           </button>
         </div>` : '';

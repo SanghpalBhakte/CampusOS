@@ -24,6 +24,8 @@
         var valid = ['paper-slate', 'midnight-ink'];
         if (!valid.includes(t)) t = 'paper-slate';
         document.documentElement.setAttribute('data-theme', t);
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute('content', t === 'midnight-ink' ? '#171412' : '#2F4A3D');
       } catch(e) {}
     })();
 
@@ -54,13 +56,13 @@
 
   <!-- Favicon & App Icons -->
   <link rel="icon" href="favicon.ico" sizes="any" />
-  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=107" />
-  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=107" />
-  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png?v=107" />
-  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=107" />
+  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=108" />
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=108" />
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png?v=108" />
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=108" />
 
   <!-- Styles -->
-  <link rel="stylesheet" href="style.css?v=107" />
+  <link rel="stylesheet" href="style.css?v=108" />
 </head>
 <body>
 
@@ -391,8 +393,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
 <!-- Firebase Config & App Script -->
-<script src="firebase-config.js?v=107"></script>
-<script type="module" src="app.js?v=107"></script>
+<script src="firebase-config.js?v=108"></script>
+<script type="module" src="app.js?v=108"></script>
 
 </body>
 </html>

@@ -1234,14 +1234,14 @@ a.card:hover,
   width: 11px;
   height: 11px;
   left: -25px;
-  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-success) 50%, transparent);
   animation: liveSlotPulse 2s ease-in-out infinite;
 }
 
 @keyframes liveSlotPulse {
-  0%   { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
-  60%  { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-success) 50%, transparent); }
+  60%  { box-shadow: 0 0 0 6px color-mix(in srgb, var(--color-success) 0%, transparent); }
+  100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-success) 0%, transparent); }
 }
 
 .schedule-slot.is-past::before {
@@ -1673,9 +1673,9 @@ a.card:hover,
 }
 
 .uncertain-badge {
-  background: rgba(245, 158, 11, 0.15);
+  background: color-mix(in srgb, var(--yellow) 14%, transparent);
   color: var(--yellow);
-  border: 1px solid rgba(245, 158, 11, 0.3);
+  border: 1px solid color-mix(in srgb, var(--yellow) 30%, transparent);
   font-size: 0.68rem;
   font-weight: 700;
   padding: 2px 6px;
@@ -1860,9 +1860,9 @@ a.card:hover,
   color: var(--text-secondary);
 }
 
-.due-badge.overdue { background: rgba(239,68,68,0.12); color: var(--red); }
-.due-badge.today   { background: rgba(245,158,11,0.12); color: var(--yellow); }
-.due-badge.soon    { background: rgba(99,102,241,0.12); color: var(--accent); }
+.due-badge.overdue { background: color-mix(in srgb, var(--red) 12%, transparent); color: var(--red); }
+.due-badge.today   { background: color-mix(in srgb, var(--yellow) 12%, transparent); color: var(--yellow); }
+.due-badge.soon    { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
 .due-badge.ongoing { background: color-mix(in srgb, var(--purple) 12%, var(--surface-2)); color: var(--purple); border: 1px solid color-mix(in srgb, var(--purple) 25%, transparent); }
 
 .marks-badge {
@@ -1888,7 +1888,7 @@ a.card:hover,
 }
 
 .att-seg-present { background: var(--green); }
-.att-seg-absent  { background: rgba(239, 68, 68, 0.55); }
+.att-seg-absent  { background: color-mix(in srgb, var(--red) 65%, transparent); }
 .att-seg-leave   { background: var(--yellow); }
 
 /* ── Settings Theme Swatch Grid ──────────────────────────────── */
@@ -2135,13 +2135,13 @@ a.card:hover,
 .cat-badge {
   font-size: 0.7rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; flex-shrink: 0;
 }
-.cat-Exam     { background: rgba(239,68,68,0.12);  color: var(--red);    }
-.cat-Event    { background: rgba(99,102,241,0.12); color: var(--accent); }
-.cat-Library  { background: rgba(16,185,129,0.12); color: var(--green);  }
-.cat-Academic { background: rgba(245,158,11,0.12); color: var(--yellow); }
-.cat-Sports   { background: rgba(236,72,153,0.12); color: var(--pink);   }
-.cat-Placement{ background: rgba(14,165,233,0.12); color: var(--blue);   }
-.cat-General  { background: rgba(107,114,128,0.1); color: var(--text-secondary); }
+.cat-Exam     { background: color-mix(in srgb, var(--red) 12%, transparent);  color: var(--red);    }
+.cat-Event    { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
+.cat-Library  { background: color-mix(in srgb, var(--green) 12%, transparent); color: var(--green);  }
+.cat-Academic { background: color-mix(in srgb, var(--yellow) 12%, transparent); color: var(--yellow); }
+.cat-Sports   { background: color-mix(in srgb, var(--pink) 12%, transparent); color: var(--pink);   }
+.cat-Placement{ background: color-mix(in srgb, var(--blue) 12%, transparent); color: var(--blue);   }
+.cat-General  { background: color-mix(in srgb, var(--text-secondary) 10%, transparent); color: var(--text-secondary); }
 
 .notice-date    { font-size: 0.78rem; color: var(--text-muted); margin-top: 6px; }
 .notice-preview { font-size: 0.83rem; color: var(--text-secondary); margin-top: 8px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
@@ -2765,8 +2765,8 @@ a.card:hover,
 }
 
 .icon-btn-danger:hover {
-  background: rgba(239, 68, 68, 0.12);
-  border-color: rgba(239, 68, 68, 0.3);
+  background: color-mix(in srgb, var(--red) 12%, transparent);
+  border-color: color-mix(in srgb, var(--red) 30%, transparent);
   color: var(--red);
 }
 
