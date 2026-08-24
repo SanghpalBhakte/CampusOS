@@ -54,13 +54,13 @@
 
   <!-- Favicon & App Icons -->
   <link rel="icon" href="favicon.ico" sizes="any" />
-  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=106" />
-  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=106" />
-  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png?v=106" />
-  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=106" />
+  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=107" />
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=107" />
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png?v=107" />
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=107" />
 
   <!-- Styles -->
-  <link rel="stylesheet" href="style.css?v=106" />
+  <link rel="stylesheet" href="style.css?v=107" />
 </head>
 <body>
 
@@ -96,6 +96,10 @@
     </div>
 
     <div class="topbar-actions">
+      <button class="topbar-theme-toggle" id="theme-toggle-btn" onclick="toggleTheme()" title="Switch theme (Paper Slate / Midnight Ink)" aria-label="Toggle theme: currently Paper Slate" aria-live="polite">
+        <span class="theme-toggle-icon" id="theme-toggle-icon">☀️</span>
+        <span class="theme-toggle-label" id="theme-toggle-label">Paper Slate</span>
+      </button>
       <button class="storage-status-badge" id="sync-status-btn" onclick="navigateTo('settings')" title="Local offline storage active · Saved automatically on this device" aria-label="Storage status">
         <span class="storage-status-dot"></span>
         <span id="sync-icon" class="storage-status-icon">💾</span>
@@ -387,8 +391,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
 <!-- Firebase Config & App Script -->
-<script src="firebase-config.js?v=106"></script>
-<script type="module" src="app.js?v=106"></script>
+<script src="firebase-config.js?v=107"></script>
+<script type="module" src="app.js?v=107"></script>
 
 </body>
 </html>

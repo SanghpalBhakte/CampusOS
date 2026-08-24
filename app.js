@@ -2746,8 +2746,34 @@ function setTheme(theme) {
 }
 
 function updateThemeSelector(theme) {
-  // Theme selector moved from topbar to Settings page — no DOM element to update here.
-  // The Settings page re-renders on setTheme() so active state is always current.
+  const btn = document.getElementById('theme-toggle-btn');
+  const icon = document.getElementById('theme-toggle-icon');
+  const label = document.getElementById('theme-toggle-label');
+  
+  const isDark = theme === 'midnight-ink';
+  const themeName = isDark ? 'Midnight Ink' : 'Paper Slate';
+  const nextThemeName = isDark ? 'Paper Slate' : 'Midnight Ink';
+  const iconSymbol = isDark ? '🌙' : '☀️';
+  
+  if (btn) {
+    btn.setAttribute('aria-label', `Current theme: ${themeName}. Click to switch to ${nextThemeName}.`);
+    btn.setAttribute('title', `Switch to ${nextThemeName}`);
+    btn.setAttribute('data-theme-active', theme);
+  }
+  if (icon) {
+    icon.textContent = iconSymbol;
+  }
+  if (label) {
+    label.textContent = themeName;
+  }
+
+  // Sync Settings page theme swatches if currently rendered
+  const swatches = document.querySelectorAll('.theme-swatch');
+  swatches.forEach(sw => {
+    const isMatch = sw.getAttribute('onclick')?.includes(`'${theme}'`);
+    sw.classList.toggle('active', !!isMatch);
+    sw.setAttribute('aria-pressed', isMatch ? 'true' : 'false');
+  });
 }
 
 // ── Routing ───────────────────────────────────────────────────
@@ -10836,6 +10862,7 @@ window.exportData       = exportData;
 window.importData       = importData;
 window.confirmClearTasks = confirmClearTasks;
 window.setTheme         = setTheme;
+window.toggleTheme      = toggleTheme;
 window.loginWithGoogle  = loginWithGoogle;
 window.loginWithGoogleRedirect = loginWithGoogleRedirect;
 window.logoutUser       = logoutUser;
