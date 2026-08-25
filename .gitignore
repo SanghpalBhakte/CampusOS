@@ -18,3 +18,9 @@ firebase-config.local.js
 
 # Dependencies
 node_modules/
+
+# Test & Build Artifacts
+.firebase/
+playwright-report/
+test-results/
+.tempmediaStorage/

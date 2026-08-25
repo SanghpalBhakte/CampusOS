@@ -2305,8 +2305,6 @@ a.card:hover,
 .setup-inline-link:hover { opacity: 0.8; }
 .setup-inline-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-
-
 /* ── Mid-Semester Attendance Baseline Dialog ────────────────── */
 .baseline-dialog {
   max-width: 520px;
@@ -3919,5 +3917,429 @@ button:disabled {
   .cd-starter-grid { grid-template-columns: 1fr; }
   .btn-assistant-toggle span { display: none; }
   .btn-assistant-toggle { width: 34px; padding: 0; }
+}
+
+/* ============================================================
+   CLARITY DESK — EDITORIAL REFINEMENT & TYPOGRAPHY SYSTEM
+   Enhanced Smoothness · Balanced Contrast · Calm Hierarchy
+   ============================================================ */
+
+/* ── 1. Text Smoothing & High-Legibility Body ─────────────── */
+body {
+  font-size: 0.92rem;
+  line-height: 1.56;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+}
+
+/* ── 2. Page Header & Editorial Titles ────────────────────── */
+.page-title {
+  font-size: 1.38rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.25;
+}
+
+.page-subtitle {
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+  margin-top: 3px;
+  line-height: 1.45;
+}
+
+.page-header {
+  margin-bottom: 28px;
+}
+
+/* ── 3. Greeting & Attendance Subtitle Clarity ────────────── */
+.desk-masthead {
+  padding: 28px 0 24px;
+  margin-bottom: 28px;
+}
+
+.desk-greeting {
+  font-size: 2.2rem;
+  letter-spacing: -0.04em;
+  line-height: 1.12;
+}
+
+.desk-greeting-sub {
+  font-size: 0.86rem;
+  color: var(--color-text-secondary);
+  margin-top: 6px;
+  line-height: 1.5;
+}
+
+/* ── 4. Section Headings & Dividers ───────────────────────── */
+.section-heading {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--color-text-tertiary);
+  margin-top: 26px;
+  margin-bottom: 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--color-border-subtle);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.section-heading:first-child {
+  margin-top: 0;
+}
+
+.panel-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-tertiary);
+}
+
+/* ── 5. Sidebar Navigation & Zone Rhythm ──────────────────── */
+.sidebar-section-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-tertiary);
+  padding: 18px 8px 6px;
+}
+
+.nav-item {
+  font-size: 0.86rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+.nav-item:hover {
+  color: var(--color-text-primary);
+}
+
+.nav-item.active {
+  background: var(--color-hover-fill);
+  color: var(--color-action-primary);
+  font-weight: 600;
+  border-left-color: var(--color-action-primary);
+}
+
+.sidebar-semester {
+  font-size: 0.70rem;
+  color: var(--color-text-tertiary);
+}
+
+/* ── 6. Topbar Chrome & Theme Switch Discoverability ──────── */
+.topbar {
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: var(--color-canvas);
+}
+
+.topbar-theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 999px;
+  color: var(--color-text-secondary);
+  font-size: 0.74rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.16s ease;
+  white-space: nowrap;
+}
+
+.topbar-theme-toggle:hover {
+  background: var(--color-surface);
+  border-color: var(--color-accent);
+  color: var(--color-text-primary);
+  transform: translateY(-0.5px);
+}
+
+.topbar-actions {
+  gap: 8px;
+}
+
+/* ── 7. Filter Pills & Workload Controls ──────────────────── */
+.filter-bar {
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.filter-chip {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+.filter-chip.active {
+  font-weight: 600;
+  background: var(--brand-primary, var(--accent));
+  color: var(--brand-primary-text, #ffffff) !important;
+}
+
+.desk-vitals-pill {
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+.desk-vitals-pill.is-safe {
+  font-weight: 500;
+}
+
+.desk-vitals-pill.is-warning {
+  font-weight: 600;
+}
+
+.desk-vitals-pill.is-critical {
+  font-weight: 700;
+}
+
+/* ── 8. Task Cards & Completed States ─────────────────────── */
+.assignment-subject {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.assignment-title {
+  font-size: 0.94rem;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.assignment-card.done {
+  opacity: 0.62;
+}
+
+.assignment-card.done .assignment-title {
+  text-decoration: none;
+  color: var(--color-text-secondary);
+}
+
+.assignment-footer {
+  margin-top: 8px;
+}
+
+/* ── 9. Timetable Schedule & Day Tabs ─────────────────────── */
+.tt-meta {
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+  line-height: 1.35;
+}
+
+.tt-subject {
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.type-badge {
+  font-size: 0.64rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  letter-spacing: 0.06em;
+}
+
+.tt-tab {
+  font-size: 0.80rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+.tt-tab.active {
+  font-weight: 600;
+}
+
+/* Recess/past slots calm down gracefully without vanishing */
+.tt-entry.past,
+.schedule-slot.is-past {
+  opacity: 0.58;
+}
+
+/* ── 10. Notice Card & Study Vault Polish ─────────────────── */
+.notice-card {
+  border-top: 2px solid var(--color-accent);
+}
+
+.notice-card.important {
+  border-top-color: var(--color-error);
+}
+
+.notice-title {
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.notice-date {
+  font-size: 0.74rem;
+  color: var(--color-text-tertiary);
+}
+
+.link-subject-header {
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.link-code {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--color-text-tertiary);
+  letter-spacing: 0.04em;
+  padding: 2px 7px;
+  border: 1px solid var(--color-border-subtle);
+}
+
+/* ── 11. Right-Rail Attendance Stats ──────────────────────── */
+.att-stat-figure {
+  font-size: 2.2rem;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+}
+
+.att-stat-label {
+  font-size: 0.70rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--color-text-tertiary);
+}
+
+.att-stat-message {
+  font-size: 0.80rem;
+  color: var(--color-text-secondary);
+  line-height: 1.45;
+}
+
+/* ── 12. Floating Action Button & Theme Token Harmony ─────── */
+.fab {
+  background: var(--color-action-primary);
+  color: var(--color-action-primary-text);
+  font-size: 0.90rem;
+  font-weight: 600;
+  padding: 10px 18px;
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--color-border-subtle);
+}
+
+.fab:hover {
+  background: var(--color-action-primary-hover);
+  color: var(--color-action-primary-text);
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-1px);
+}
+
+/* ── 13. Chrono Beacon & Form Control Consistency ─────────── */
+.chrono-beacon {
+  padding: 14px 18px;
+  margin-bottom: 20px;
+}
+
+.chrono-beacon-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.chrono-beacon-meta {
+  font-size: 0.76rem;
+  color: var(--color-text-secondary);
+}
+
+.form-label {
+  font-size: 0.80rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+/* ── 14. Timetable Time Column & 12-Hour AM/PM Alignment ──── */
+.tt-time-col {
+  width: 78px;
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.tt-time-start {
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  letter-spacing: -0.01em;
+}
+
+.tt-time-end {
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  color: var(--color-text-tertiary);
+  margin-top: 2px;
+  white-space: nowrap;
+}
+
+.schedule-slot-time {
+  font-family: var(--font-sans);
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  width: 145px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  letter-spacing: -0.01em;
+}
+
+.chrono-beacon-time {
+  font-family: var(--font-sans);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.015em;
+  white-space: nowrap;
+}
+
+/* ── 15. Stable Font Rendering During Hover / Active ──────── */
+.nav-item,
+.filter-chip,
+.topbar-theme-toggle,
+.storage-status-badge,
+.tt-tab,
+.cd-chip,
+.btn-assistant-toggle,
+.btn,
+.btn-primary,
+.btn-secondary,
+.btn-subtle,
+.btn-review,
+.btn-action,
+.btn-outline {
+  transform: none !important;
+}
+
+.nav-item:hover {
+  transform: translateX(2px) !important;
+}
+
+.btn-primary:hover,
+.btn-secondary:hover,
+.btn-outline:hover,
+.btn-action:hover,
+.btn-subtle:hover,
+.btn-review:hover {
+  transform: translateY(-1px) !important;
+}
+
+.btn-primary:active,
+.btn-secondary:active,
+.btn-outline:active,
+.btn-action:active,
+.btn-subtle:active,
+.btn-review:active {
+  transform: translateY(0) !important;
 }
 

@@ -1,0 +1,33 @@
+{
+  "name": "clarity-desk",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "node tests/verify_master.mjs && node tests/verify_gap_fixes.mjs && node tests/verify_subject_normalization.mjs",
+    "test:visual": "playwright test tests/clarity-visual-verification.spec.ts",
+    "test:visual:update": "playwright test tests/clarity-visual-verification.spec.ts --update-snapshots",
+    "test:pwa-smoke": "playwright test tests/pwa-smoke.spec.ts --project=chromium-desktop",
+    "test:smoke": "playwright test tests/post-deploy-smoke.spec.ts --project=chromium-desktop",
+    "release:check": "node tests/release-check.mjs",
+    "clear:pwa-cache": "node tests/clear-pwa-cache.mjs",
+    "clear:pwa-cache:full": "node tests/clear-pwa-cache.mjs --full",
+    "serve": "node tests/serve.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SanghpalBhakte/Clarity-Desk.git"
+  },
+  "keywords": [],
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/SanghpalBhakte/Clarity-Desk/issues"
+  },
+  "homepage": "https://github.com/SanghpalBhakte/Clarity-Desk#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.62.1"
+  }
+}

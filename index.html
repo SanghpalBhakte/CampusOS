@@ -56,20 +56,20 @@
 
   <!-- Favicon & App Icons -->
   <link rel="icon" href="favicon.ico" sizes="any" />
-  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=109" />
-  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=109" />
-  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png?v=109" />
-  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=109" />
+  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=110" />
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=110" />
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png?v=110" />
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=110" />
 
   <!-- Styles -->
-  <link rel="stylesheet" href="style.css?v=109" />
+  <link rel="stylesheet" href="style.css?v=110" />
 </head>
 <body>
 
 <div class="app-shell">
 
   <!-- ── Topbar ──────────────────────────────────────── -->
-  <header class="topbar">
+  <header class="topbar" data-testid="topbar">
     <div class="topbar-left">
       <button id="nav-back-btn" class="btn-back" onclick="navigateBack()" title="Go back to previous page" aria-label="Go back" style="display:none">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -98,7 +98,7 @@
     </div>
 
     <div class="topbar-actions">
-      <button class="topbar-theme-toggle" id="theme-toggle-btn" onclick="toggleTheme()" title="Switch theme (Paper Slate / Midnight Ink)" aria-label="Toggle theme: currently Paper Slate" aria-live="polite">
+      <button class="topbar-theme-toggle" id="theme-toggle-btn" data-testid="theme-toggle" onclick="toggleTheme()" title="Switch theme (Paper Slate / Midnight Ink)" aria-label="Toggle theme: currently Paper Slate" aria-live="polite">
         <span class="theme-toggle-icon" id="theme-toggle-icon">☀️</span>
         <span class="theme-toggle-label" id="theme-toggle-label">Paper Slate</span>
       </button>
@@ -210,34 +210,34 @@
     <main class="content-area" role="main">
 
       <!-- Dashboard -->
-      <section id="page-dashboard" class="section-page active" data-page="dashboard" aria-label="Dashboard"></section>
+      <section id="page-dashboard" class="section-page active" data-page="dashboard" data-testid="dashboard" aria-label="Dashboard"></section>
 
       <!-- Weekly Review -->
-      <section id="page-review" class="section-page" data-page="review" aria-label="Weekly Review"></section>
+      <section id="page-review" class="section-page" data-page="review" data-testid="review" aria-label="Weekly Review"></section>
 
       <!-- Timetable -->
-      <section id="page-timetable" class="section-page" data-page="timetable" aria-label="Timetable"></section>
+      <section id="page-timetable" class="section-page" data-page="timetable" data-testid="timetable" aria-label="Timetable"></section>
 
       <!-- Subject Hubs -->
-      <section id="page-subjects" class="section-page" data-page="subjects" aria-label="Subject Hubs"></section>
+      <section id="page-subjects" class="section-page" data-page="subjects" data-testid="subject-hub" aria-label="Subject Hubs"></section>
 
       <!-- Assignments -->
-      <section id="page-assignments" class="section-page" data-page="assignments" aria-label="Tasks & Workload"></section>
+      <section id="page-assignments" class="section-page" data-page="assignments" data-testid="assignments" aria-label="Tasks & Workload"></section>
 
       <!-- Notices -->
-      <section id="page-notices" class="section-page" data-page="notices" aria-label="Notice Board"></section>
+      <section id="page-notices" class="section-page" data-page="notices" data-testid="notices" aria-label="Notice Board"></section>
 
       <!-- Resources -->
-      <section id="page-resources" class="section-page" data-page="resources" aria-label="Study Vault"></section>
+      <section id="page-resources" class="section-page" data-page="resources" data-testid="resources" aria-label="Study Vault"></section>
 
       <!-- Quick Links -->
-      <section id="page-links" class="section-page" data-page="links" aria-label="Study Vault"></section>
+      <section id="page-links" class="section-page" data-page="links" data-testid="links" aria-label="Study Vault"></section>
 
       <!-- Daily Summary -->
-      <section id="page-summary" class="section-page" data-page="summary" aria-label="Daily Briefing"></section>
+      <section id="page-summary" class="section-page" data-page="summary" data-testid="summary" aria-label="Daily Briefing"></section>
 
       <!-- Settings -->
-      <section id="page-settings" class="section-page" data-page="settings" aria-label="Desk Settings"></section>
+      <section id="page-settings" class="section-page" data-page="settings" data-testid="settings" aria-label="Desk Settings"></section>
 
     </main>
   </div><!-- /main-wrapper -->
@@ -308,7 +308,7 @@
 </nav>
 
 <!-- Floating Action Button — Add Task -->
-<button class="fab" onclick="showAddTaskModal()" aria-label="Add new task">
+<button class="fab" data-testid="add-task-button" onclick="showAddTaskModal()" aria-label="Add new task">
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
     <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
   </svg>
@@ -393,8 +393,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
 <!-- Firebase Config & App Script -->
-<script src="firebase-config.js?v=109"></script>
-<script type="module" src="app.js?v=109"></script>
+<script src="firebase-config.js?v=110"></script>
+<script type="module" src="app.js?v=110"></script>
 
 </body>
 </html>

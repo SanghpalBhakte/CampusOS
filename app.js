@@ -23,6 +23,34 @@ const KEY_USER_BATCH          = 'cos_user_batch';
 const KEY_CLEANUP_BACKUP      = 'cos_cleanup_backup';
 
 // ── Safe Storage Helpers ─────────────────────────────────────
+function formatDisplayTime(t) {
+  if (!t || typeof t !== 'string') return t || '';
+  const trimmed = t.trim();
+  const match = trimmed.match(/^(\d{1,2}):(\d{2})(?:\s*([AP]M))?$/i);
+  if (!match) return trimmed;
+  let h = parseInt(match[1], 10);
+  const m = match[2];
+  const existingSuffix = match[3];
+  if (existingSuffix) {
+    return `${h}:${m} ${existingSuffix.toUpperCase()}`;
+  }
+  const suffix = h >= 12 ? 'PM' : 'AM';
+  h = ((h - 1 + 12) % 12) + 1;
+  return `${h}:${m} ${suffix}`;
+}
+
+function formatDisplayTimeRange(start, end) {
+  if (!start && !end) return '';
+  if (!start) return formatDisplayTime(end);
+  if (!end) return formatDisplayTime(start);
+  return `${formatDisplayTime(start)} – ${formatDisplayTime(end)}`;
+}
+
+if (typeof window !== 'undefined') {
+  window.formatDisplayTime = formatDisplayTime;
+  window.formatDisplayTimeRange = formatDisplayTimeRange;
+}
+
 function safeGetStorage(key, fallback = null) {
   try {
     const v = localStorage.getItem(key);
@@ -2635,7 +2663,7 @@ function checkScheduledNotifications() {
         const classKey = `class_rem_${c.code || c.subject}_${c.time}_${today}`;
         if (!notifiedMap[classKey]) {
           dispatchNotification(`Class Starting Soon: ${c.subject}`, {
-            body: `Starts at ${c.time} in ${c.room || 'class'} with ${c.teacher || 'faculty'}`,
+            body: `Starts at ${formatDisplayTime(c.time)} in ${c.room || 'class'} with ${c.teacher || 'faculty'}`,
             tag: classKey,
             data: { url: './#timetable' }
           });
@@ -3846,7 +3874,7 @@ function renderWeeklyAttendanceTracker() {
               </span>
             </div>
             <div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px">
-              ${c.time} ${c.end ? '- ' + c.end : ''} ${c.room ? '· ' + c.room : ''}
+              ${formatDisplayTimeRange(c.time, c.end)} ${c.room ? '· ' + c.room : ''}
             </div>
           </div>
           <div style="display:flex;align-items:center;gap:6px">
@@ -4242,7 +4270,7 @@ function answerTodaySummary() {
   let html = `<div style="font-weight:600;margin-bottom:8px">Today's Focus &amp; Summary</div>`;
   html += `<div style="font-size:0.85rem;margin-bottom:8px">You have ${classesLeft} class${classesLeft!==1?'es':''} left and ${tsks.length} task${tsks.length!==1?'s':''} due today.</div>`;
   if (nextClass) {
-    html += `<div style="font-size:0.85rem;color:var(--text-secondary)">👉 Next session: <strong>${nextClass.subject}</strong> at ${nextClass.time} (${nextClass.room})</div>`;
+    html += `<div style="font-size:0.85rem;color:var(--text-secondary)">👉 Next session: <strong>${nextClass.subject}</strong> at ${formatDisplayTime(nextClass.time)} (${nextClass.room})</div>`;
   }
   if (tsks.length > 0) {
     html += `<ul style="font-size:0.85rem;color:var(--text-secondary);margin:8px 0 0 16px;padding:0">`;
@@ -4299,7 +4327,7 @@ function answerTimetableDay(dayMatch) {
   } else {
     html += `<div style="font-size:0.85rem;margin-bottom:8px">You have ${classes.length} class${classes.length!==1?'es':''}:</div>`;
     html += `<ul style="font-size:0.85rem;color:var(--text-secondary);margin:0 0 0 16px;padding:0">`;
-    classes.forEach(c => { html += `<li><strong>${c.subject}</strong> (${c.time} · ${c.room})</li>`; });
+    classes.forEach(c => { html += `<li><strong>${c.subject}</strong> (${formatDisplayTime(c.time)} · ${c.room})</li>`; });
     html += `</ul>`;
   }
   return html;
@@ -4553,7 +4581,7 @@ function renderDashboard() {
               <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--status-success);box-shadow:0 0 6px var(--status-success)"></span>
               In Session
             </span>
-            <span class="chrono-beacon-time">${activeClass.time} → ${activeClass.end || 'end'}</span>
+            <span class="chrono-beacon-time">${formatDisplayTimeRange(activeClass.time, activeClass.end)}</span>
           </div>
           <div class="chrono-beacon-title" onclick="openSubjectHub('${activeClass.subject}')" style="cursor:pointer" title="Open Subject Hub">
             ${activeClass.subject}
@@ -4579,7 +4607,7 @@ function renderDashboard() {
         <div style="flex:1;min-width:180px">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
             <span class="chrono-beacon-badge" style="background:color-mix(in srgb, var(--accent-warm) 15%, transparent);color:var(--accent-warm)">⏳ Next Up</span>
-            <span class="chrono-beacon-time">${nextClass.time} → ${nextClass.end || 'end'}</span>
+            <span class="chrono-beacon-time">${formatDisplayTimeRange(nextClass.time, nextClass.end)}</span>
           </div>
           <div class="chrono-beacon-title" onclick="openSubjectHub('${nextClass.subject}')" style="cursor:pointer" title="Open Subject Hub">
             ${nextClass.subject}
@@ -4716,7 +4744,7 @@ function renderDashboard() {
                 const isPast = (currentMin >= timeToMinutes(c.end || '23:59'));
                 return `
                   <div class="schedule-slot ${isNow ? 'is-now' : ''} ${isPast ? 'is-past' : ''}">
-                    <div class="schedule-slot-time">${c.time}${c.end ? '–' + c.end : ''}</div>
+                    <div class="schedule-slot-time">${formatDisplayTimeRange(c.time, c.end)}</div>
                     <div style="flex:1;min-width:100px;cursor:pointer" onclick="openSubjectHub('${c.subject}')">
                       <div class="schedule-slot-title">${c.subject}</div>
                       <div style="font-size:0.71rem;color:var(--text-muted);margin-top:1px">${c.room ? c.room + ' · ' : ''}${c.teacher ? 'Prof. ' + c.teacher + ' · ' : ''}${c.type || 'lecture'}</div>
@@ -4737,7 +4765,10 @@ function renderDashboard() {
         <div class="dashboard-panel">
           <div class="panel-header">
             <div class="panel-title">Tasks &amp; Deadlines</div>
-            <button class="panel-action" onclick="navigateTo('assignments')">All tasks (${pending}) →</button>
+            <div style="display:flex;align-items:center;gap:8px">
+              <button class="btn btn-xs btn-secondary" data-testid="add-task-button" onclick="showAddTaskModal()" style="font-size:0.75rem;padding:3px 8px">+ Add</button>
+              <button class="panel-action" onclick="navigateTo('assignments')">All tasks (${pending}) →</button>
+            </div>
           </div>
 
           <!-- Progress bar -->
@@ -4936,8 +4967,8 @@ function renderTimetable() {
       return `
         <div class="tt-entry ${isCurrent ? 'current' : ''} ${isPast ? 'past' : ''}">
           <div class="tt-time-col">
-            <div class="tt-time-start">${c.time}</div>
-            <div class="tt-time-end">${c.end || ''}</div>
+            <div class="tt-time-start">${formatDisplayTime(c.time)}</div>
+            <div class="tt-time-end">${c.end ? formatDisplayTime(c.end) : ''}</div>
           </div>
           <div class="tt-divider"></div>
           <div class="tt-info">
@@ -7661,7 +7692,7 @@ function renderSingleSubjectHub(el, subj, allSubjects) {
   const slotsHTML = subj.slots.length > 0 ? subj.slots.map(sl => `
     <div class="card card-sm" style="margin-bottom:6px;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
       <div>
-        <div style="font-weight:600;font-size:0.85rem">${DAY_NAMES[sl.day]} · ${sl.time} ${sl.end ? '- ' + sl.end : ''}</div>
+        <div style="font-weight:600;font-size:0.85rem">${DAY_NAMES[sl.day]} · ${formatDisplayTimeRange(sl.time, sl.end)}</div>
         <div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px">${sl.room || subj.room || 'Classroom'} ${sl.teacher ? '· ' + sl.teacher : subj.teacher ? '· ' + subj.teacher : ''} ${sl.batches && sl.batches.length > 0 ? '· Batch ' + sl.batches.join(', ') : ''}</div>
       </div>
       <div style="display:flex;align-items:center;gap:6px">
@@ -8153,7 +8184,7 @@ function renderAssignments() {
         <div class="page-title">Tasks &amp; Deadlines</div>
         <div class="page-subtitle">${pendingCount()} pending · ${all.filter(a=>a.status==='submitted').length} completed</div>
       </div>
-      <button class="btn-primary" onclick="showAddTaskModal()" style="display:flex;align-items:center;gap:6px;flex-shrink:0">${icons.plus()} Add Task</button>
+      <button class="btn-primary" data-testid="add-task-button" onclick="showAddTaskModal()" style="display:flex;align-items:center;gap:6px;flex-shrink:0">${icons.plus()} Add Task</button>
     </div>
     <div class="filter-bar">${statusBar}</div>
     <div class="filter-bar">${typeBar}</div>
@@ -8191,7 +8222,7 @@ function showAddTaskModal(editTaskId = null, prefilledSubject = null, defaultTyp
   backdrop.className = 'modal-backdrop';
   backdrop.id = 'add-task-backdrop';
   backdrop.innerHTML = `
-    <div class="modal add-task-modal" onclick="event.stopPropagation()">
+    <div class="modal add-task-modal" data-testid="add-task-modal" onclick="event.stopPropagation()">
       <div class="modal-header">
         <h2 class="modal-title">${editTask ? 'Edit Task' : initialType === 'mission' ? 'Create Mission' : 'Add Task'}</h2>
         <button class="modal-close" onclick="document.getElementById('add-task-backdrop').remove()">${icons.x()}</button>
@@ -8199,7 +8230,7 @@ function showAddTaskModal(editTaskId = null, prefilledSubject = null, defaultTyp
 
       <div class="form-group">
         <label class="form-label">Subject / Category <span class="req">*</span></label>
-        <select class="form-select" id="task-subject">
+        <select class="form-select" id="task-subject" data-testid="task-subject">
           <option value="">Select subject or category…</option>
           <optgroup label="Academic Subjects">
             ${subjectOptions}
@@ -8213,7 +8244,7 @@ function showAddTaskModal(editTaskId = null, prefilledSubject = null, defaultTyp
 
       <div class="form-group">
         <label class="form-label">Task Title <span class="req">*</span></label>
-        <input type="text" class="form-input" id="task-title"
+        <input type="text" class="form-input" id="task-title" data-testid="task-title"
           placeholder="e.g. Master Dynamic Programming, Lab Report 3, or Pay Fee" maxlength="120"
           value="${editTask ? editTask.title.replace(/"/g, '&quot;') : ''}">
       </div>
@@ -8223,7 +8254,7 @@ function showAddTaskModal(editTaskId = null, prefilledSubject = null, defaultTyp
           <div class="form-label-row">
             <label class="form-label" for="task-type">Task Type</label>
           </div>
-          <select class="form-select" id="task-type" onchange="handleTaskTypeChange(this.value)">
+          <select class="form-select" id="task-type" data-testid="task-type" onchange="handleTaskTypeChange(this.value)">
             <option value="assignment" ${initialType === 'assignment' ? 'selected' : ''}>📝 Assignment</option>
             <option value="mission" ${initialType === 'mission' ? 'selected' : ''}>🚀 Mission (Long-term Goal)</option>
             <option value="general" ${initialType === 'general' ? 'selected' : ''}>📋 General / Personal</option>
@@ -8242,7 +8273,7 @@ function showAddTaskModal(editTaskId = null, prefilledSubject = null, defaultTyp
               <span>Ongoing · No deadline</span>
             </label>
           </div>
-          <input type="date" class="form-input" id="task-due" value="${editTask && !isOngoing ? (editTask.dueDate || '') : defaultDate}" ${isOngoing ? 'disabled style="opacity:0.45;background:var(--surface-2);cursor:not-allowed"' : ''}>
+          <input type="date" class="form-input" id="task-due" data-testid="task-due" data-testid-alt="task-date" value="${editTask && !isOngoing ? (editTask.dueDate || '') : defaultDate}" ${isOngoing ? 'disabled style="opacity:0.45;background:var(--surface-2);cursor:not-allowed"' : ''}>
           <div id="task-ongoing-hint" style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;line-height:1.4;display:${isOngoing ? 'flex' : 'none'};align-items:center;gap:6px">
             <span style="color:var(--purple);font-weight:600">✦ Standing Goal:</span> Stays active on your desk until completed or deleted. Never becomes overdue.
           </div>
@@ -8261,7 +8292,7 @@ function showAddTaskModal(editTaskId = null, prefilledSubject = null, defaultTyp
           <div class="form-label-row">
             <label class="form-label">Priority</label>
           </div>
-          <div class="priority-pills">
+          <div class="priority-pills" data-testid="task-priority">
             <label class="priority-pill priority-high">
               <input type="radio" name="task-priority" value="high" ${editTask && editTask.priority === 'high' ? 'checked' : ''}> High
             </label>
@@ -8283,7 +8314,7 @@ function showAddTaskModal(editTaskId = null, prefilledSubject = null, defaultTyp
 
       <div class="form-actions">
         <button class="btn-secondary" onclick="document.getElementById('add-task-backdrop').remove()">Cancel</button>
-        <button class="btn-primary" onclick="submitAddTask(${editTask ? `'${editTask.id}'` : ''})">${editTask ? 'Save Changes' : initialType === 'mission' ? 'Create Mission' : 'Add Task'}</button>
+        <button class="btn-primary" data-testid="task-save" onclick="submitAddTask(${editTask ? `'${editTask.id}'` : ''})">${editTask ? 'Save Changes' : initialType === 'mission' ? 'Create Mission' : 'Add Task'}</button>
       </div>
     </div>
   `;
@@ -8947,7 +8978,7 @@ function renderSummaryContent(container) {
                 <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.subject}</span>
                 <span class="type-badge type-${c.type}">${c.type}</span>
               </div>
-              <div class="summary-text-sub">${c.time}–${c.end} · ${c.room} · ${c.teacher}</div>
+              <div class="summary-text-sub">${formatDisplayTimeRange(c.time, c.end)} · ${c.room} · ${c.teacher}</div>
             </div>
           </div>`;
         }).join('')
@@ -9815,11 +9846,7 @@ const ClarityAssistant = (() => {
   const DAY_ABBR  = ['sun','mon','tue','wed','thu','fri','sat'];
 
   function formatTime(t) {
-    if (!t) return '—';
-    const [h, m] = t.split(':').map(Number);
-    const suffix = h >= 12 ? 'PM' : 'AM';
-    const hour = ((h - 1 + 12) % 12) + 1;
-    return `${hour}:${String(m).padStart(2,'0')} ${suffix}`;
+    return formatDisplayTime(t);
   }
 
   // ── Intent Matching ───────────────────────────────────────────
@@ -10778,7 +10805,7 @@ const ClarityAssistant = (() => {
             [1,2,3,4,5,6,0].forEach(d => {
               (tt[d] || []).forEach(c => {
                 if (isTeachingClass(c) && c.subject && c.subject.toLowerCase() === s.name.toLowerCase()) {
-                  classes.push(`${DAY_SHORT[d]} ${c.time}–${c.end || 'end'}${c.room ? ' (' + c.room + ')' : ''}`);
+                  classes.push(`${DAY_SHORT[d]} ${formatDisplayTimeRange(c.time, c.end)}${c.room ? ' (' + c.room + ')' : ''}`);
                 }
               });
             });
