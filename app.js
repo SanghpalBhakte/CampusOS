@@ -799,6 +799,123 @@ const SUBJECT_CODE_PATTERN = /\b([A-Z]{2,8}[0-9]{1,4}[A-Z]{1,4}[0-9]{1,4}[A-Z]?|
 const FACULTY_TITLE_PATTERN = /\b(?:Prof\.?|Dr\.?|Mr\.?|Mrs\.?|Ms\.?|Shri|Smt\.?)\s+[A-Za-z]+(?:\s+(?!LH|LT|CR|Room|Lab|Cabin|Hall|Batch|Sec)[A-Za-z]+)?/gi;
 const ROOM_PATTERN = /\b(?:Room|LT|CR|LH|Cabin|Hall|SF|FF|GF|WS)[-.\s]*(?:\d+[A-Z]?|[A-D]\b)|\bLab[-.\s]*\d+[A-Z]?\b|\b(?:G|F|S|T)-\d{2,3}\b|\b[A-Z]{1,2}-\d{2,3}\b/i;
 
+function getCanonicalSubjectName(rawText) {
+  if (!rawText || typeof rawText !== 'string') return '';
+  let text = rawText.trim().replace(/\r\n|\r/g, '\n');
+
+  // 1. Remove bracketed expressions (e.g. "(AI-A2, B2)", "(Lab)", "(Theory)", "[Batch 1]")
+  text = text.replace(/\([^)]*\)/g, ' ');
+  text = text.replace(/\[[^\]]*\]/g, ' ');
+
+  // 2. Remove Batch/Section/Group keywords and tags (e.g. "Batch A2", "Sec B", "Grp 1", "- A2", "- C2")
+  text = text.replace(/\b(?:Batch(?:es)?|Sec(?:tion)?|Grp|Group)\s*[:\-\s]*[A-D0-9,\s/-]+\b/gi, ' ');
+  text = text.replace(/[:\-\s]+\b[A-D][1-4]\b/gi, ' ');
+  text = text.replace(/[:\-\s]+\b[A-D]\b(?![a-zA-Z])/gi, ' ');
+
+  // 3. Remove Faculty Titles & Names
+  const FACULTY_TITLE_PATTERN = /\b(?:Prof\.?|Dr\.?|Mr\.?|Mrs\.?|Ms\.?|Shri|Smt\.?)\s+[A-Za-z]+(?:\s+[A-Za-z]+)?/gi;
+  text = text.replace(FACULTY_TITLE_PATTERN, ' ');
+
+  // 4. Remove Room numbers
+  const ROOM_PATTERN = /\b(?:Room|LT|CR|LH|Cabin|Hall|SF|FF|GF|WS)[-.\s]*(?:\d+[A-Z]?|[A-D]\b)|\bLab[-.\s]*\d+[A-Z]?\b|\b(?:G|F|S|T)-\d{2,3}\b|\b[A-Z]{1,2}-\d{2,3}\b/gi;
+  text = text.replace(ROOM_PATTERN, ' ');
+
+  // 5. Remove Subject Code patterns e.g. CS401, AID21PCL202
+  const SUBJECT_CODE_PATTERN = /\b([A-Z]{2,8}[0-9]{1,4}[A-Z]{1,4}[0-9]{1,4}[A-Z]?|[A-Z]{2,6}[-\s]?[0-9]{2,5}[A-Z]?|[0-9]{2}[A-Z]{2,6}[0-9]{2,4})\b/gi;
+  text = text.replace(SUBJECT_CODE_PATTERN, ' ');
+
+  // 6. Remove Type keywords (lab, theory, practical, lecture, tutorial, workshop)
+  text = text.replace(/\b(?:laboratory|lab|practical|tutorial|tut|lecture|theory|project|seminar|workshop)\b/gi, ' ');
+  text = text.replace(/\b(?:credits?|hours?|hrs?|periods?|sem(?:ester)?\s*(?:[1-8]|i{1,3}|iv|v|vi{0,3})?)\b/gi, ' ');
+
+  // 7. Clean punctuation and whitespace
+  text = text.replace(/^\d+[\s.\-–)]+/, '');
+  let clean = text.replace(/[^a-zA-Z0-9\s/&+-]/g, ' ').replace(/\s+/g, ' ').trim();
+
+  const words = clean.split(' ').filter(w => {
+    const wLow = w.toLowerCase();
+    if (w.length <= 1 && !['c', 'r'].includes(wLow)) return false;
+    if (TIMETABLE_JUNK_TOKENS.has(wLow)) return false;
+    if (/^[A-D][1-4]$/i.test(w)) return false;
+    if (/^\d+$/.test(w)) return false;
+    return true;
+  });
+
+  clean = words.join(' ').trim();
+
+  const CANONICAL_MAP = {
+    'ds': 'Data Structures',
+    'data structure': 'Data Structures',
+    'data structures': 'Data Structures',
+    'demp': 'Digital Electronics and Microprocessors',
+    'digital electronics': 'Digital Electronics and Microprocessors',
+    'digital electronics and microprocessor': 'Digital Electronics and Microprocessors',
+    'digital electronics and microprocessors': 'Digital Electronics and Microprocessors',
+    'pbst': 'Probability and Statistics',
+    'probability statistics': 'Probability and Statistics',
+    'probability & statistics': 'Probability and Statistics',
+    'probability and statistics': 'Probability and Statistics',
+    'bmfa': 'Business Management and Financial Accounting',
+    'business management': 'Business Management and Financial Accounting',
+    'coi': 'Constitution of India',
+    'ce': 'Community Engagement',
+    'web dev': 'Web Development',
+    'web development': 'Web Development',
+    'wd': 'Web Development',
+    'os': 'Operating Systems',
+    'operating system': 'Operating Systems',
+    'operating systems': 'Operating Systems',
+    'dbms': 'Database Management Systems',
+    'database management': 'Database Management Systems',
+    'ai': 'Artificial Intelligence',
+    'ml': 'Machine Learning',
+    'cn': 'Computer Networks',
+    'computer network': 'Computer Networks',
+    'computer networks': 'Computer Networks',
+    'mdm': 'Multi Disciplinary Minor',
+    'oe-1': 'Open Elective 1',
+    'oe-2': 'Open Elective 2'
+  };
+
+  const lower = clean.toLowerCase();
+  if (CANONICAL_MAP[lower]) return CANONICAL_MAP[lower];
+  return clean || rawText.trim();
+}
+
+function getCanonicalSubjectKey(rawText) {
+  const name = getCanonicalSubjectName(rawText);
+  return (name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function getCanonicalSubjectCode(rawName, rawCode) {
+  if (rawCode && rawCode.trim() && !/lab|theory|batch/i.test(rawCode)) {
+    return rawCode.trim().toUpperCase();
+  }
+  const cleanName = getCanonicalSubjectName(rawName);
+  const CODE_MAP = {
+    'Data Structures': 'DS',
+    'Digital Electronics and Microprocessors': 'DEMP',
+    'Probability and Statistics': 'PBST',
+    'Business Management and Financial Accounting': 'BMFA',
+    'Constitution of India': 'COI',
+    'Community Engagement': 'CE',
+    'Web Development': 'WD',
+    'Operating Systems': 'OS',
+    'Database Management Systems': 'DBMS',
+    'Artificial Intelligence': 'AI',
+    'Machine Learning': 'ML',
+    'Computer Networks': 'CN',
+    'Multi Disciplinary Minor': 'MDM'
+  };
+  if (CODE_MAP[cleanName]) return CODE_MAP[cleanName];
+  if (rawCode && rawCode.trim()) return rawCode.trim().toUpperCase();
+  const words = cleanName.split(/\s+/).filter(Boolean);
+  if (words.length > 1) {
+    return words.map(w => w[0].toUpperCase()).join('');
+  }
+  return cleanName.slice(0, 4).toUpperCase();
+}
+
 function extractBatchTags(rawText) {
   if (!rawText || typeof rawText !== 'string') return [];
   const batches = new Set();
@@ -4916,28 +5033,26 @@ function getSubjectList() {
     const cleanRaw = rawName.trim();
     if (!cleanRaw || /^(off|lunch|break|holiday|recess|free)$/i.test(cleanRaw)) return null;
 
-    const norm = normalizeSubjectIdentity(cleanRaw, [], classType);
-    const isLab = classType === 'lab' || norm.isLab;
-    const finalName = norm.canonicalName || cleanRaw;
-    const finalCode = norm.canonicalCode || rawCode || finalName;
+    const canonicalName = getCanonicalSubjectName(cleanRaw);
+    const canonicalCode = getCanonicalSubjectCode(cleanRaw, rawCode);
+    const key = getCanonicalSubjectKey(canonicalName);
+    if (!key) return null;
 
-    // Distinguish theory from lab canonical identity cleanly
-    const key = `${finalName.toLowerCase()}|||${isLab ? 'lab' : 'theory'}`;
     if (!map.has(key)) {
       map.set(key, {
-        name: finalName,
-        code: finalCode,
-        type: isLab ? 'lab' : (classType || norm.classType || 'lecture'),
-        teacher: teacher || norm.teacher || '',
-        room: room || norm.room || '',
+        name: canonicalName,
+        code: canonicalCode,
+        type: classType || 'course',
+        teacher: teacher || '',
+        room: room || '',
         color: color || 'var(--accent)',
         slots: []
       });
     }
     const item = map.get(key);
-    if (!item.teacher && (teacher || norm.teacher)) item.teacher = teacher || norm.teacher;
-    if (!item.room && (room || norm.room)) item.room = room || norm.room;
-    if (!item.code && finalCode) item.code = finalCode;
+    if (!item.teacher && teacher) item.teacher = teacher;
+    if (!item.room && room) item.room = room;
+    if (!item.code && canonicalCode) item.code = canonicalCode;
     return item;
   };
 
@@ -4953,7 +5068,10 @@ function getSubjectList() {
             end: c.end,
             room: c.room || item.room,
             teacher: c.teacher || item.teacher,
-            code: c.code || item.code
+            code: c.code || item.code,
+            rawSubject: c.subject,
+            type: c.type || 'lecture',
+            batches: c.batches || []
           });
         }
       }
@@ -4963,14 +5081,14 @@ function getSubjectList() {
   // 2. Collect from Tasks
   allTasks().forEach(t => {
     if (t.subject && t.subject.trim()) {
-      getOrCreateSubject(t.subject, t.subject, 'lecture');
+      getOrCreateSubject(t.subject, t.code || t.subject, 'lecture');
     }
   });
 
   // 3. Collect from Quick Links
   loadCustomLinks().forEach(l => {
     if (l.subject && l.subject.trim()) {
-      getOrCreateSubject(l.subject, l.subject, 'lecture', '', '', l.color);
+      getOrCreateSubject(l.subject, l.code || l.subject, 'lecture', '', '', l.color);
     }
   });
 
@@ -4981,7 +5099,7 @@ function getSubjectList() {
       const name = (b.subjectName || k || '').trim();
       const code = (b.subjectCode || '').trim();
       if (name) {
-        getOrCreateSubject(name, code, b.classType || (b.isLab ? 'lab' : 'lecture'));
+        getOrCreateSubject(name, code, b.classType || 'lecture');
       }
     } else if (k && typeof k === 'string' && k.trim()) {
       getOrCreateSubject(k.trim(), '', 'lecture');
@@ -5140,14 +5258,23 @@ function getSubjectAttendance(subjItem) {
 
   const targetCode = (subjItem.code || '').toLowerCase().replace(/[^a-zA-Z0-9]/g, '');
   const targetName = (subjItem.name || '').toLowerCase().replace(/[^a-zA-Z0-9]/g, '');
+  const targetKey  = getCanonicalSubjectKey(subjItem.name);
 
   Object.values(attendanceData).forEach(dayObj => {
     if (dayObj && typeof dayObj === 'object') {
       Object.entries(dayObj).forEach(([key, status]) => {
         const cleanKey = key.toLowerCase().replace(/[^a-zA-Z0-9_]/g, '');
+        const keyPrefix = cleanKey.split('_')[0];
         const matchesCode = targetCode && cleanKey.startsWith(targetCode + '_');
         const matchesName = targetName && cleanKey.startsWith(targetName + '_');
-        if (matchesCode || matchesName) {
+        const matchesCanonical = targetKey && (getCanonicalSubjectKey(keyPrefix) === targetKey || (keyPrefix.length >= 3 && (keyPrefix.includes(targetKey) || targetKey.includes(keyPrefix))));
+        const matchesSlots = Array.isArray(subjItem.slots) && subjItem.slots.some(sl => {
+          const rawK = (sl.rawSubject || '').toLowerCase().replace(/[^a-zA-Z0-9]/g, '');
+          const codeK = (sl.code || '').toLowerCase().replace(/[^a-zA-Z0-9]/g, '');
+          return (rawK && cleanKey.startsWith(rawK + '_')) || (codeK && cleanKey.startsWith(codeK + '_'));
+        });
+
+        if (matchesCode || matchesName || matchesCanonical || matchesSlots) {
           if (status === 'attended') dailyAttended++;
           else if (status === 'skipped') dailySkipped++;
         }
@@ -7338,7 +7465,15 @@ function renderSubjects() {
 
   const subjects = getSubjectList();
   const activeName = state.activeSubject;
-  const activeSubject = activeName ? subjects.find(s => s.name.toLowerCase() === activeName.toLowerCase() || s.code.toLowerCase() === activeName.toLowerCase()) : null;
+  const activeKey = activeName ? getCanonicalSubjectKey(activeName) : '';
+  const activeSubject = activeName ? (
+    subjects.find(s => 
+      s.name.toLowerCase() === activeName.toLowerCase() || 
+      (s.code && s.code.toLowerCase() === activeName.toLowerCase()) ||
+      getCanonicalSubjectKey(s.name) === activeKey ||
+      (Array.isArray(s.slots) && s.slots.some(sl => (sl.rawSubject && sl.rawSubject.toLowerCase() === activeName.toLowerCase())))
+    )
+  ) : null;
 
   if (activeSubject) {
     renderSingleSubjectHub(el, activeSubject, subjects);
@@ -7527,9 +7662,12 @@ function renderSingleSubjectHub(el, subj, allSubjects) {
     <div class="card card-sm" style="margin-bottom:6px;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
       <div>
         <div style="font-weight:600;font-size:0.85rem">${DAY_NAMES[sl.day]} · ${sl.time} ${sl.end ? '- ' + sl.end : ''}</div>
-        <div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px">${sl.room || subj.room || 'Classroom'} ${sl.teacher ? '· ' + sl.teacher : subj.teacher ? '· ' + subj.teacher : ''}</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px">${sl.room || subj.room || 'Classroom'} ${sl.teacher ? '· ' + sl.teacher : subj.teacher ? '· ' + subj.teacher : ''} ${sl.batches && sl.batches.length > 0 ? '· Batch ' + sl.batches.join(', ') : ''}</div>
       </div>
-      <span class="type-badge">${sl.code || subj.code}</span>
+      <div style="display:flex;align-items:center;gap:6px">
+        <span class="type-badge" style="font-size:0.7rem;text-transform:capitalize">${sl.type || 'lecture'}</span>
+        <span class="type-badge">${sl.code || subj.code}</span>
+      </div>
     </div>
   `).join('') : `<div style="font-size:0.82rem;color:var(--text-muted);padding:10px 0">No weekly timetable slots assigned to this subject yet.</div>`;
 
@@ -8082,7 +8220,9 @@ function showAddTaskModal(editTaskId = null, prefilledSubject = null, defaultTyp
 
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">Task Type</label>
+          <div class="form-label-row">
+            <label class="form-label" for="task-type">Task Type</label>
+          </div>
           <select class="form-select" id="task-type" onchange="handleTaskTypeChange(this.value)">
             <option value="assignment" ${initialType === 'assignment' ? 'selected' : ''}>📝 Assignment</option>
             <option value="mission" ${initialType === 'mission' ? 'selected' : ''}>🚀 Mission (Long-term Goal)</option>
@@ -8095,9 +8235,9 @@ function showAddTaskModal(editTaskId = null, prefilledSubject = null, defaultTyp
           </select>
         </div>
         <div class="form-group" id="task-due-group">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-            <label class="form-label" style="margin-bottom:0" id="task-due-label">Due Date <span class="req" id="task-due-req" style="${isOngoing ? 'display:none' : ''}">*</span></label>
-            <label style="display:inline-flex;align-items:center;gap:6px;font-size:0.76rem;color:var(--text-secondary);cursor:pointer;user-select:none;font-weight:500">
+          <div class="form-label-row">
+            <label class="form-label" id="task-due-label" for="task-due">Due Date <span class="req" id="task-due-req" style="${isOngoing ? 'display:none' : ''}">*</span></label>
+            <label class="checkbox-inline">
               <input type="checkbox" id="task-no-deadline" ${isOngoing ? 'checked' : ''} onchange="handleTaskNoDeadlineToggle(this.checked)">
               <span>Ongoing · No deadline</span>
             </label>
@@ -8111,12 +8251,16 @@ function showAddTaskModal(editTaskId = null, prefilledSubject = null, defaultTyp
 
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">Marks / Weightage</label>
+          <div class="form-label-row">
+            <label class="form-label" for="task-marks">Marks / Weightage</label>
+          </div>
           <input type="number" class="form-input" id="task-marks" placeholder="10" min="0" max="100"
             value="${editTask && editTask.marks ? editTask.marks : ''}">
         </div>
         <div class="form-group">
-          <label class="form-label">Priority</label>
+          <div class="form-label-row">
+            <label class="form-label">Priority</label>
+          </div>
           <div class="priority-pills">
             <label class="priority-pill priority-high">
               <input type="radio" name="task-priority" value="high" ${editTask && editTask.priority === 'high' ? 'checked' : ''}> High

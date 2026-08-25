@@ -105,6 +105,7 @@
   --card-border: var(--color-border-subtle);
   --input-bg: var(--color-surface);
   --input-border: var(--color-border-default);
+  --modal-bg: var(--color-surface);
   --sidebar-bg: var(--color-canvas);
   --sidebar-active-rail: var(--color-accent);
   --ledger-row-bg: transparent;
@@ -270,6 +271,7 @@
   --card-border: var(--color-border-subtle);
   --input-bg: var(--color-surface-sunken);
   --input-border: var(--color-border-default);
+  --modal-bg: var(--color-surface);
   --sidebar-bg: var(--color-canvas);
   --sidebar-active-rail: var(--color-accent);
   --ledger-row-bg: transparent;
@@ -2149,31 +2151,30 @@ a.card:hover,
 /* Notice & Form Modals — Frosted Glass Panel */
 .modal-backdrop {
   position: fixed; inset: 0;
-  background: rgba(23, 20, 18, 0.65);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  background: rgba(18, 15, 13, 0.72);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   z-index: 200;
   display: grid;
   place-items: center;
   padding: 16px;
-  animation: fadeIn 0.2s ease;
+  animation: fadeIn 0.18s ease;
 }
 
 @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
 
 .modal {
-  background: var(--modal-bg);
-  backdrop-filter: var(--modal-blur);
-  -webkit-backdrop-filter: var(--modal-blur);
+  background: var(--modal-bg, var(--color-surface, #fffdfc));
   border: 1px solid var(--border);
   border-radius: var(--radius);
   max-width: 540px;
-  max-height: 85vh;
+  max-height: 88vh;
   overflow-y: auto;
   width: 100%;
   padding: 24px;
-  box-shadow: var(--shadow-md);
-  animation: slideUp 0.25s ease;
+  box-shadow: var(--shadow-lg);
+  color: var(--text-primary);
+  animation: slideUp 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* ── Startup / Onboarding Welcome Dialog ────────────────────── */
@@ -2881,7 +2882,15 @@ a.card:hover,
 .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: 14px;
+  align-items: start;
+}
+
+@media (max-width: 540px) {
+  .form-row {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
 }
 
 .form-label {
@@ -2890,6 +2899,32 @@ a.card:hover,
   font-weight: 600;
   color: var(--text-secondary);
   margin-bottom: 6px;
+  line-height: 1.3;
+}
+
+.form-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+  min-height: 19px;
+}
+
+.form-label-row .form-label {
+  margin-bottom: 0;
+}
+
+.checkbox-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.76rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+  font-weight: 500;
+  white-space: nowrap;
 }
 
 .form-label .req { color: var(--red); }
@@ -2949,6 +2984,7 @@ a.card:hover,
 .priority-pills {
   display: flex;
   gap: 8px;
+  height: 38px;
 }
 
 .priority-pill {
@@ -2957,7 +2993,8 @@ a.card:hover,
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 7px 10px;
+  height: 38px;
+  padding: 0 10px;
   border-radius: var(--radius-sm);
   border: 1.5px solid var(--border);
   font-size: 0.8rem;
