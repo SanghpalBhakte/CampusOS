@@ -2902,15 +2902,13 @@ function updateThemeSelector(theme) {
   const isDark = theme === 'midnight-ink';
   const themeName = isDark ? 'Midnight Ink' : 'Paper Slate';
   const nextThemeName = isDark ? 'Paper Slate' : 'Midnight Ink';
-  const iconSymbol = isDark ? '🌙' : '☀️';
-  
   if (btn) {
     btn.setAttribute('aria-label', `Current theme: ${themeName}. Click to switch to ${nextThemeName}.`);
     btn.setAttribute('title', `Switch to ${nextThemeName}`);
     btn.setAttribute('data-theme-active', theme);
   }
   if (icon) {
-    icon.textContent = iconSymbol;
+    icon.innerHTML = isDark ? icons.moon() : icons.sun();
   }
   if (label) {
     label.textContent = themeName;
@@ -4924,7 +4922,7 @@ function renderTimetable() {
   if (!classes.length) {
     content = `
       <div class="empty-state-card" style="margin-top:8px">
-        <span class="empty-state-icon">🏖️</span>
+        <span class="empty-state-icon">${icons.calendar()}</span>
         <div class="empty-state-title">No Classes on ${DAY_NAMES[day]}</div>
         <div class="empty-state-desc">No classes scheduled for this day. You can add class slots manually, scan your class timetable photo, or load a sample template.</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:6px">
@@ -7523,7 +7521,7 @@ function renderSubjectsOverview(el, subjects) {
         </div>
       </div>
       <div class="empty-state-card" style="margin-top:16px">
-        <span class="empty-state-icon">📚</span>
+        <span class="empty-state-icon">${icons.book()}</span>
         <div class="empty-state-title">No Subjects Set Up Yet</div>
         <div class="empty-state-desc">Import your timetable schedule or enter an initial attendance baseline to automatically create your Subject Hubs.</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:10px">
@@ -8159,20 +8157,20 @@ function renderAssignments() {
       </div>`;
   }).join('') : (all.length === 0 
     ? `<div class="empty-state-card" style="margin-top:14px">
-        <span class="empty-state-icon">📚</span>
+        <span class="empty-state-icon">${icons.assignments()}</span>
         <div class="empty-state-title">No Tasks Yet</div>
         <div class="empty-state-desc">Stay on top of coursework, deadlines, and project milestones. Tap Add Task to get started.</div>
         <button class="btn-primary" onclick="showAddTaskModal()" style="font-size:0.82rem;padding:7px 16px">+ Add Task</button>
       </div>`
     : (state.assignFilter === 'ongoing' || state.assignFilter === 'missions')
     ? `<div class="empty-state-card" style="margin-top:14px">
-        <span class="empty-state-icon">🚀</span>
+        <span class="empty-state-icon">${icons.target()}</span>
         <div class="empty-state-title">No Standing Missions</div>
         <div class="empty-state-desc">Missions stay visible on your desk without rigid deadlines until you complete them.</div>
         <button class="btn-primary" onclick="showAddTaskModal(null, null, 'mission')" style="font-size:0.82rem;padding:7px 16px">+ Create Mission</button>
       </div>`
     : `<div class="empty-state-card" style="margin-top:14px">
-        <span class="empty-state-icon">✨</span>
+        <span class="empty-state-icon">${icons.search()}</span>
         <div class="empty-state-title">No Matching Tasks</div>
         <div class="empty-state-desc">No tasks found matching the selected filter. Try switching back to All Tasks or resetting your filters.</div>
         <button class="btn-secondary" onclick="resetAssignmentFilters()" style="font-size:0.82rem;padding:6px 14px">Reset Filters</button>
@@ -8455,7 +8453,7 @@ function renderNotices() {
       </div>
     </div>
   `).join('') : `<div class="empty-state-card" style="margin-top:14px">
-    <span class="empty-state-icon">🔍</span>
+    <span class="empty-state-icon">${icons.search()}</span>
     <div class="empty-state-title">No Announcements Found</div>
     <div class="empty-state-desc">No campus notices match "${state.noticeSearch}". Check your keywords or clear your search to view all notices.</div>
     <button class="btn-secondary" onclick="filterNotices(''); const el=document.getElementById('notice-search'); if(el) el.value='';" style="font-size:0.82rem;padding:6px 14px">Clear Search</button>
@@ -9689,7 +9687,7 @@ function renderDevNotesEntriesHtml(filter) {
   if (!entries.length) {
     return `
       <div class="empty-state-card" style="padding:28px 16px;margin:10px 0">
-        <span class="empty-state-icon">✨</span>
+        <span class="empty-state-icon">${icons.clock()}</span>
         <div class="empty-state-title">No Updates for Selected Filter</div>
         <div class="empty-state-desc">No release notes found for this time range. You can switch to <strong>This Week</strong> or <strong>All Updates</strong> to view recent improvements.</div>
         <div style="display:flex;gap:8px;justify-content:center;margin-top:12px">
