@@ -3688,14 +3688,18 @@ button:disabled {
 .cd-starter-btn:hover {
   background: var(--surface-3, var(--surface-2));
   border-color: var(--accent);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow);
 }
 .cd-starter-btn:active {
-  transform: translateY(0) scale(0.98);
+  background: var(--surface-2);
 }
 .cd-starter-icon {
-  font-size: 1rem;
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-secondary);
+}
+.cd-starter-icon svg {
+  width: 16px;
+  height: 16px;
 }
 .cd-starter-btn strong {
   font-size: 0.82rem;

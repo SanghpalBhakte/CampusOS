@@ -10852,28 +10852,28 @@ function renderAssistantWelcome() {
     thread.innerHTML = `
       <div class="cd-welcome-card">
         <div class="cd-welcome-badge" style="background:var(--accent-dim);color:var(--brand-primary)">
-          <span class="cd-dot-live"></span> ✨ Getting Started
+          <span class="cd-dot-live"></span> Getting Started
         </div>
         <div class="cd-welcome-title">Welcome to Ask Desk</div>
         <div class="cd-welcome-sub">I answer academic questions grounded in your real timetable, tasks, and attendance.</div>
         <div class="cd-starter-grid">
           <button class="cd-starter-btn" onclick="sendAssistantMessage('Is anything missing from my setup?')">
-            <span class="cd-starter-icon">⚙️</span>
+            <span class="cd-starter-icon">${icons.settings()}</span>
             <strong>Setup Checklist</strong>
             <span>Check missing setup gaps</span>
           </button>
           <button class="cd-starter-btn" onclick="sendAssistantMessage('What do I have today?')">
-            <span class="cd-starter-icon">📅</span>
+            <span class="cd-starter-icon">${icons.calendar()}</span>
             <strong>What do I have today?</strong>
             <span>Today's classes &amp; tasks</span>
           </button>
           <button class="cd-starter-btn" onclick="sendAssistantMessage('How is my attendance?')">
-            <span class="cd-starter-icon">📊</span>
+            <span class="cd-starter-icon">${icons.check()}</span>
             <strong>How is my attendance?</strong>
             <span>Overall attendance status</span>
           </button>
           <button class="cd-starter-btn" onclick="sendAssistantMessage('What tasks are urgent?')">
-            <span class="cd-starter-icon">⚡</span>
+            <span class="cd-starter-icon">${icons.alert()}</span>
             <strong>What tasks are urgent?</strong>
             <span>Check pending deadlines</span>
           </button>
@@ -10890,32 +10890,32 @@ function renderAssistantWelcome() {
         <div class="cd-welcome-sub">Grounded in your real timetable, task deadlines, and attendance logs.</div>
         <div class="cd-starter-grid">
           <button class="cd-starter-btn" onclick="sendAssistantMessage('What do I have today?')">
-            <span class="cd-starter-icon">📅</span>
+            <span class="cd-starter-icon">${icons.calendar()}</span>
             <strong>What do I have today?</strong>
             <span>Today's schedule &amp; tasks</span>
           </button>
           <button class="cd-starter-btn" onclick="sendAssistantMessage('What is my next class?')">
-            <span class="cd-starter-icon">⏰</span>
+            <span class="cd-starter-icon">${icons.clock()}</span>
             <strong>What is my next class?</strong>
             <span>Next upcoming lecture/lab</span>
           </button>
           <button class="cd-starter-btn" onclick="sendAssistantMessage('Which subject needs attention?')">
-            <span class="cd-starter-icon">🎯</span>
-            <strong>Focus Radar</strong>
+            <span class="cd-starter-icon">${icons.target()}</span>
+            <strong>Subject focus</strong>
             <span>Subject risk &amp; priority check</span>
           </button>
           <button class="cd-starter-btn" onclick="sendAssistantMessage('How is my attendance?')">
-            <span class="cd-starter-icon">📊</span>
+            <span class="cd-starter-icon">${icons.check()}</span>
             <strong>How is my attendance?</strong>
             <span>Overall record &amp; safe skips</span>
           </button>
           <button class="cd-starter-btn" onclick="sendAssistantMessage('What tasks are urgent?')">
-            <span class="cd-starter-icon">⚡</span>
+            <span class="cd-starter-icon">${icons.alert()}</span>
             <strong>What tasks are urgent?</strong>
             <span>Deadlines due today or overdue</span>
           </button>
           <button class="cd-starter-btn" onclick="sendAssistantMessage('Is anything missing from my setup?')">
-            <span class="cd-starter-icon">⚙️</span>
+            <span class="cd-starter-icon">${icons.settings()}</span>
             <strong>Setup Checklist</strong>
             <span>Check desk health &amp; gaps</span>
           </button>
