@@ -4472,7 +4472,7 @@ function renderDashboard() {
       label: '1. Set Practical Batch & Profile',
       desc: 'Set your name, semester, and batch for filtered timetable views.',
       action: `navigateTo('settings')`,
-      icon: '👤'
+      icon: icons.user()
     });
   }
 
@@ -4484,7 +4484,7 @@ function renderDashboard() {
       label: '2. Import Timetable Schedule',
       desc: 'Scan your schedule photo, add class slots, or load a sample template.',
       action: `navigateTo('timetable')`,
-      icon: '🗓️'
+      icon: icons.timetable()
     });
   }
 
@@ -4497,7 +4497,7 @@ function renderDashboard() {
       label: '3. Set Attendance Starting Counts',
       desc: 'Enter your portal baseline once to unlock percentage tracking and safe skips.',
       action: `showBaselineModal(null, 'manual')`,
-      icon: '📊'
+      icon: icons.summary()
     });
   }
 
@@ -4515,7 +4515,7 @@ function renderDashboard() {
     tickerItems.push(`<span class="desk-ticker-item" style="color:${isAttendanceAtRisk ? 'var(--red)' : 'var(--green)'}">Attendance: ${attendancePct}% (${dashGuidance.isSafe ? 'Safe' : 'Action needed'})</span>`);
   }
   if (countdownText) {
-    tickerItems.push(`<span class="desk-ticker-item">🎯 ${countdownText}</span>`);
+    tickerItems.push(`<span class="desk-ticker-item">${icons.target()} ${countdownText}</span>`);
   }
   const tickerHTML = tickerItems.join('<span class="desk-ticker-sep">/</span>');
 
@@ -4529,42 +4529,45 @@ function renderDashboard() {
   if (dayClasses.length > 0) {
     vitalsPills.push(`
       <span class="desk-vitals-pill" onclick="navigateTo('timetable')" title="View Today's Schedule">
-        📚 ${classesLeftCount} of ${dayClasses.length} classes left
+        ${icons.book()} ${classesLeftCount} of ${dayClasses.length} classes left
       </span>
     `);
   } else {
     vitalsPills.push(`
       <span class="desk-vitals-pill" onclick="navigateTo('timetable')" title="View Timetable">
-        🏖️ No classes today
+        ${icons.sun()} No classes today
       </span>
     `);
   }
   vitalsPills.push(`
     <span class="desk-vitals-pill ${overdue > 0 ? 'is-critical' : pending > 0 ? '' : 'is-safe'}" onclick="filterAndNavigateToAssignments('${overdue > 0 ? 'overdue' : 'pending'}')" title="View Tasks">
-      📝 ${pending} task${pending !== 1 ? 's' : ''}${overdue > 0 ? ` (${overdue} overdue)` : ''}
+      ${icons.filetext()} ${pending} task${pending !== 1 ? 's' : ''}${overdue > 0 ? ` (${overdue} overdue)` : ''}
     </span>
   `);
   if (attendancePct !== null) {
     vitalsPills.push(`
       <span class="desk-vitals-pill ${isAttendanceAtRisk ? 'is-critical' : 'is-safe'}" onclick="navigateTo('review')" title="View Attendance Guidance">
-        📊 ${attendancePct}% attendance · ${dashGuidance.isSafe ? 'Safe' : 'Needs attention'}
+        ${icons.summary()} ${attendancePct}% attendance · ${dashGuidance.isSafe ? 'Safe' : 'Needs attention'}
       </span>
     `);
   } else {
     vitalsPills.push(`
       <span class="desk-vitals-pill" onclick="showBaselineModal(null, 'manual')" title="Set Attendance Baseline">
-        📊 Attendance: Not set
+        ${icons.summary()} Attendance: Not set
       </span>
     `);
   }
   if (countdownText) {
     vitalsPills.push(`
       <span class="desk-vitals-pill" onclick="navigateTo('settings')" title="Exam Date Settings">
-        🎯 ${countdownText}
+        ${icons.target()} ${countdownText}
       </span>
     `);
   }
   const vitalsBarHTML = `<div class="desk-vitals-bar">${vitalsPills.join('')}</div>`;
+
+  // Self-contained icon+text pairing for containers that aren't already flex-aligned
+  const iconText = (svgIcon, text) => `<span style="display:inline-flex;align-items:center;gap:5px">${svgIcon}${text}</span>`;
 
   // Signature Chrono Beacon (Active lecture, next slot, day complete, or free day)
   let beaconHTML = '';
@@ -4585,8 +4588,8 @@ function renderDashboard() {
             ${activeClass.subject}
           </div>
           <div class="chrono-beacon-meta">
-            ${activeClass.room ? `<span>📍 ${activeClass.room}</span>` : ''}
-            ${activeClass.teacher ? `<span>👤 Prof. ${activeClass.teacher}</span>` : ''}
+            ${activeClass.room ? `<span>${activeClass.room}</span>` : ''}
+            ${activeClass.teacher ? `<span>${iconText(icons.user(), 'Prof. ' + activeClass.teacher)}</span>` : ''}
             <span class="type-badge type-${activeClass.type || 'lecture'}" style="font-size:0.62rem">${activeClass.type || 'lecture'}</span>
           </div>
         </div>
@@ -4611,8 +4614,8 @@ function renderDashboard() {
             ${nextClass.subject}
           </div>
           <div class="chrono-beacon-meta">
-            ${nextClass.room ? `<span>📍 ${nextClass.room}</span>` : ''}
-            ${nextClass.teacher ? `<span>👤 Prof. ${nextClass.teacher}</span>` : ''}
+            ${nextClass.room ? `<span>${nextClass.room}</span>` : ''}
+            ${nextClass.teacher ? `<span>${iconText(icons.user(), 'Prof. ' + nextClass.teacher)}</span>` : ''}
             <span class="type-badge type-${nextClass.type || 'lecture'}" style="font-size:0.62rem">${nextClass.type || 'lecture'}</span>
           </div>
         </div>
@@ -4630,7 +4633,7 @@ function renderDashboard() {
           </div>
           <div class="chrono-beacon-title">Classes Done for Today</div>
           <div class="chrono-beacon-meta">
-            <span>${pending > 0 ? `📝 ${pending} task${pending !== 1 ? 's' : ''} pending on your desk` : '🌿 No pending tasks. Enjoy your evening.'}</span>
+            <span>${pending > 0 ? iconText(icons.filetext(), `${pending} task${pending !== 1 ? 's' : ''} pending on your desk`) : iconText(icons.check(), 'No pending tasks. Enjoy your evening.')}</span>
           </div>
         </div>
         <button class="btn btn-sm btn-secondary" onclick="navigateTo('${pending > 0 ? 'assignments' : 'links'}')" style="font-size:0.75rem;padding:6px 12px">
@@ -4642,7 +4645,7 @@ function renderDashboard() {
       <div class="chrono-beacon is-free" role="region" aria-label="Free day">
         <div style="flex:1;min-width:180px">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-            <span class="chrono-beacon-badge" style="background:var(--surface-2);color:var(--text-secondary)">🏖️ Rest Day</span>
+            <span class="chrono-beacon-badge" style="background:var(--surface-2);color:var(--text-secondary)">${icons.sun()} Rest Day</span>
             <span style="font-size:0.78rem;color:var(--text-muted)">${DAY_NAMES[dayIdx]}</span>
           </div>
           <div class="chrono-beacon-title">No Classes Today</div>
@@ -4660,7 +4663,7 @@ function renderDashboard() {
   const setupBanner = !isFullySetup ? `
     <div class="desk-setup-guide" role="complementary" aria-label="Setup checklist">
       <div class="setup-guide-header">
-        <span class="setup-guide-title">🚀 Welcome · Recommended Setup Order</span>
+        <span class="setup-guide-title">${iconText(icons.settings(), 'Welcome · Recommended Setup Order')}</span>
         <span class="setup-guide-count">${setupSteps.length} step${setupSteps.length !== 1 ? 's' : ''} left</span>
       </div>
       <div class="setup-guide-steps">
@@ -4800,7 +4803,7 @@ function renderDashboard() {
                   </div>
                   <span class="due-badge ${rel.cls}" style="font-size:0.68rem;padding:2px 6px;font-family:var(--font-mono);flex-shrink:0">${rel.label}</span>
                 </div>`;
-            }).join('') : `<div style="padding:12px 0;color:var(--text-muted);font-size:0.84rem">🌿 All caught up. No urgent tasks.</div>`}
+            }).join('') : `<div style="padding:12px 0;color:var(--text-muted);font-size:0.84rem">${iconText(icons.check(), 'All caught up. No urgent tasks.')}</div>`}
           </div>
 
           <!-- Inline Task Quick Add -->
