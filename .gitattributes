@@ -1,0 +1,28 @@
+# Default: treat as text, normalize to LF on checkout/commit
+* text=auto eol=lf
+
+# Explicit web/code text types
+*.js    text eol=lf
+*.mjs   text eol=lf
+*.ts    text eol=lf
+*.html  text eol=lf
+*.css   text eol=lf
+*.json  text eol=lf
+*.md    text eol=lf
+*.svg   text eol=lf
+*.rules text eol=lf
+
+# Text dotfiles
+.gitignore    text eol=lf
+.firebaserc   text eol=lf
+.nojekyll     text eol=lf
+.env.example  text eol=lf
+
+# Binary assets — never line-ending-normalize
+*.png  binary
+*.ico  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.woff  binary
+*.woff2 binary
