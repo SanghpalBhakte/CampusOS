@@ -174,6 +174,22 @@
   --topbar-h:  56px;
   --nav-h:     60px;
   --ease: 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Layer 3: Spacing Scale — values already dominant in the codebase */
+  --space-2:  2px;
+  --space-4:  4px;
+  --space-6:  6px;
+  --space-8:  8px;
+  --space-10: 10px;
+  --space-12: 12px;
+  --space-14: 14px;
+  --space-16: 16px;
+  --space-20: 20px;
+  --space-24: 24px;
+
+  /* Semantic aliases (dashboard-scoped for this pass) */
+  --space-card-padding: var(--space-14);
+  --space-section-gap:  var(--space-24);
 }
 
 /* ── 2) Midnight Ink — Canonical Night Study Theme ─────────── */
@@ -525,7 +541,6 @@ img { display: block; max-width: 100%; }
   background: var(--surface);
   border-color: var(--accent);
   color: var(--accent);
-  transform: translateY(-1px);
 }
 
 .topbar-theme-toggle:active {
@@ -581,7 +596,6 @@ img { display: block; max-width: 100%; }
   background: var(--surface);
   border-color: var(--accent);
   color: var(--text-primary);
-  transform: translateY(-1px);
 }
 
 .storage-status-badge:active {
@@ -1039,8 +1053,8 @@ a.card:hover,
 .vitals-tile {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 14px 16px;
+  gap: var(--space-2);
+  padding: var(--space-14) var(--space-16);
   border-radius: var(--radius-sm);
   background: var(--surface);
   border: 1px solid var(--border);
@@ -1052,8 +1066,7 @@ a.card:hover,
 }
 
 .vitals-tile:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-sm);
   border-color: var(--border-btn, var(--border));
 }
 
@@ -1402,13 +1415,13 @@ a.card:hover,
 .dashboard-layout {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 20px;
+  gap: var(--space-20);
 }
 
 .dashboard-right-panel {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--space-14);
 }
 
 .dashboard-left {
@@ -1429,7 +1442,7 @@ a.card:hover,
 .dashboard-panel {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-12);
 }
 
 .panel-header {
@@ -1458,7 +1471,7 @@ a.card:hover,
   background: none;
   border: none;
   cursor: pointer;
-  padding: 2px 0;
+  padding: var(--space-2) 0;
   transition: color 0.15s ease;
 }
 
@@ -1495,8 +1508,8 @@ a.card:hover,
 .stat-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
-  margin-bottom: 24px;
+  gap: var(--space-10);
+  margin-bottom: var(--space-section-gap);
 }
 
 .stat-card {
@@ -1505,18 +1518,17 @@ a.card:hover,
   -webkit-backdrop-filter: var(--statcard-blur);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 14px;
+  padding: var(--space-card-padding);
   box-shadow: var(--shadow);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-6);
   transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
   cursor: pointer;
 }
 
 .stat-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-sm);
   border-color: var(--border-btn, var(--border));
 }
 
@@ -1750,7 +1762,6 @@ a.card:hover,
 .filter-chip:hover {
   border-color: var(--accent);
   color: var(--text-primary);
-  transform: translateY(-0.5px);
 }
 
 .filter-chip:active {
@@ -3105,9 +3116,7 @@ button:disabled {
 .btn-primary:hover {
   background: var(--accent-hover);
   color: var(--brand-primary-text, #ffffff) !important;
-  transform: translateY(-1.5px);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
-  filter: brightness(1.04);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16);
 }
 
 .btn-primary:active {
@@ -3912,7 +3921,6 @@ button:disabled {
   background: var(--surface-3, var(--surface-2));
   color: var(--accent);
   border-color: var(--accent);
-  transform: translateY(-1px);
 }
 .btn-assistant-toggle:active {
   transform: translateY(0) scale(0.97);
@@ -4069,7 +4077,6 @@ body {
   background: var(--color-surface);
   border-color: var(--color-accent);
   color: var(--color-text-primary);
-  transform: translateY(-0.5px);
 }
 
 .topbar-actions {
