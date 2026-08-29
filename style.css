@@ -1683,7 +1683,7 @@ a.card:hover,
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  padding: 2px 6px;
+  padding: var(--space-2) var(--space-6);
   border-radius: 4px;
   flex-shrink: 0;
 }
@@ -1781,18 +1781,17 @@ a.card:hover,
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 16px;
-  margin-bottom: 8px;
+  padding: var(--space-16);
+  margin-bottom: var(--space-8);
   box-shadow: var(--shadow);
   transition: box-shadow 0.18s var(--ease), border-color 0.18s var(--ease), transform 0.18s var(--ease);
   display: flex;
-  gap: 14px;
+  gap: var(--space-14);
   align-items: flex-start;
 }
 
 .assignment-card:hover {
-  box-shadow: var(--shadow-md);
-  transform: translateY(-1.5px);
+  box-shadow: var(--shadow-sm);
   border-color: var(--border-btn, var(--border));
 }
 
@@ -1821,7 +1820,7 @@ a.card:hover,
   place-items: center;
   cursor: pointer;
   flex-shrink: 0;
-  margin-top: 2px;
+  margin-top: var(--space-2);
   transition: background 0.14s var(--ease), border-color 0.14s var(--ease), transform 0.12s var(--ease);
   background: transparent;
   touch-action: manipulation;
@@ -1848,18 +1847,18 @@ a.card:hover,
   font-size: 0.95rem;
   font-weight: 600;
   color: var(--text-primary);
-  margin-top: 2px;
+  margin-top: var(--space-2);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.assignment-desc    { font-size: 0.83rem; color: var(--text-secondary); margin-top: 6px; line-height: 1.5; }
+.assignment-desc    { font-size: 0.83rem; color: var(--text-secondary); margin-top: var(--space-6); line-height: 1.5; }
 
 .assignment-footer {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-top: 10px;
+  gap: var(--space-10);
+  margin-top: var(--space-8);
   flex-wrap: wrap;
 }
 
@@ -4131,7 +4130,7 @@ body {
 .assignment-title {
   font-size: 0.94rem;
   font-weight: 600;
-  margin-top: 2px;
+  margin-top: var(--space-2);
 }
 
 .assignment-card.done {
@@ -4139,12 +4138,7 @@ body {
 }
 
 .assignment-card.done .assignment-title {
-  text-decoration: none;
   color: var(--color-text-secondary);
-}
-
-.assignment-footer {
-  margin-top: 8px;
 }
 
 /* ── 9. Timetable Schedule & Day Tabs ─────────────────────── */
@@ -4163,7 +4157,7 @@ body {
 .type-badge {
   font-size: 0.64rem;
   font-weight: 700;
-  padding: 2px 6px;
+  padding: var(--space-2) var(--space-6);
   letter-spacing: 0.06em;
 }
 

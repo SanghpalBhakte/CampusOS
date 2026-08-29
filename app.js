@@ -8049,26 +8049,28 @@ function renderAssignments() {
   const today = todayStr();
   const subjects = ['all', ...new Set(all.map(a => a.code || a.subject))];
 
+  const chipLabel = (iconSvg, text) => `<span style="display:inline-flex;align-items:center;gap:5px">${iconSvg}${text}</span>`;
+
   const statusFilters = [
     { key:'all',       label:'All Tasks' },
-    { key:'today',     label:'🔥 Due Today' },
-    { key:'upcoming',  label:'📅 Upcoming' },
-    { key:'ongoing',   label:'🚀 Ongoing Missions' },
-    { key:'overdue',   label:'⚠️ Overdue' },
-    { key:'exams',     label:'🎯 Exams & Tests' },
-    { key:'submitted', label:'✓ Completed' },
+    { key:'today',     label: chipLabel(icons.clock(), 'Due Today') },
+    { key:'upcoming',  label: chipLabel(icons.calendar(), 'Upcoming') },
+    { key:'ongoing',   label: chipLabel(icons.target(), 'Ongoing Missions') },
+    { key:'overdue',   label: chipLabel(icons.alert(), 'Overdue') },
+    { key:'exams',     label: chipLabel(icons.graduation(), 'Exams & Tests') },
+    { key:'submitted', label: chipLabel(icons.check(), 'Completed') },
   ];
 
   const typeFilters = [
     { key:'all',        label:'All Types' },
-    { key:'assignment', label:'📝 Assignments' },
-    { key:'mission',    label:'🚀 Missions' },
-    { key:'general',    label:'📋 General' },
-    { key:'quiz',       label:'⚡ Quizzes' },
-    { key:'lab',        label:'🧪 Labs' },
-    { key:'project',    label:'💻 Projects' },
-    { key:'exam',       label:'🎯 Exams' },
-    { key:'study',      label:'📚 Self Study' },
+    { key:'assignment', label: chipLabel(icons.filetext(), 'Assignments') },
+    { key:'mission',    label: chipLabel(icons.target(), 'Missions') },
+    { key:'general',    label: chipLabel(icons.list(), 'General') },
+    { key:'quiz',       label: chipLabel(icons.calculator(), 'Quizzes') },
+    { key:'lab',        label: chipLabel(icons.cpu(), 'Labs') },
+    { key:'project',    label: chipLabel(icons.code(), 'Projects') },
+    { key:'exam',       label: chipLabel(icons.graduation(), 'Exams') },
+    { key:'study',      label: chipLabel(icons.book(), 'Self Study') },
   ];
 
   let filtered = all;
