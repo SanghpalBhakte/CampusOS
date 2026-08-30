@@ -1105,12 +1105,12 @@ a.card:hover,
 
 /* ── Signature Layout Moment: The Chrono Beacon ──────────── */
 .chrono-beacon {
-  background: var(--surface);
+  background: color-mix(in srgb, var(--accent-warm) 7%, var(--surface));
   border: 1px solid var(--border);
   border-left: 3.5px solid var(--accent-warm);
   border-radius: var(--radius);
   padding: 16px 20px;
-  box-shadow: var(--shadow);
+  box-shadow: 0 4px 16px -2px color-mix(in srgb, var(--accent-warm) 18%, transparent);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1123,18 +1123,20 @@ a.card:hover,
 
 .chrono-beacon.is-live {
   border-left-color: var(--green);
-  background: color-mix(in srgb, var(--green) 3%, var(--surface));
-  box-shadow: 0 4px 16px -2px rgba(78, 122, 93, 0.12);
+  background: color-mix(in srgb, var(--green) 10%, var(--surface));
+  box-shadow: 0 4px 16px -2px color-mix(in srgb, var(--green) 24%, transparent);
 }
 
 .chrono-beacon.is-finished {
   border-left-color: var(--accent);
-  background: var(--surface);
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  box-shadow: 0 4px 16px -2px color-mix(in srgb, var(--accent) 16%, transparent);
 }
 
 .chrono-beacon.is-free {
   border-left-color: var(--border-btn);
-  background: var(--surface);
+  background: color-mix(in srgb, var(--text-secondary) 5%, var(--surface));
+  box-shadow: 0 3px 14px -2px color-mix(in srgb, var(--text-secondary) 12%, transparent);
 }
 
 .chrono-beacon-badge {
