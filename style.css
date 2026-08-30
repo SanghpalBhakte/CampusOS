@@ -173,6 +173,7 @@
   --sidebar-w: 240px;
   --topbar-h:  56px;
   --nav-h:     60px;
+  --fab-safe:  66px; /* FAB gap-above-nav + height + breathing margin, mobile only */
   --ease: 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 
   /* Layer 3: Spacing Scale — values already dominant in the codebase */
@@ -792,7 +793,7 @@ img { display: block; max-width: 100%; }
 
 .content-area {
   flex: 1;
-  padding: 20px 16px calc(var(--nav-h) + 28px);
+  padding: 20px 16px calc(var(--nav-h) + var(--fab-safe));
   min-width: 0;
   width: 100%;
   overflow-x: hidden;
@@ -1559,7 +1560,7 @@ a.card:hover,
 }
 
 @media (max-width: 600px) {
-  .content-area { padding: 16px 12px calc(var(--nav-h) + 24px); }
+  .content-area { padding: 16px 12px calc(var(--nav-h) + var(--fab-safe)); }
   .today-hero-surface { padding: 18px 16px; }
   .greeting-text { font-size: 1.25rem; }
 }
@@ -3384,7 +3385,8 @@ button:disabled {
   white-space: nowrap;
   box-shadow: 0 4px 12px rgba(0,0,0,0.1);
   border: 1px solid var(--border-color);
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: pointer;
   animation: bounceHint 2s infinite ease-in-out;
 }
 .fab-hint::after {

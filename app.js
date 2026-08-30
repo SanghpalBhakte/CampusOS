@@ -11253,11 +11253,45 @@ function setupFABDrag() {
   let clickPrevented = false;
   // First-time hint
   let hintEl = null;
+  let hintTimeoutId = null;
+  let hintOutsideHandler = null;
+
+  const dismissHint = () => {
+    if (!hintEl) return;
+    hintEl.remove();
+    hintEl = null;
+    if (hintTimeoutId) { clearTimeout(hintTimeoutId); hintTimeoutId = null; }
+    if (hintOutsideHandler) {
+      document.removeEventListener('pointerdown', hintOutsideHandler, true);
+      hintOutsideHandler = null;
+    }
+    localStorage.setItem('fabHintDismissed', 'true');
+  };
+
   if (window.innerWidth <= 768 && !localStorage.getItem('fabHintDismissed')) {
     hintEl = document.createElement('div');
     hintEl.className = 'fab-hint';
     hintEl.innerText = 'Drag me left/right';
     fab.appendChild(hintEl);
+
+    // Exit 1: tap the hint itself
+    hintEl.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dismissHint();
+    });
+
+    // Exit 2: tap anywhere outside the FAB/hint cluster (modal dialogs, e.g. the
+    // onboarding welcome card, are a separate blocking layer and don't count as
+    // "browsing the dashboard", so a tap inside one is ignored here)
+    hintOutsideHandler = (e) => {
+      if (fab.contains(e.target)) return;
+      if (e.target.closest && e.target.closest('.modal-backdrop')) return;
+      dismissHint();
+    };
+    document.addEventListener('pointerdown', hintOutsideHandler, true);
+
+    // Exit 3: auto-hide after a few seconds if the user takes no action
+    hintTimeoutId = setTimeout(dismissHint, 3500);
   }
 
   const applySnapPosition = (pos) => {
@@ -11302,11 +11336,7 @@ function setupFABDrag() {
     
     if (Math.abs(diff) > 5) {
       hasMoved = true;
-      if (hintEl) {
-        hintEl.remove();
-        hintEl = null;
-        localStorage.setItem('fabHintDismissed', 'true');
-      }
+      dismissHint();
       fab.classList.add('dragging');
       if (e.cancelable) e.preventDefault(); // Prevent scrolling while actively dragging horizontally
     }
