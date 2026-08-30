@@ -821,7 +821,7 @@ const TIMETABLE_JUNK_TOKENS = new Set([
   'sr', 'no', 'code', 'subject', 'faculty', 'room', 'venue', 'timing'
 ]);
 
-const BATCH_PATTERN = /\b(?:Batch(?:es)?|Sec(?:tion)?|Grp|Group)?\s*[:\-\s]*\b([A-D][1-4]|[A-D](?![a-z])|[1-4](?![0-9]))\b/gi;
+const BATCH_PATTERN = /\b(?:Batch(?:es)?|Sec(?:tion)?|Grp|Group)\s*[:\-\s]*\b([A-D][1-4]|[A-D](?![a-zA-Z])|[1-4](?![0-9]))\b|\b([A-D][1-4])\b/gi;
 const BRACKETED_BATCH_PATTERN = /\((?:AI-)?([A-D][1-4](?:[\s,/-]+(?:AI-)?[A-D][1-4])*)\)/i;
 const SUBJECT_CODE_PATTERN = /\b([A-Z]{2,8}[0-9]{1,4}[A-Z]{1,4}[0-9]{1,4}[A-Z]?|[A-Z]{2,6}[-\s]?[0-9]{2,5}[A-Z]?|[0-9]{2}[A-Z]{2,6}[0-9]{2,4})\b/i;
 const FACULTY_TITLE_PATTERN = /\b(?:Prof\.?|Dr\.?|Mr\.?|Mrs\.?|Ms\.?|Shri|Smt\.?)\s+[A-Za-z]+(?:\s+(?!LH|LT|CR|Room|Lab|Cabin|Hall|Batch|Sec)[A-Za-z]+)?/gi;
@@ -960,17 +960,70 @@ function extractBatchTags(rawText) {
     });
   }
 
-  // 2. Check standalone batch markers e.g. "Batch A2", "Sec B", "Batch D1"
+  // 2. Check standalone batch markers e.g. "Batch A2", "Sec B", "Batch D1",
+  // plus bare two-character batch codes like "A2"/"D1" outside brackets
+  // (e.g. "DS-AI-A2 (VJM)"). Bare single-letter/single-digit tokens now
+  // require an explicit Batch/Sec/Grp/Group keyword -- see BATCH_PATTERN.
   let match;
   const regex = new RegExp(BATCH_PATTERN.source, 'gi');
   while ((match = regex.exec(rawText)) !== null) {
-    const tag = match[1].toUpperCase();
-    if (/^[A-D][1-4]$|^[A-D]$/.test(tag)) {
+    const tag = (match[1] || match[2] || '').toUpperCase();
+    if (tag && (/^[A-D][1-4]$|^[A-D]$/.test(tag))) {
       batches.add(tag);
     }
   }
 
   return Array.from(batches);
+}
+
+// ── Bounded Fuzzy Matching for Existing-Subject Reconciliation ──
+// Conservative, name-only (never applied to codes -- codes are short
+// structured tokens where ratio-based fuzzing is dangerous). Used solely to
+// catch small OCR/typo variants of an already-known subject. Below
+// threshold, callers fall through to the existing "no match" behavior
+// completely unchanged -- this never partially merges anything.
+function levenshteinDistance(a, b) {
+  if (a === b) return 0;
+  const aLen = a.length, bLen = b.length;
+  if (aLen === 0) return bLen;
+  if (bLen === 0) return aLen;
+  let prevRow = new Array(bLen + 1);
+  let currRow = new Array(bLen + 1);
+  for (let j = 0; j <= bLen; j++) prevRow[j] = j;
+  for (let i = 1; i <= aLen; i++) {
+    currRow[0] = i;
+    for (let j = 1; j <= bLen; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      currRow[j] = Math.min(
+        prevRow[j] + 1,
+        currRow[j - 1] + 1,
+        prevRow[j - 1] + cost
+      );
+    }
+    const tmp = prevRow; prevRow = currRow; currRow = tmp;
+  }
+  return prevRow[bLen];
+}
+
+// Requires BOTH a high similarity ratio AND a small absolute edit distance,
+// and refuses to run on short strings where a single edit would otherwise
+// cross the ratio threshold. This is what keeps it conservative (few false
+// positives) at the deliberate cost of more false negatives.
+const FUZZY_MIN_LENGTH = 6;
+const FUZZY_MAX_EDIT_DISTANCE = 3;
+const FUZZY_MIN_SIMILARITY = 0.90;
+
+function subjectNameFuzzyMatch(a, b) {
+  if (!a || !b) return { isMatch: false, similarity: 0 };
+  if (a === b) return { isMatch: true, similarity: 1 };
+  if (a.length < FUZZY_MIN_LENGTH || b.length < FUZZY_MIN_LENGTH) {
+    return { isMatch: false, similarity: 0 };
+  }
+  const dist = levenshteinDistance(a, b);
+  if (dist > FUZZY_MAX_EDIT_DISTANCE) return { isMatch: false, similarity: 0 };
+  const maxLen = Math.max(a.length, b.length);
+  const similarity = maxLen === 0 ? 1 : 1 - (dist / maxLen);
+  return { isMatch: similarity >= FUZZY_MIN_SIMILARITY, similarity };
 }
 
 function normalizeSubjectIdentity(rawText, existingSubjects = [], forceType = null) {
@@ -1115,10 +1168,12 @@ function normalizeSubjectIdentity(rawText, existingSubjects = [], forceType = nu
   }
 
   // Match against existing subjects
+  let fuzzyMatchApplied = false;
   if (existingSubjects && existingSubjects.length > 0) {
     const cleanNoSpaces = cleanName.toLowerCase().replace(/[^a-z0-9]/g, '');
     const cleanCodeNoSpaces = code.toLowerCase().replace(/[^a-z0-9]/g, '');
 
+    let exactMatchFound = false;
     for (const ex of existingSubjects) {
       const exName = (ex.name || ex.subject || '').trim();
       const exCode = (ex.code || '').trim();
@@ -1131,17 +1186,46 @@ function normalizeSubjectIdentity(rawText, existingSubjects = [], forceType = nu
       if (cleanCodeNoSpaces && exCodeClean && cleanCodeNoSpaces === exCodeClean) {
         cleanName = exName;
         code = exCode;
+        exactMatchFound = true;
         break;
       }
       if (cleanNoSpaces && exNameClean && cleanNoSpaces === exNameClean) {
         cleanName = exName;
         code = exCode || code;
+        exactMatchFound = true;
         break;
+      }
+    }
+
+    // Conservative fuzzy fallback: only runs when no exact code/name match was
+    // found above. Anything below subjectNameFuzzyMatch's threshold is left
+    // exactly as-is -- treated as a new/unmatched subject, unchanged from
+    // prior behavior. Never partially merged, never silently glued on.
+    if (!exactMatchFound && cleanNoSpaces) {
+      let bestFuzzy = null;
+      for (const ex of existingSubjects) {
+        const exName = (ex.name || ex.subject || '').trim();
+        if (!exName) continue;
+        const exNameClean = exName.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const exIsLab = /\blab\b/i.test(exName) || (ex.type === 'lab');
+        if (exIsLab !== (classType === 'lab')) continue;
+
+        const result = subjectNameFuzzyMatch(cleanNoSpaces, exNameClean);
+        if (result.isMatch && (!bestFuzzy || result.similarity > bestFuzzy.similarity)) {
+          bestFuzzy = { exName, exCode: (ex.code || '').trim(), similarity: result.similarity };
+        }
+      }
+      if (bestFuzzy) {
+        cleanName = bestFuzzy.exName;
+        code = bestFuzzy.exCode || code;
+        fuzzyMatchApplied = true;
       }
     }
   }
 
-  const confidence = (cleanName && cleanName !== 'General Subject') ? (code ? 95 : 85) : (code ? 80 : 50);
+  const confidence = fuzzyMatchApplied
+    ? 82
+    : (cleanName && cleanName !== 'General Subject') ? (code ? 95 : 85) : (code ? 80 : 50);
 
   return {
     raw_label: rawText,
@@ -1789,9 +1873,14 @@ let selectedTimetablePreviewBatch = 'all';
 function showTimetablePreviewModal(schedule) {
   const currentProfileBatch = (liveProfile?.batch || '').trim().toUpperCase();
 
+  // Real existing-subject list (not []) so re-normalization here can
+  // actually reconcile against subjects the user already has -- previously
+  // this discarded the match context established at scan time.
+  const existingSubjectsForPreview = getSubjectList();
+
   // Normalize each row through canonical normalization layer
   pendingExtractedSchedule = (schedule || []).map(item => {
-    const norm = normalizeSubjectIdentity(item.subject || '', [], item.type);
+    const norm = normalizeSubjectIdentity(item.subject || '', existingSubjectsForPreview, item.type);
     const batches = (norm.batches && norm.batches.length > 0) ? norm.batches : (item.batches || []);
     return {
       day: standardizeTimetableDay(item.day) || 'Mon',
@@ -5056,7 +5145,8 @@ window.closeSubjectHub = function() {
   }
 };
 
-function getSubjectList() {
+function getSubjectList(options = {}) {
+  const { includeTimetable = true } = options;
   const map = new Map();
   const liveTT = loadTimetable();
 
@@ -5089,26 +5179,28 @@ function getSubjectList() {
   };
 
   // 1. Collect from Timetable
-  [1, 2, 3, 4, 5, 6, 0].forEach(d => {
-    (liveTT[d] || []).forEach(c => {
-      if (isTeachingClass(c) && c.subject) {
-        const item = getOrCreateSubject(c.subject, c.code, c.type, c.teacher, c.room, c.color);
-        if (item) {
-          item.slots.push({
-            day: d,
-            time: c.time,
-            end: c.end,
-            room: c.room || item.room,
-            teacher: c.teacher || item.teacher,
-            code: c.code || item.code,
-            rawSubject: c.subject,
-            type: c.type || 'lecture',
-            batches: c.batches || []
-          });
+  if (includeTimetable) {
+    [1, 2, 3, 4, 5, 6, 0].forEach(d => {
+      (liveTT[d] || []).forEach(c => {
+        if (isTeachingClass(c) && c.subject) {
+          const item = getOrCreateSubject(c.subject, c.code, c.type, c.teacher, c.room, c.color);
+          if (item) {
+            item.slots.push({
+              day: d,
+              time: c.time,
+              end: c.end,
+              room: c.room || item.room,
+              teacher: c.teacher || item.teacher,
+              code: c.code || item.code,
+              rawSubject: c.subject,
+              type: c.type || 'lecture',
+              batches: c.batches || []
+            });
+          }
         }
-      }
+      });
     });
-  });
+  }
 
   // 2. Collect from Tasks
   allTasks().forEach(t => {
@@ -7003,6 +7095,15 @@ function generateDeclutterPlan(liveTT, liveBaselines, liveTasks, userBatch = 'al
   const subjectMap = new Map();
   const remappedBaselines = [];
   const mergedSubjects = new Map();
+  // Real existing-subject list (not []) so this normalization pass can
+  // reconcile OCR/typo variants against subjects the user already has.
+  // Deliberately excludes timetable-derived entries: those are exactly the
+  // raw/dirty slots this pass is reconciling, so including them here would
+  // let a duplicate slot's own pre-declutter bucket exact-match itself and
+  // short-circuit the fuzzy fallback before it ever compares against the
+  // OTHER (correct) slot. Within-timetable duplicates are reconciled below
+  // against the incrementally-growing survivor list instead.
+  const externalExistingSubjects = getSubjectList({ includeTimetable: false });
 
   // 1. Process Timetable Slots
   [1, 2, 3, 4, 5, 6, 0].forEach(d => {
@@ -7019,7 +7120,7 @@ function generateDeclutterPlan(liveTT, liveBaselines, liveTasks, userBatch = 'al
         return;
       }
 
-      const norm = normalizeSubjectIdentity(rawName, [], c.type);
+      const norm = normalizeSubjectIdentity(rawName, externalExistingSubjects.concat(Array.from(subjectMap.values())), c.type);
       const isLab = c.type === 'lab' || norm.isLab;
       const canonicalName = norm.canonicalName || rawName;
       const canonicalCode = norm.canonicalCode || c.code || '';

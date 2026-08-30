@@ -62,7 +62,12 @@ const sandboxCode = `
     loadTimetable,
     safeSetStorage,
     KEY_CUSTOM_TIMETABLE,
-    KEY_ATTENDANCE
+    KEY_ATTENDANCE,
+    normalizeSubjectIdentity,
+    extractBatchTags,
+    generateDeclutterPlan,
+    saveAttendanceBaselines,
+    KEY_ATTENDANCE_BASELINE
   };
 `;
 
@@ -183,6 +188,81 @@ check('5. Attendance tracking matches both canonical names and specific timetabl
   const att = mod.getSubjectAttendance(webDev);
   if (att.dailyAttended !== 2) {
     return `Expected 2 daily attended classes counted, got ${att.dailyAttended}`;
+  }
+  return true;
+});
+
+// ── STAGE 1: PARSER RELIABILITY (bounded fuzzy matching + BATCH_PATTERN) ──
+check('6. Fuzzy matching merges a small OCR/typo variant of an existing custom subject', () => {
+  const existing = [{ name: 'Software Engineering', code: 'SE', type: 'lecture' }];
+  // Missing one 'e' in "Engineering" -- a plausible single-character OCR drop,
+  // not present in the hardcoded CANONICAL_SUBJECT_MAP.
+  const norm = mod.normalizeSubjectIdentity('Software Enginering', existing);
+  if (norm.canonicalName !== 'Software Engineering') {
+    return `Expected fuzzy merge to "Software Engineering", got "${norm.canonicalName}"`;
+  }
+  if (norm.normalization_confidence !== 82) {
+    return `Expected fuzzy-match confidence of 82, got ${norm.normalization_confidence}`;
+  }
+  return true;
+});
+
+check('7. Genuinely different subjects sharing a prefix do NOT get merged (false negatives preferred)', () => {
+  const existing = [{ name: 'Data Structures', code: 'DS', type: 'lecture' }];
+  const norm = mod.normalizeSubjectIdentity('Data Science', existing);
+  if (norm.canonicalName === 'Data Structures') {
+    return `"Data Science" was incorrectly merged into "Data Structures"`;
+  }
+  return true;
+});
+
+check('8. Short subject names/codes like "C" are not stripped as batch tags', () => {
+  const tags = mod.extractBatchTags('C Programming Lab - A2');
+  if (!tags.includes('A2')) return `Expected A2 to be detected as a batch tag, got: ${JSON.stringify(tags)}`;
+  if (tags.includes('C')) return `"C" (a subject-name letter, no batch keyword nearby) was incorrectly treated as a batch tag: ${JSON.stringify(tags)}`;
+  return true;
+});
+
+check('9. Bare batch codes like "A2" outside brackets are still detected (regression guard)', () => {
+  const tags = mod.extractBatchTags('DS-AI-A2 (VJM)');
+  if (!tags.includes('A2')) return `Expected A2 to still be detected without a Batch/Sec keyword, got: ${JSON.stringify(tags)}`;
+  return true;
+});
+
+check('10. Baseline-first-then-timetable-second: OCR variant reconciles against an already-established subject', () => {
+  localStorage.clear();
+  // Attendance baseline scanned & saved FIRST, establishing the canonical spelling.
+  mod.saveAttendanceBaselines({
+    'BMFA': { subjectCode: 'BMFA', subjectName: 'Business Management and Financial Accounting', present: 10, absent: 2, leave: 0, notEntered: 0, totalSessions: 0, updatedAt: new Date().toISOString() }
+  });
+  const existingSubjects = mod.getSubjectList();
+  const bmfa = existingSubjects.find(s => s.name === 'Business Management and Financial Accounting');
+  if (!bmfa) return `Expected baseline-derived subject to exist first, got: ${existingSubjects.map(s => s.name).join(', ')}`;
+
+  // A later timetable scan produces a slightly-garbled variant (dropped "and").
+  const norm = mod.normalizeSubjectIdentity('Business Management Financial Accounting', existingSubjects);
+  if (norm.canonicalName !== 'Business Management and Financial Accounting') {
+    return `Expected reconciliation to the existing baseline subject, got "${norm.canonicalName}"`;
+  }
+  return true;
+});
+
+check('11. Declutter plan reconciles an OCR-variant timetable slot against an existing subject', () => {
+  localStorage.clear();
+  const tt = {
+    1: [
+      { time: '10:00', end: '11:00', subject: 'Digital Electronics and Microprocessors', code: 'DEMP', type: 'lecture', room: 'SF-31', teacher: 'Prof. VAK' },
+      { time: '13:00', end: '14:00', subject: 'Digital Electronic and Microprocesor', code: '', type: 'lecture', room: 'SF-31', teacher: '' }
+    ],
+    2: [], 3: [], 4: [], 5: [], 6: [], 0: []
+  };
+  mod.safeSetStorage(mod.KEY_CUSTOM_TIMETABLE, tt);
+  const plan = mod.generateDeclutterPlan(tt, {}, [], 'all');
+  if (plan.survivingSubjects.length !== 1) {
+    return `Expected both slots to merge into 1 surviving subject, got ${plan.survivingSubjects.length}: ${plan.survivingSubjects.map(s => s.name).join(', ')}`;
+  }
+  if (plan.survivingSubjects[0].slotsCount !== 2) {
+    return `Expected merged subject to carry both slots, got slotsCount ${plan.survivingSubjects[0].slotsCount}`;
   }
   return true;
 });
