@@ -1304,6 +1304,218 @@ function cleanupTimetableDomain(rawText, existingSubjects = []) {
   };
 }
 
+// ── OCR Cell Clustering Helpers (Stage 2A: structure-aware timetable parsing) ──
+// Groups words into physical text lines by vertical bbox overlap -- this is
+// orientation-independent (text always reads top-to-bottom regardless of
+// whether the table has days-as-rows or days-as-columns), so it is reused
+// unchanged for both Layout A and Layout B below. Same 0.42 overlap ratio
+// already used by the existing visual-line clusterer (Strategy 2), kept
+// consistent rather than inventing a new constant.
+function groupWordsIntoLines(words, overlapThreshold = 0.42) {
+  const sorted = [...words].sort((a, b) => a.bbox.y0 - b.bbox.y0);
+  const lines = [];
+  for (const w of sorted) {
+    let placed = false;
+    for (const line of lines) {
+      const avgY0 = line.reduce((s, x) => s + x.bbox.y0, 0) / line.length;
+      const avgY1 = line.reduce((s, x) => s + x.bbox.y1, 0) / line.length;
+      const wH = w.bbox.y1 - w.bbox.y0;
+      const overlap = Math.max(0, Math.min(w.bbox.y1, avgY1) - Math.max(w.bbox.y0, avgY0));
+      if (wH > 0 && (overlap / wH) > overlapThreshold) {
+        line.push(w);
+        placed = true;
+        break;
+      }
+    }
+    if (!placed) lines.push([w]);
+  }
+  lines.forEach(l => l.sort((a, b) => a.bbox.x0 - b.bbox.x0));
+  lines.sort((a, b) => a[0].bbox.y0 - b[0].bbox.y0);
+  return lines;
+}
+
+function bboxOfWords(wordsArr) {
+  return {
+    x0: Math.min(...wordsArr.map(w => w.bbox.x0)),
+    x1: Math.max(...wordsArr.map(w => w.bbox.x1)),
+    y0: Math.min(...wordsArr.map(w => w.bbox.y0)),
+    y1: Math.max(...wordsArr.map(w => w.bbox.y1))
+  };
+}
+
+// Splits one physical text line into horizontal segments wherever the gap
+// between consecutive words exceeds gapPx. Used only when the time axis
+// runs horizontally (Layout A), to separate genuinely distinct side-by-side
+// cells that share one day-row's Y-band without breaking apart a single
+// label's own normal word spacing.
+function splitLineByXGap(line, gapPx) {
+  const sorted = [...line].sort((a, b) => a.bbox.x0 - b.bbox.x0);
+  const segments = [];
+  let current = [sorted[0]];
+  for (let i = 1; i < sorted.length; i++) {
+    const prev = sorted[i - 1];
+    const w = sorted[i];
+    const gap = w.bbox.x0 - prev.bbox.x1;
+    if (gap > gapPx) {
+      segments.push(current);
+      current = [w];
+    } else {
+      current.push(w);
+    }
+  }
+  segments.push(current);
+  return segments;
+}
+
+function axisOverlapFraction(bboxA, bboxB, axis) {
+  const aMin = axis === 'x' ? bboxA.x0 : bboxA.y0;
+  const aMax = axis === 'x' ? bboxA.x1 : bboxA.y1;
+  const bMin = axis === 'x' ? bboxB.x0 : bboxB.y0;
+  const bMax = axis === 'x' ? bboxB.x1 : bboxB.y1;
+  const overlap = Math.max(0, Math.min(aMax, bMax) - Math.max(aMin, bMin));
+  const narrower = Math.min(aMax - aMin, bMax - bMin);
+  if (narrower <= 0) return 0;
+  return overlap / narrower;
+}
+
+// Merges a flat list of word-segments into cell clusters by testing overlap
+// on the given axis between each pair's combined bbox extent. Used by
+// Layout A to re-stitch a single label's stacked subject/teacher/room lines
+// (or a spanned cell's own wrapped text) back into one cluster after the
+// per-line X-gap split above.
+function mergeSegmentsByAxisOverlap(segments, axis, overlapFrac) {
+  const items = segments.map(s => ({ words: s, bbox: bboxOfWords(s) }));
+  const used = new Array(items.length).fill(false);
+  const merged = [];
+
+  for (let i = 0; i < items.length; i++) {
+    if (used[i]) continue;
+    const group = [items[i]];
+    used[i] = true;
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (let j = 0; j < items.length; j++) {
+        if (used[j]) continue;
+        const overlapsAny = group.some(g => axisOverlapFraction(g.bbox, items[j].bbox, axis) >= overlapFrac);
+        if (overlapsAny) {
+          group.push(items[j]);
+          used[j] = true;
+          changed = true;
+        }
+      }
+    }
+    const allWords = group.flatMap(g => g.words);
+    merged.push({ words: allWords, bbox: bboxOfWords(allWords) });
+  }
+  return merged;
+}
+
+// Merges consecutive physical text lines into one cell cluster when the
+// vertical gap between them is small (stacked lines of one session). Used
+// when the time axis runs vertically (Layout B): a day-band there is
+// already a narrow column, so distinct cells are separated by vertical
+// proximity rather than by any horizontal gap.
+function mergeLinesByYGap(lines, gapPx) {
+  const clusters = [];
+  let current = null;
+  for (const line of lines) {
+    const bbox = bboxOfWords(line);
+    if (current && (bbox.y0 - current.bbox.y1) <= gapPx) {
+      current.words.push(...line);
+      current.bbox = bboxOfWords(current.words);
+    } else {
+      current = { words: [...line], bbox };
+      clusters.push(current);
+    }
+  }
+  return clusters;
+}
+
+// Determines which time intervals a cluster's bbox spans on the given axis.
+// An interval counts as "covered" when the overlap between the cluster's
+// extent and that interval is at least overlapFrac of the interval's own
+// width/height -- this is what lets one merged cell correctly claim 2
+// adjacent time columns/rows instead of being force-assigned to whichever
+// one its center point happens to fall in. A weak-but-passing overlap on
+// any covered interval is flagged borderline for human review.
+function computeIntervalSpan(clusterBBox, intervals, axis, overlapFrac = 0.35) {
+  const cMin = axis === 'x' ? clusterBBox.x0 : clusterBBox.y0;
+  const cMax = axis === 'x' ? clusterBBox.x1 : clusterBBox.y1;
+  const clusterSize = cMax - cMin;
+  const covered = [];
+  intervals.forEach((iv, idx) => {
+    const ivMin = axis === 'x' ? iv.minX : iv.minY;
+    const ivMax = axis === 'x' ? iv.maxX : iv.maxY;
+    const overlap = Math.max(0, Math.min(cMax, ivMax) - Math.max(cMin, ivMin));
+    const ivSize = ivMax - ivMin;
+    const ivFrac = ivSize > 0 ? overlap / ivSize : 0;
+    const clusterFrac = clusterSize > 0 ? overlap / clusterSize : 0;
+    // An interval counts as covered if the overlap is a substantial share of
+    // EITHER the interval's own width/height (catches a cell that spans
+    // multiple columns/rows) OR the cluster's own extent (catches a short,
+    // narrow label -- e.g. a bare 2-letter abbreviation -- sitting inside
+    // one much wider column, which would otherwise never clear an
+    // interval-relative threshold). Coverage via the interval-relative
+    // share is the stronger signal; when neither measure is confident the
+    // interval is flagged as weak evidence for the caller.
+    if (ivFrac >= overlapFrac || clusterFrac >= overlapFrac) {
+      covered.push({ idx, iv, ivFrac, clusterFrac, weak: ivFrac < 0.5 && clusterFrac < 0.5 });
+    }
+  });
+  if (covered.length === 0) return null;
+  covered.sort((a, b) => a.idx - b.idx);
+  const borderline = covered.some(c => c.weak);
+  return {
+    startIdx: covered[0].idx,
+    endIdx: covered[covered.length - 1].idx,
+    startInterval: covered[0].iv,
+    endInterval: covered[covered.length - 1].iv,
+    durationInSlots: covered[covered.length - 1].idx - covered[0].idx + 1,
+    borderline
+  };
+}
+
+// Conservative pre-normalization split for a clustered cell's raw text: only
+// splits on a '+' that looks like a real parallel-session separator (real
+// production timetable data in this codebase already uses "+" to join
+// grouped multi-batch lab cells, e.g. "DS-AI-A2 (VJM) + WEB DEV.-AI-C2
+// (MKP)"). Requires 2-4 fragments, each with a real minimum of readable
+// text, and refuses to partially split -- an ambiguous or over-long split
+// falls back to the original single-string behavior unchanged, leaving the
+// caller to flag it uncertain instead.
+function splitMultiSessionCellText(rawText) {
+  if (!rawText || typeof rawText !== 'string') return { fragments: [rawText || ''], wasSplit: false };
+  if (rawText.indexOf('+') === -1) return { fragments: [rawText], wasSplit: false };
+
+  const MAX_FRAGMENTS = 4;
+  const MIN_FRAGMENT_CHARS = 3;
+
+  const trimmed = rawText.split(/\s*\+\s*/).map(p => p.trim());
+
+  if (trimmed.length < 2 || trimmed.length > MAX_FRAGMENTS) {
+    return { fragments: [rawText], wasSplit: false };
+  }
+  if (trimmed.some(f => f.replace(/[^a-zA-Z0-9]/g, '').length < MIN_FRAGMENT_CHARS)) {
+    return { fragments: [rawText], wasSplit: false };
+  }
+  return { fragments: trimmed, wasSplit: true };
+}
+
+// A canonical name that never resolved past raw codes/branch-qualifiers
+// (e.g. an unresolved "DS-AI", or a bare "AI") is a real, observed failure
+// mode found against this codebase's own reference timetable data ("AI"
+// aliases to the real subject "Artificial Intelligence" in
+// CANONICAL_SUBJECT_MAP, but also appears as a branch qualifier inside
+// codes like "DS-AI-A2") -- flag it for review instead of silently trusting
+// a guess either way.
+function looksLikeUnresolvedCodeResidue(canonicalName) {
+  if (!canonicalName) return true;
+  const trimmed = canonicalName.trim();
+  if (trimmed.length > 15) return false;
+  return /^[A-Z0-9]+([\s-]+[A-Z0-9]+)*$/.test(trimmed);
+}
+
 // ── Table-Aware 2D Grid Reconstructor ────────────────────────────
 function reconstructTimetable2DGrid(ocrData, existingSubjects = []) {
   if (!ocrData || !ocrData.words || ocrData.words.length === 0) {
@@ -1400,34 +1612,65 @@ function reconstructTimetable2DGrid(ocrData, existingSubjects = []) {
 
     const headerWordSet = new Set([...dayTokens.map(d => d.word), ...timeTokens.flatMap(t => t.words)]);
 
-    dayIntervals.forEach(dInt => {
-      timeIntervals.forEach(tInt => {
-        const cellWords = words.filter(w => {
-          if (headerWordSet.has(w)) return false;
-          return w.cy >= dInt.minY && w.cy < dInt.maxY && w.cx >= tInt.minX && w.cx < tInt.maxX;
-        });
+    // Median column width sizes the horizontal gap threshold that
+    // separates genuinely distinct side-by-side cells from a single
+    // label's own word spacing -- scales with the actual scanned table
+    // instead of a fixed pixel guess.
+    const colWidthsA = timeIntervals.map(t => t.maxX - t.minX).filter(w => w > 0);
+    const medianColWidthA = colWidthsA.length ? colWidthsA.slice().sort((a, b) => a - b)[Math.floor(colWidthsA.length / 2)] : 80;
+    const xGapThresholdA = Math.max(18, medianColWidthA * 0.55);
 
-        if (cellWords.length > 0) {
-          cellWords.sort((a, b) => a.bbox.y0 === b.bbox.y0 ? a.bbox.x0 - b.bbox.x0 : a.bbox.y0 - b.bbox.y0);
-          const cellRaw = cellWords.map(w => w.text).join(' ');
-          if (cellRaw.length >= 2 && !/^(break|lunch|recess|tea|interval)$/i.test(cellRaw.trim())) {
-            const norm = normalizeSubjectIdentity(cellRaw, existingSubjects);
-            if (norm.canonicalName && !TIMETABLE_JUNK_TOKENS.has(norm.canonicalName.toLowerCase())) {
-              schedule.push({
-                day: dInt.day,
-                time: tInt.timeNorm.time,
-                end: tInt.timeNorm.end,
-                subject: norm.canonicalName,
-                code: norm.canonicalCode,
-                room: norm.room,
-                teacher: norm.teacher,
-                type: norm.classType,
-                batches: norm.batches,
-                isUncertain: !norm.canonicalName
-              });
-            }
-          }
-        }
+    dayIntervals.forEach(dInt => {
+      const dayBandWords = words.filter(w => {
+        if (headerWordSet.has(w)) return false;
+        return w.cy >= dInt.minY && w.cy < dInt.maxY;
+      });
+      if (dayBandWords.length === 0) return;
+
+      // 1. Group into physical text lines (orientation-independent).
+      const linesA = groupWordsIntoLines(dayBandWords);
+      // 2. Split each line into horizontal segments on a real gap.
+      const segmentsA = linesA.flatMap(line => splitLineByXGap(line, xGapThresholdA));
+      // 3. Merge segments across lines into full cell clusters when their
+      //    X-ranges substantially overlap.
+      const clustersA = mergeSegmentsByAxisOverlap(segmentsA, 'x', 0.4);
+
+      clustersA.forEach(cluster => {
+        const cellWords = [...cluster.words].sort((a, b) => a.bbox.y0 === b.bbox.y0 ? a.bbox.x0 - b.bbox.x0 : a.bbox.y0 - b.bbox.y0);
+        const cellRaw = cellWords.map(w => w.text).join(' ');
+        if (cellRaw.length < 2 || /^(break|lunch|recess|tea|interval)$/i.test(cellRaw.trim())) return;
+
+        const span = computeIntervalSpan(cluster.bbox, timeIntervals, 'x', 0.35);
+        if (!span) return;
+
+        const { fragments, wasSplit } = splitMultiSessionCellText(cellRaw);
+        const guardrailDeclinedSplit = cellRaw.includes('+') && !wasSplit;
+
+        fragments.forEach(fragmentText => {
+          const norm = normalizeSubjectIdentity(fragmentText, existingSubjects);
+          if (!norm.canonicalName || TIMETABLE_JUNK_TOKENS.has(norm.canonicalName.toLowerCase())) return;
+
+          const isUncertainRow = !norm.canonicalName
+            || span.borderline
+            || guardrailDeclinedSplit
+            || looksLikeUnresolvedCodeResidue(norm.canonicalName);
+
+          schedule.push({
+            day: dInt.day,
+            time: span.startInterval.timeNorm.time,
+            end: span.endInterval.timeNorm.end,
+            startSlot: span.startIdx,
+            endSlot: span.endIdx,
+            durationInSlots: span.durationInSlots,
+            subject: norm.canonicalName,
+            code: norm.canonicalCode,
+            room: norm.room,
+            teacher: norm.teacher,
+            type: norm.classType,
+            batches: norm.batches,
+            isUncertain: isUncertainRow
+          });
+        });
       });
     });
   } else if (isLayoutB && dayTokens.length >= 1 && timeTokens.length >= 1) {
@@ -1453,34 +1696,64 @@ function reconstructTimetable2DGrid(ocrData, existingSubjects = []) {
 
     const headerWordSet = new Set([...dayTokens.map(d => d.word), ...timeTokens.flatMap(t => t.words)]);
 
-    timeIntervals.forEach(tInt => {
-      dayIntervals.forEach(dInt => {
-        const cellWords = words.filter(w => {
-          if (headerWordSet.has(w)) return false;
-          return w.cy >= tInt.minY && w.cy < tInt.maxY && w.cx >= dInt.minX && w.cx < dInt.maxX;
-        });
+    // Median row height sizes the vertical gap threshold that separates
+    // genuinely distinct stacked cells from one session's own stacked
+    // subject/teacher/room lines.
+    const rowHeightsB = timeIntervals.map(t => t.maxY - t.minY).filter(h => h > 0);
+    const medianRowHeightB = rowHeightsB.length ? rowHeightsB.slice().sort((a, b) => a - b)[Math.floor(rowHeightsB.length / 2)] : 60;
+    const yGapThresholdB = Math.max(14, medianRowHeightB * 0.5);
 
-        if (cellWords.length > 0) {
-          cellWords.sort((a, b) => a.bbox.y0 === b.bbox.y0 ? a.bbox.x0 - b.bbox.x0 : a.bbox.y0 - b.bbox.y0);
-          const cellRaw = cellWords.map(w => w.text).join(' ');
-          if (cellRaw.length >= 2 && !/^(break|lunch|recess|tea|interval)$/i.test(cellRaw.trim())) {
-            const norm = normalizeSubjectIdentity(cellRaw, existingSubjects);
-            if (norm.canonicalName && !TIMETABLE_JUNK_TOKENS.has(norm.canonicalName.toLowerCase())) {
-              schedule.push({
-                day: dInt.day,
-                time: tInt.timeNorm.time,
-                end: tInt.timeNorm.end,
-                subject: norm.canonicalName,
-                code: norm.canonicalCode,
-                room: norm.room,
-                teacher: norm.teacher,
-                type: norm.classType,
-                batches: norm.batches,
-                isUncertain: !norm.canonicalName
-              });
-            }
-          }
-        }
+    dayIntervals.forEach(dInt => {
+      const dayBandWords = words.filter(w => {
+        if (headerWordSet.has(w)) return false;
+        return w.cx >= dInt.minX && w.cx < dInt.maxX;
+      });
+      if (dayBandWords.length === 0) return;
+
+      // Physical text lines (same orientation-independent grouping as
+      // Layout A above). In this orientation the day-band is already a
+      // narrow column, so distinct cells are separated vertically, not
+      // horizontally: merge consecutive lines into one cluster when the
+      // gap between them is small, start a new cluster otherwise.
+      const linesB = groupWordsIntoLines(dayBandWords);
+      const clustersB = mergeLinesByYGap(linesB, yGapThresholdB);
+
+      clustersB.forEach(cluster => {
+        const cellWords = [...cluster.words].sort((a, b) => a.bbox.y0 === b.bbox.y0 ? a.bbox.x0 - b.bbox.x0 : a.bbox.y0 - b.bbox.y0);
+        const cellRaw = cellWords.map(w => w.text).join(' ');
+        if (cellRaw.length < 2 || /^(break|lunch|recess|tea|interval)$/i.test(cellRaw.trim())) return;
+
+        const span = computeIntervalSpan(cluster.bbox, timeIntervals, 'y', 0.35);
+        if (!span) return;
+
+        const { fragments, wasSplit } = splitMultiSessionCellText(cellRaw);
+        const guardrailDeclinedSplit = cellRaw.includes('+') && !wasSplit;
+
+        fragments.forEach(fragmentText => {
+          const norm = normalizeSubjectIdentity(fragmentText, existingSubjects);
+          if (!norm.canonicalName || TIMETABLE_JUNK_TOKENS.has(norm.canonicalName.toLowerCase())) return;
+
+          const isUncertainRow = !norm.canonicalName
+            || span.borderline
+            || guardrailDeclinedSplit
+            || looksLikeUnresolvedCodeResidue(norm.canonicalName);
+
+          schedule.push({
+            day: dInt.day,
+            time: span.startInterval.timeNorm.time,
+            end: span.endInterval.timeNorm.end,
+            startSlot: span.startIdx,
+            endSlot: span.endIdx,
+            durationInSlots: span.durationInSlots,
+            subject: norm.canonicalName,
+            code: norm.canonicalCode,
+            room: norm.room,
+            teacher: norm.teacher,
+            type: norm.classType,
+            batches: norm.batches,
+            isUncertain: isUncertainRow
+          });
+        });
       });
     });
   }
@@ -2138,6 +2411,7 @@ window.confirmSaveExtractedTimetable = function() {
       room:    (item.room || '').trim(),
       teacher: (item.teacher || '').trim(),
       type:    item.type || 'lecture',
+      batches: Array.isArray(item.batches) ? item.batches : [],
     });
   });
 
