@@ -798,7 +798,11 @@ function standardizeTimetableDay(rawDay) {
   if (!rawDay || typeof rawDay !== 'string') return '';
   const clean = rawDay.toLowerCase().replace(/[^a-z0-9]/g, '');
   for (const [alias, standard] of Object.entries(DAY_ALIASES)) {
-    if (clean === alias || clean.startsWith(alias) || (alias.length >= 3 && clean.includes(alias))) {
+    // Exact match always wins (covers legitimate short forms like "we").
+    // Prefix/substring matches require alias.length >= 3 -- otherwise a
+    // 2-letter alias (mo/tu/we/th/fr/sa) can false-positive-match the start
+    // of a real word, e.g. "WEB" (as in "Web Development") -> "Wed".
+    if (clean === alias || (alias.length >= 3 && (clean.startsWith(alias) || clean.includes(alias)))) {
       return standard;
     }
   }
@@ -1516,21 +1520,14 @@ function looksLikeUnresolvedCodeResidue(canonicalName) {
   return /^[A-Z0-9]+([\s-]+[A-Z0-9]+)*$/.test(trimmed);
 }
 
-// ── Table-Aware 2D Grid Reconstructor ────────────────────────────
-function reconstructTimetable2DGrid(ocrData, existingSubjects = []) {
-  if (!ocrData || !ocrData.words || ocrData.words.length === 0) {
-    return { schedule: [], confidence: 0, ambiguous: true };
-  }
-
-  const words = ocrData.words.map(w => ({
-    text: (w.text || '').trim(),
-    bbox: w.bbox || { x0: 0, y0: 0, x1: 0, y1: 0 },
-    conf: w.confidence || 0,
-    cx: ((w.bbox?.x0 || 0) + (w.bbox?.x1 || 0)) / 2,
-    cy: ((w.bbox?.y0 || 0) + (w.bbox?.y1 || 0)) / 2
-  })).filter(w => w.text.length > 0);
-
-  // 1. Identify Day Tokens and Time Tokens with coordinates
+// ── OCR Header-Band Robustness Helpers (Stage A) ─────────────────
+// Pure extraction of the day/time-token detection loop that
+// reconstructTimetable2DGrid already used inline. Identical behavior --
+// operates on whatever already-mapped `words` array the caller passes in,
+// so reference-equality against that same array (used later for
+// headerWordSet exclusion) is preserved when called from
+// reconstructTimetable2DGrid itself.
+function detectDayAndTimeTokens(words) {
   const dayTokens = [];
   const timeTokens = [];
 
@@ -1567,6 +1564,118 @@ function reconstructTimetable2DGrid(ocrData, existingSubjects = []) {
       }
     }
   }
+
+  return { dayTokens, timeTokens };
+}
+
+// Maps raw Tesseract word entries {text, bbox, confidence} into the
+// {text, bbox, conf, cx, cy} shape detectDayAndTimeTokens expects. Kept
+// separate from reconstructTimetable2DGrid's own copy of this mapping
+// (that one must stay untouched -- see note above) since this one feeds
+// a completely independent word array (first-pass trigger check, and the
+// header-crop re-OCR pass), with no reference-identity requirements.
+function mapRawOcrWordsForDetection(rawWords) {
+  return (rawWords || []).map(w => ({
+    text: (w.text || '').trim(),
+    bbox: w.bbox || { x0: 0, y0: 0, x1: 0, y1: 0 },
+    conf: w.confidence || 0,
+    cx: ((w.bbox?.x0 || 0) + (w.bbox?.x1 || 0)) / 2,
+    cy: ((w.bbox?.y0 || 0) + (w.bbox?.y1 || 0)) / 2
+  })).filter(w => w.text.length > 0);
+}
+
+// Crops the header band (day/time label row) out of the already-
+// preprocessed image, using the topmost detected day token as the lower
+// bound, upscales it, and runs one additional, isolated OCR pass over
+// just that crop with PSM 6 (uniform block) -- restoring the worker's
+// default PSM afterward no matter what happens. Returns recovered word
+// entries (raw Tesseract shape) remapped into full-image coordinates, for
+// the caller to merge onto the first pass's word list. Does not touch or
+// depend on reconstructTimetable2DGrid in any way.
+async function reOcrHeaderBandForTimeTokens(preprocessedDataUrl, worker, dayTokens) {
+  if (!dayTokens || dayTokens.length === 0) return [];
+
+  const topmostY0 = Math.min(...dayTokens.map(d => d.word.bbox.y0 ?? d.word.bbox?.y0 ?? Infinity));
+  if (!isFinite(topmostY0)) return [];
+
+  const cropSlackPx = 6;
+  const cropBottomY = Math.round(topmostY0 + cropSlackPx);
+  if (cropBottomY < 20) return [];
+
+  const img = await new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Failed to load preprocessed image for header-band re-OCR"));
+    image.src = preprocessedDataUrl;
+  });
+
+  const clampedBottom = Math.min(img.height, cropBottomY);
+  const scale = 3;
+  const canvas = document.createElement('canvas');
+  canvas.width = img.width * scale;
+  canvas.height = clampedBottom * scale;
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(img, 0, 0, img.width, clampedBottom, 0, 0, canvas.width, canvas.height);
+  const cropDataUrl = canvas.toDataURL('image/png', 0.92);
+  canvas.width = 1;
+  canvas.height = 1;
+
+  let cropResult;
+  try {
+    await worker.setParameters({ tessedit_pageseg_mode: '6' });
+    cropResult = await worker.recognize(cropDataUrl);
+  } finally {
+    // Always restore the default segmentation mode so nothing leaks into
+    // later scans, even if the crop recognize() call above threw.
+    await worker.setParameters({ tessedit_pageseg_mode: '3' });
+  }
+
+  const cropWords = mapRawOcrWordsForDetection(cropResult?.data?.words);
+  const { timeTokens: cropTimeTokens } = detectDayAndTimeTokens(cropWords);
+
+  // Re-express each recovered token as ONE clean, self-contained range
+  // string (e.g. "10:00 - 11:00"), not its raw constituent word(s). This
+  // matters: detectDayAndTimeTokens's windowing checks a word's own text
+  // first and only looks ahead at neighbors if that fails. A clean,
+  // already-valid single token always matches on that first check and
+  // never triggers a lookahead into whatever real word ends up next to
+  // it once merged -- so it can't get accidentally absorbed into (or
+  // accidentally absorb) unrelated neighboring content the way raw,
+  // fragment-level words could.
+  const recovered = [];
+  cropTimeTokens.forEach(t => {
+    const x0 = Math.min(...t.words.map(cw => cw.bbox.x0)) / scale;
+    const y0 = Math.min(...t.words.map(cw => cw.bbox.y0)) / scale;
+    const x1 = Math.max(...t.words.map(cw => cw.bbox.x1)) / scale;
+    const y1 = Math.max(...t.words.map(cw => cw.bbox.y1)) / scale;
+    const avgConf = t.words.reduce((sum, cw) => sum + cw.conf, 0) / t.words.length;
+    recovered.push({
+      text: `${t.timeNorm.time} - ${t.timeNorm.end}`,
+      bbox: { x0, y0, x1, y1 },
+      confidence: avgConf
+    });
+  });
+  return recovered;
+}
+
+// ── Table-Aware 2D Grid Reconstructor ────────────────────────────
+function reconstructTimetable2DGrid(ocrData, existingSubjects = []) {
+  if (!ocrData || !ocrData.words || ocrData.words.length === 0) {
+    return { schedule: [], confidence: 0, ambiguous: true };
+  }
+
+  const words = ocrData.words.map(w => ({
+    text: (w.text || '').trim(),
+    bbox: w.bbox || { x0: 0, y0: 0, x1: 0, y1: 0 },
+    conf: w.confidence || 0,
+    cx: ((w.bbox?.x0 || 0) + (w.bbox?.x1 || 0)) / 2,
+    cy: ((w.bbox?.y0 || 0) + (w.bbox?.y1 || 0)) / 2
+  })).filter(w => w.text.length > 0);
+
+  // 1. Identify Day Tokens and Time Tokens with coordinates
+  const { dayTokens, timeTokens } = detectDayAndTimeTokens(words);
 
   // 2. Detect Orientation:
   // Layout A: Rows = Days (stacked vertically), Columns = Times (spread horizontally)
@@ -1926,7 +2035,30 @@ async function extractTimetableFromImage(base64Data, mimeType) {
   updateTimetableLoadingModal("Scanning timetable text with local OCR...");
   const worker = await getTesseractWorker();
   const ocrResult = await worker.recognize(preprocessedDataUrl);
-  
+
+  // Stage A: if the first pass found day labels but essentially no usable
+  // time-range tokens, retry OCR on just the header band (cropped +
+  // upscaled) before handing off to the deterministic parser. Only
+  // triggers on an already-failing first pass, so a normal/clean scan is
+  // completely unaffected.
+  try {
+    const firstPassWords = mapRawOcrWordsForDetection(ocrResult.data?.words);
+    const { dayTokens: firstPassDayTokens, timeTokens: firstPassTimeTokens } = detectDayAndTimeTokens(firstPassWords);
+    if (firstPassDayTokens.length >= 1 && firstPassTimeTokens.length <= 1) {
+      updateTimetableLoadingModal("Re-scanning header row for class times...");
+      const recoveredWords = await reOcrHeaderBandForTimeTokens(preprocessedDataUrl, worker, firstPassDayTokens);
+      if (recoveredWords.length > 0) {
+        // Prepended, not appended: a clean recovered token never looks
+        // ahead past itself once it self-validates (see note above), so
+        // placing it before the rest of the words means nothing already
+        // in the array can accidentally window-match into it either.
+        ocrResult.data.words = [...recoveredWords, ...(ocrResult.data.words || [])];
+      }
+    }
+  } catch (err) {
+    console.warn("[TimetableParser] Header-band retry OCR failed, continuing with first-pass data:", err);
+  }
+
   updateTimetableLoadingModal("Reconstructing schedule rows and matching subjects...");
   let deterministicResult;
   try {
