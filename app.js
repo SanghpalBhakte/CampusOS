@@ -1506,6 +1506,44 @@ function splitMultiSessionCellText(rawText) {
   return { fragments: trimmed, wasSplit: true };
 }
 
+// Fallback split for a clustered cell with NO literal '+' separator. Real
+// timetable data can show two distinct parallel sessions stacked as two
+// physical lines within one cell with no connecting character at all --
+// but splitting on line count alone is unsafe, since a single subject's
+// own label commonly wraps across two lines too. This only splits when
+// each line, run independently through the exact same subject-matching
+// used everywhere else in this file, resolves to its own confident
+// (non-residue) canonical subject, and the two resolved subjects differ.
+// Any weaker signal declines the split and returns wasSplit:false, the
+// same refuse-if-ambiguous behavior as splitMultiSessionCellText's '+'
+// path. Callers must flag a resulting split uncertain -- unlike an
+// explicit '+' separator, this is inferred from ambiguous input.
+function trySplitByIndependentLines(clusterWords, existingSubjects) {
+  if (!clusterWords || clusterWords.length === 0) return { fragments: null, wasSplit: false };
+
+  const lines = groupWordsIntoLines(clusterWords);
+  if (lines.length !== 2) return { fragments: null, wasSplit: false };
+
+  const lineTexts = lines.map(line =>
+    [...line].sort((a, b) => a.bbox.x0 - b.bbox.x0).map(w => w.text).join(' ').trim()
+  );
+  if (lineTexts.some(t => t.replace(/[^a-zA-Z0-9]/g, '').length < 3)) {
+    return { fragments: null, wasSplit: false };
+  }
+
+  const norms = lineTexts.map(t => normalizeSubjectIdentity(t, existingSubjects));
+  // 'General Subject' is normalizeSubjectIdentity's own explicit fallback
+  // sentinel for "nothing meaningful resolved" (e.g. a line that's entirely
+  // a teacher name, like "Prof. Rao") -- it must never count as a real,
+  // confidently-distinct subject, or a lone teacher-name line would look
+  // like a second session and trigger a false split.
+  const bothConfident = norms.every(n => n.canonicalName && n.canonicalName !== 'General Subject' && !looksLikeUnresolvedCodeResidue(n.canonicalName));
+  const distinctSubjects = bothConfident && norms[0].canonicalName.toLowerCase() !== norms[1].canonicalName.toLowerCase();
+
+  if (!bothConfident || !distinctSubjects) return { fragments: null, wasSplit: false };
+  return { fragments: lineTexts, wasSplit: true };
+}
+
 // A canonical name that never resolved past raw codes/branch-qualifiers
 // (e.g. an unresolved "DS-AI", or a bare "AI") is a real, observed failure
 // mode found against this codebase's own reference timetable data ("AI"
@@ -1752,8 +1790,17 @@ function reconstructTimetable2DGrid(ocrData, existingSubjects = []) {
         const span = computeIntervalSpan(cluster.bbox, timeIntervals, 'x', 0.35);
         if (!span) return;
 
-        const { fragments, wasSplit } = splitMultiSessionCellText(cellRaw);
-        const guardrailDeclinedSplit = cellRaw.includes('+') && !wasSplit;
+        const { fragments: plusFragments, wasSplit: plusWasSplit } = splitMultiSessionCellText(cellRaw);
+        let fragments = plusFragments;
+        let lineSplitFallback = false;
+        if (!plusWasSplit && !cellRaw.includes('+')) {
+          const lineSplit = trySplitByIndependentLines(cluster.words, existingSubjects);
+          if (lineSplit.wasSplit) {
+            fragments = lineSplit.fragments;
+            lineSplitFallback = true;
+          }
+        }
+        const guardrailDeclinedSplit = cellRaw.includes('+') && !plusWasSplit;
 
         fragments.forEach(fragmentText => {
           const norm = normalizeSubjectIdentity(fragmentText, existingSubjects);
@@ -1762,6 +1809,7 @@ function reconstructTimetable2DGrid(ocrData, existingSubjects = []) {
           const isUncertainRow = !norm.canonicalName
             || span.borderline
             || guardrailDeclinedSplit
+            || lineSplitFallback
             || looksLikeUnresolvedCodeResidue(norm.canonicalName);
 
           schedule.push({
@@ -1835,8 +1883,17 @@ function reconstructTimetable2DGrid(ocrData, existingSubjects = []) {
         const span = computeIntervalSpan(cluster.bbox, timeIntervals, 'y', 0.35);
         if (!span) return;
 
-        const { fragments, wasSplit } = splitMultiSessionCellText(cellRaw);
-        const guardrailDeclinedSplit = cellRaw.includes('+') && !wasSplit;
+        const { fragments: plusFragments, wasSplit: plusWasSplit } = splitMultiSessionCellText(cellRaw);
+        let fragments = plusFragments;
+        let lineSplitFallback = false;
+        if (!plusWasSplit && !cellRaw.includes('+')) {
+          const lineSplit = trySplitByIndependentLines(cluster.words, existingSubjects);
+          if (lineSplit.wasSplit) {
+            fragments = lineSplit.fragments;
+            lineSplitFallback = true;
+          }
+        }
+        const guardrailDeclinedSplit = cellRaw.includes('+') && !plusWasSplit;
 
         fragments.forEach(fragmentText => {
           const norm = normalizeSubjectIdentity(fragmentText, existingSubjects);
@@ -1845,6 +1902,7 @@ function reconstructTimetable2DGrid(ocrData, existingSubjects = []) {
           const isUncertainRow = !norm.canonicalName
             || span.borderline
             || guardrailDeclinedSplit
+            || lineSplitFallback
             || looksLikeUnresolvedCodeResidue(norm.canonicalName);
 
           schedule.push({
