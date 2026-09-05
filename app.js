@@ -1698,6 +1698,84 @@ async function reOcrHeaderBandForTimeTokens(preprocessedDataUrl, worker, dayToke
   return recovered;
 }
 
+// True when a word's own center point falls inside a region's bbox --
+// used to remove exactly the original (low-confidence) words a targeted
+// cell re-OCR is about to replace, without relying on object identity
+// (the reconstructor maps OCR words into its own new objects, so
+// reference equality against the raw ocrResult.data.words array doesn't
+// hold).
+function isBboxInsideRegion(wordBbox, regionBbox) {
+  if (!wordBbox || !regionBbox) return false;
+  const cx = (wordBbox.x0 + wordBbox.x1) / 2;
+  const cy = (wordBbox.y0 + wordBbox.y1) / 2;
+  return cx >= regionBbox.x0 && cx <= regionBbox.x1 && cy >= regionBbox.y0 && cy <= regionBbox.y1;
+}
+
+// Generic targeted re-OCR of an arbitrary, already-known cell region.
+// Unlike a naive whole-row or whole-line crop, the region here always
+// comes from the real 2D grid clustering itself (reconstructTimetable2DGrid's
+// own cluster.bbox), so it's already properly bounded to ONE cell and
+// never spans multiple side-by-side columns -- empirically, cropping
+// across column borders badly confuses OCR (border strokes read as
+// garbage text, columns' text interleaved), while a single cell-sized
+// crop upscaled 2x with PSM 6 (uniform block) reliably recovers dense,
+// multi-line body text that a whole-image single pass garbles. Always
+// restores the worker's default PSM afterward even if recognize() itself
+// throws. Returns recovered words remapped into full-image coordinates.
+async function reOcrCellRegion(preprocessedDataUrl, worker, bboxFullImage) {
+  const PAD = 6;
+  const SCALE = 2;
+
+  const img = await new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Failed to load preprocessed image for cell re-OCR"));
+    image.src = preprocessedDataUrl;
+  });
+
+  const x0 = Math.max(0, Math.floor(bboxFullImage.x0 - PAD));
+  const y0 = Math.max(0, Math.floor(bboxFullImage.y0 - PAD));
+  const x1 = Math.min(img.width, Math.ceil(bboxFullImage.x1 + PAD));
+  const y1 = Math.min(img.height, Math.ceil(bboxFullImage.y1 + PAD));
+  const cropW = x1 - x0;
+  const cropH = y1 - y0;
+  if (cropW < 10 || cropH < 10) return [];
+
+  const canvas = document.createElement('canvas');
+  canvas.width = cropW * SCALE;
+  canvas.height = cropH * SCALE;
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(img, x0, y0, cropW, cropH, 0, 0, canvas.width, canvas.height);
+  const cropDataUrl = canvas.toDataURL('image/png', 0.92);
+  canvas.width = 1;
+  canvas.height = 1;
+
+  let cropResult;
+  try {
+    await worker.setParameters({ tessedit_pageseg_mode: '6' });
+    cropResult = await worker.recognize(cropDataUrl);
+  } finally {
+    // Always restore the default segmentation mode so nothing leaks into
+    // later scans, even if the crop recognize() call above threw.
+    await worker.setParameters({ tessedit_pageseg_mode: '3' });
+  }
+
+  return (cropResult?.data?.words || [])
+    .map(w => ({
+      text: w.text,
+      bbox: {
+        x0: (w.bbox.x0 / SCALE) + x0,
+        y0: (w.bbox.y0 / SCALE) + y0,
+        x1: (w.bbox.x1 / SCALE) + x0,
+        y1: (w.bbox.y1 / SCALE) + y0
+      },
+      confidence: w.confidence
+    }))
+    .filter(w => (w.text || '').trim().length > 0);
+}
+
 // ── Table-Aware 2D Grid Reconstructor ────────────────────────────
 function reconstructTimetable2DGrid(ocrData, existingSubjects = []) {
   if (!ocrData || !ocrData.words || ocrData.words.length === 0) {
@@ -1735,6 +1813,12 @@ function reconstructTimetable2DGrid(ocrData, existingSubjects = []) {
   }
 
   const schedule = [];
+  const lowConfidenceClusters = [];
+  // Below this average per-cluster OCR confidence, a cell is more likely
+  // garbled than genuinely simple -- flagged for a later targeted re-OCR
+  // retry (see reOcrCellRegion / extractTimetableFromImage) rather than
+  // silently trusted or silently dropped.
+  const CELL_RETRY_CONFIDENCE_THRESHOLD = 55;
 
   if (isLayoutA && dayTokens.length >= 1 && timeTokens.length >= 1) {
     // Layout A: Days are row headers along left, Times are column headers along top
@@ -1786,6 +1870,11 @@ function reconstructTimetable2DGrid(ocrData, existingSubjects = []) {
         const cellWords = [...cluster.words].sort((a, b) => a.bbox.y0 === b.bbox.y0 ? a.bbox.x0 - b.bbox.x0 : a.bbox.y0 - b.bbox.y0);
         const cellRaw = cellWords.map(w => w.text).join(' ');
         if (cellRaw.length < 2 || /^(break|lunch|recess|tea|interval)$/i.test(cellRaw.trim())) return;
+
+        const avgConfA = cellWords.reduce((sum, w) => sum + w.conf, 0) / cellWords.length;
+        if (avgConfA < CELL_RETRY_CONFIDENCE_THRESHOLD) {
+          lowConfidenceClusters.push({ day: dInt.day, bbox: cluster.bbox });
+        }
 
         const span = computeIntervalSpan(cluster.bbox, timeIntervals, 'x', 0.35);
         if (!span) return;
@@ -1880,6 +1969,11 @@ function reconstructTimetable2DGrid(ocrData, existingSubjects = []) {
         const cellRaw = cellWords.map(w => w.text).join(' ');
         if (cellRaw.length < 2 || /^(break|lunch|recess|tea|interval)$/i.test(cellRaw.trim())) return;
 
+        const avgConfB = cellWords.reduce((sum, w) => sum + w.conf, 0) / cellWords.length;
+        if (avgConfB < CELL_RETRY_CONFIDENCE_THRESHOLD) {
+          lowConfidenceClusters.push({ day: dInt.day, bbox: cluster.bbox });
+        }
+
         const span = computeIntervalSpan(cluster.bbox, timeIntervals, 'y', 0.35);
         if (!span) return;
 
@@ -1926,7 +2020,7 @@ function reconstructTimetable2DGrid(ocrData, existingSubjects = []) {
   }
 
   const confidence = Math.min(98, 75 + schedule.length * 5);
-  return { schedule, confidence, ambiguous: schedule.length === 0 };
+  return { schedule, confidence, ambiguous: schedule.length === 0, lowConfidenceClusters };
 }
 
 // ── Multi-Strategy Timetable Parser (2D Grid + Geometric Rows + Text Stream) ───
@@ -2128,6 +2222,36 @@ async function extractTimetableFromImage(base64Data, mimeType) {
       deterministicResult = { schedule: streamFallback, confidence: streamFallback.length ? 50 : 0, ambiguous: streamFallback.length === 0 };
     } catch {
       deterministicResult = { schedule: [], confidence: 0, ambiguous: true };
+    }
+  }
+
+  // Stage C: the 2D grid reconstructor flags any cell cluster whose OCR
+  // confidence was too low to trust (dense multi-line body cells can hit
+  // the same kind of OCR breakdown Stage A fixed for header numerals).
+  // Each flagged region is already properly bounded to ONE cell by the
+  // real clustering (never spans multiple side-by-side columns the way a
+  // naive whole-row crop would), so a targeted crop + upscale + isolated
+  // OCR pass can retry just that region safely. Only runs when something
+  // was actually flagged, so a clean scan pays no extra cost, and the
+  // retry result is only adopted if it doesn't produce fewer rows than
+  // the first pass already found.
+  if (deterministicResult?.lowConfidenceClusters?.length > 0) {
+    try {
+      updateTimetableLoadingModal("Re-scanning unclear cells for better accuracy...");
+      let improvedWords = ocrResult.data.words || [];
+      for (const region of deterministicResult.lowConfidenceClusters) {
+        const recovered = await reOcrCellRegion(preprocessedDataUrl, worker, region.bbox);
+        if (recovered.length > 0) {
+          improvedWords = improvedWords.filter(w => !isBboxInsideRegion(w.bbox, region.bbox));
+          improvedWords = [...improvedWords, ...recovered];
+        }
+      }
+      const retryResult = parseTimetableFromGrid({ ...ocrResult.data, words: improvedWords }, existingSubjects);
+      if ((retryResult?.schedule?.length || 0) >= (deterministicResult.schedule?.length || 0)) {
+        deterministicResult = retryResult;
+      }
+    } catch (err) {
+      console.warn("[TimetableParser] Cell-region retry OCR failed, continuing with prior result:", err);
     }
   }
   
