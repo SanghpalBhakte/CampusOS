@@ -828,7 +828,7 @@ const TIMETABLE_JUNK_TOKENS = new Set([
 const BATCH_PATTERN = /\b(?:Batch(?:es)?|Sec(?:tion)?|Grp|Group)\s*[:\-\s]*\b([A-D][1-4]|[A-D](?![a-zA-Z])|[1-4](?![0-9]))\b|\b([A-D][1-4])\b/gi;
 const BRACKETED_BATCH_PATTERN = /\((?:AI-)?([A-D][1-4](?:[\s,/-]+(?:AI-)?[A-D][1-4])*)\)/i;
 const SUBJECT_CODE_PATTERN = /\b([A-Z]{2,8}[0-9]{1,4}[A-Z]{1,4}[0-9]{1,4}[A-Z]?|[A-Z]{2,6}[-\s]?[0-9]{2,5}[A-Z]?|[0-9]{2}[A-Z]{2,6}[0-9]{2,4})\b/i;
-const FACULTY_TITLE_PATTERN = /\b(?:Prof\.?|Dr\.?|Mr\.?|Mrs\.?|Ms\.?|Shri|Smt\.?)\s+[A-Za-z]+(?:\s+(?!LH|LT|CR|Room|Lab|Cabin|Hall|Batch|Sec)[A-Za-z]+)?/gi;
+const FACULTY_TITLE_PATTERN = /\b(?:Prof\.?|Dr\.?|Mr\.?|Mrs\.?|Ms\.?|Adv\.?|Shri|Smt\.?)\s+[A-Za-z]+(?:\s+(?!LH|LT|CR|Room|Lab|Cabin|Hall|Batch|Sec)[A-Za-z]+)?/gi;
 const ROOM_PATTERN = /\b(?:Room|LT|CR|LH|Cabin|Hall|SF|FF|GF|WS)[-.\s]*(?:\d+[A-Z]?|[A-D]\b)|\bLab[-.\s]*\d+[A-Z]?\b|\b(?:G|F|S|T)-\d{2,3}\b|\b[A-Z]{1,2}-\d{2,3}\b/i;
 
 function getCanonicalSubjectName(rawText) {
@@ -1030,7 +1030,96 @@ function subjectNameFuzzyMatch(a, b) {
   return { isMatch: similarity >= FUZZY_MIN_SIMILARITY, similarity };
 }
 
-function normalizeSubjectIdentity(rawText, existingSubjects = [], forceType = null) {
+// ── Faculty-Initials Legend Parser (auto name resolution) ───────────
+// Many real timetables print a small legend below the grid mapping the
+// short initials used inside cells (e.g. "VAK") to the actual faculty
+// member's full name (e.g. "Prof. V. A. Kulkarni"). This detects that
+// legend section via a distinctive header marker ("...faculty..."), then
+// reads each physical line below it as one <INITIALS> <Title Name...>
+// row. Returns a plain { INITIALS: 'Full Name' } map (empty when no such
+// legend is found or nothing in it parses cleanly) -- deliberately
+// conservative: an entry is only ever added when a line's first word is a
+// short (2-4 letter) all-caps token immediately followed by text
+// containing a recognizable title (Prof./Dr./etc), so a mis-detected
+// boundary or a stray noise line just yields fewer entries, never a wrong
+// one. Runs once per scan against the ORIGINAL, unfiltered word list --
+// independent of reconstructTimetable2DGrid's own legend-boundary guard,
+// which only concerns the grid side of that same boundary.
+function parseFacultyLegend(rawWords) {
+  const legend = {};
+  if (!rawWords || rawWords.length === 0) return legend;
+
+  const mapped = mapRawOcrWordsForDetection(rawWords);
+  const lines = groupWordsIntoLines(mapped);
+
+  // Detect the legend's header line by looking at each physical line's
+  // words left-to-right -- covers both a single fused "FacultyName" token
+  // (common on tight, small-column screenshots) and the more common
+  // "Name of the faculty" multi-word phrasing (each word its own OCR
+  // token). A per-word substring check alone would miss the multi-word
+  // case entirely, since no single word contains "facultyname".
+  // groupWordsIntoLines already returns lines sorted top-to-bottom (by
+  // each line's own first word's y0), so the header's ORDINAL position is
+  // used to separate it from the content rows below it, rather than an
+  // absolute Y-pixel cutoff -- a real photo's row spacing is uneven
+  // enough that the header's own text can visually overlap the very next
+  // content row's vertical span (real evidence: a header row spanning
+  // y0-y1 1122-1149 sitting right against a content row starting at
+  // y0=1144), which made a Y-threshold comparison wrongly swallow the
+  // first legend entry.
+  let headerIndex = -1;
+  lines.forEach((line, idx) => {
+    if (headerIndex !== -1) return;
+    const sorted = [...line].sort((a, b) => a.bbox.x0 - b.bbox.x0);
+    const cleanWords = sorted.map(w => w.text.toLowerCase().replace(/[^a-z]/g, ''));
+    const joined = cleanWords.join('');
+    // Truncated prefixes ("facu" not "faculty") because a blurry real
+    // photo's OCR commonly clips the tail off "faculty" -- real evidence:
+    // "Name of the facul" (missing "ty") on an otherwise clean real scan.
+    const hasFusedMarker = joined.includes('nameofthefacu') || joined.includes('facultynam');
+    const hasWordSequence = cleanWords.some((cw, i) => cw === 'name' && cleanWords.slice(i + 1, i + 4).some(w2 => w2.length >= 4 && w2.startsWith('facu')));
+    if (hasFusedMarker || hasWordSequence) {
+      headerIndex = idx;
+    }
+  });
+  if (headerIndex === -1) return legend;
+
+  const legendTitlePattern = /\b(?:Prof\.?|Dr\.?|Mr\.?|Mrs\.?|Ms\.?|Adv\.?|Shri|Smt\.?)\b/i;
+  // A real faculty name is short and title-only-once; a garbled multi-
+  // column table read out of order (subject name + faculty name + a
+  // student roll-number range all bleeding onto one detected "line") is
+  // what real evidence on a compact layout actually produced -- reject it
+  // outright rather than accept a wrong mapping. Better no entry than a
+  // wrong one.
+  const MAX_NAME_LENGTH = 45;
+
+  lines.slice(headerIndex + 1).forEach(line => {
+    const sorted = [...line].sort((a, b) => a.bbox.x0 - b.bbox.x0);
+    if (sorted.length < 2) return;
+
+    const cleanInitials = (sorted[0].text || '').toUpperCase().replace(/[^A-Z]/g, '');
+    if (!/^[A-Z]{2,4}$/.test(cleanInitials)) return;
+
+    // Strip stray leading/trailing punctuation a real photo's OCR often
+    // picks up from adjacent table borders (e.g. a leading "[" or "|").
+    const restText = sorted.slice(1).map(w => w.text).join(' ')
+      .replace(/^[^A-Za-z0-9]+/, '').replace(/[^A-Za-z0-9.]+$/, '').trim();
+    if (!legendTitlePattern.test(restText)) return;
+
+    const fullName = restText.replace(/\s{2,}/g, ' ').trim();
+    const titleOccurrences = (fullName.match(/\b(?:Prof|Dr|Mr|Mrs|Ms|Adv|Shri|Smt)\b\.?/gi) || []).length;
+    if (fullName.length < 5 || fullName.length > MAX_NAME_LENGTH) return;
+    if (/\d/.test(fullName)) return;
+    if (titleOccurrences > 1) return;
+    if (!legend[cleanInitials]) {
+      legend[cleanInitials] = fullName;
+    }
+  });
+
+  return legend;
+}
+
+function normalizeSubjectIdentity(rawText, existingSubjects = [], forceType = null, facultyLegend = {}) {
   if (!rawText || typeof rawText !== 'string') {
     return {
       canonicalName: '',
@@ -1056,6 +1145,27 @@ function normalizeSubjectIdentity(rawText, existingSubjects = [], forceType = nu
     text = text.replace(teacherMatch[0], ' ');
   }
 
+  // 2b. Resolve bare faculty initials (e.g. "VAK") via a per-scan legend
+  // parsed from this image's own "Name of the faculty" table, for the
+  // common case where a raw cell only prints the initials with no title
+  // prefix (so step 2's FACULTY_TITLE_PATTERN never finds them). Scans
+  // every short all-caps token in reading order and stops at the first
+  // one that's an actual legend match -- e.g. "DEMP VAK" tries "DEMP"
+  // first (no match, since that's a subject abbreviation, not a faculty
+  // legend entry) before matching "VAK". Only ever fires when no teacher
+  // was already resolved, so it can only add information, never override
+  // an already-confident result.
+  if (!teacher && facultyLegend && Object.keys(facultyLegend).length > 0) {
+    const candidateTokens = text.match(/\b[A-Z]{2,4}\b/g) || [];
+    for (const tok of candidateTokens) {
+      if (facultyLegend[tok]) {
+        teacher = facultyLegend[tok];
+        text = text.replace(new RegExp(`\\b${tok}\\b`), ' ');
+        break;
+      }
+    }
+  }
+
   // 3. Extract Room
   let room = '';
   const roomMatch = text.match(ROOM_PATTERN);
@@ -1079,6 +1189,27 @@ function normalizeSubjectIdentity(rawText, existingSubjects = [], forceType = nu
   text = text.replace(/\([^)]*\)/g, ' ');
   text = text.replace(/\[[^\]]*\]/g, ' ');
   text = text.replace(/\b(?:Batch(?:es)?|Sec(?:tion)?)\s*[:\-\s]*[A-D0-9,\s/-]+\b/gi, ' ');
+
+  // Strip an inline, unbracketed branch/batch qualifier appended directly
+  // to a subject abbreviation with a hyphen -- e.g. "DS-AI-A2", "DEMP-AI-B2",
+  // "WEB DEV.-AI- C2" -- the same "(AI-)?[A-D][1-4]" shape
+  // BRACKETED_BATCH_PATTERN already recognizes inside parentheses, just
+  // without the parens. Real evidence: on a clean real-photo scan, cells
+  // like "DS-AI-A2" were left as an unresolved raw code (never matching
+  // CANONICAL_SUBJECT_MAP's plain "ds" key) purely because this suffix was
+  // never separated from the subject abbreviation before the lookup. The
+  // batch itself is already captured independently via extractBatchTags
+  // (BATCH_PATTERN's bare "[A-D][1-4]" alternative matches regardless of
+  // brackets), so this only needs to remove it from the text used to
+  // derive the subject NAME, not re-extract it.
+  //
+  // "A[IL]" (not just "AI") because the same real photos show Tesseract
+  // inconsistently misreading the "I" in this exact qualifier as a
+  // lowercase "l" -- "WEB DEV.-Al- C2" right next to a correctly-read
+  // "DEMP-AI- D2" on the very same line. The /gi flag already makes each
+  // matched letter case-insensitive, so "A[IL]" alone covers all of
+  // AI/Ai/aI/ai/AL/Al/aL/al without needing separate alternatives.
+  text = text.replace(/[-\s]+(?:A[IL][-\s]*)?[A-D][1-4]\b/gi, ' ');
 
   // 5. Detect Class Type & Lab markers
   let classType = forceType || 'lecture';
@@ -1522,7 +1653,13 @@ function trySplitByIndependentLines(clusterWords, existingSubjects) {
   if (!clusterWords || clusterWords.length === 0) return { fragments: null, wasSplit: false };
 
   const lines = groupWordsIntoLines(clusterWords);
-  if (lines.length !== 2) return { fragments: null, wasSplit: false };
+  // Originally capped at exactly 2 lines; generalized to up to 4 after real
+  // evidence showed a genuinely-independent 3-subject stacked cell (three
+  // distinct classes crammed into one merged multi-hour cell) on a real
+  // photo. Capped at 4 to keep this a targeted heuristic, not an open-ended
+  // one -- more stacked lines than that is far more likely to be OCR line
+  // fragmentation noise than a real 4+-subject cell.
+  if (lines.length < 2 || lines.length > 4) return { fragments: null, wasSplit: false };
 
   const lineTexts = lines.map(line =>
     [...line].sort((a, b) => a.bbox.x0 - b.bbox.x0).map(w => w.text).join(' ').trim()
@@ -1537,10 +1674,11 @@ function trySplitByIndependentLines(clusterWords, existingSubjects) {
   // a teacher name, like "Prof. Rao") -- it must never count as a real,
   // confidently-distinct subject, or a lone teacher-name line would look
   // like a second session and trigger a false split.
-  const bothConfident = norms.every(n => n.canonicalName && n.canonicalName !== 'General Subject' && !looksLikeUnresolvedCodeResidue(n.canonicalName));
-  const distinctSubjects = bothConfident && norms[0].canonicalName.toLowerCase() !== norms[1].canonicalName.toLowerCase();
+  const allConfident = norms.every(n => n.canonicalName && n.canonicalName !== 'General Subject' && !looksLikeUnresolvedCodeResidue(n.canonicalName));
+  const uniqueNames = new Set(norms.map(n => n.canonicalName.toLowerCase()));
+  const allDistinct = allConfident && uniqueNames.size === norms.length;
 
-  if (!bothConfident || !distinctSubjects) return { fragments: null, wasSplit: false };
+  if (!allConfident || !allDistinct) return { fragments: null, wasSplit: false };
   return { fragments: lineTexts, wasSplit: true };
 }
 
@@ -1776,18 +1914,53 @@ async function reOcrCellRegion(preprocessedDataUrl, worker, bboxFullImage) {
 }
 
 // ── Table-Aware 2D Grid Reconstructor ────────────────────────────
-function reconstructTimetable2DGrid(ocrData, existingSubjects = []) {
+function reconstructTimetable2DGrid(ocrData, existingSubjects = [], facultyLegend = {}) {
   if (!ocrData || !ocrData.words || ocrData.words.length === 0) {
     return { schedule: [], confidence: 0, ambiguous: true };
   }
 
-  const words = ocrData.words.map(w => ({
+  let words = ocrData.words.map(w => ({
     text: (w.text || '').trim(),
     bbox: w.bbox || { x0: 0, y0: 0, x1: 0, y1: 0 },
     conf: w.confidence || 0,
     cx: ((w.bbox?.x0 || 0) + (w.bbox?.x1 || 0)) / 2,
     cy: ((w.bbox?.y0 || 0) + (w.bbox?.y1 || 0)) / 2
   })).filter(w => w.text.length > 0);
+
+  // Guard against footer/legend-table content (e.g. a "Subject /
+  // Abbrivation / Lab / Hall No." or "Name of the faculty" key printed
+  // below the grid) bleeding into whichever day happens to sit physically
+  // last. Real evidence: on a compact layout, such a table can sit close
+  // enough beneath the grid that its header row falls inside the last
+  // day's otherwise-unbounded lower band (which only extends a fixed
+  // +70px past that day's own row), fabricating a "row" out of words that
+  // are actually legend/footer text. This only ever removes words when at
+  // least one distinctive legend-header marker is legible in the OCR
+  // output, and never touches anything above it.
+  const LEGEND_BOUNDARY_MARKERS = ['abbrivat', 'abbreviat', 'facultyname', 'subjectname', 'nameofthefacult', 'nameoffacult'];
+  let legendBoundaryY = Infinity;
+  words.forEach(w => {
+    const cleanW = w.text.toLowerCase().replace(/[^a-z]/g, '');
+    if (cleanW.length >= 6 && LEGEND_BOUNDARY_MARKERS.some(m => cleanW.includes(m))) {
+      legendBoundaryY = Math.min(legendBoundaryY, w.bbox.y0);
+    }
+  });
+  // Also catch the marker when it's spread across separate words on one
+  // line (e.g. "Name of the facul[ty]", OCR-truncated on a real photo) --
+  // the per-word check above only matches a single fused token, but a
+  // less-compact layout OCRs each word of the legend header separately.
+  const legendGuardLines = groupWordsIntoLines(words);
+  legendGuardLines.forEach(line => {
+    const sorted = [...line].sort((a, b) => a.bbox.x0 - b.bbox.x0);
+    const cleanWords = sorted.map(w => w.text.toLowerCase().replace(/[^a-z]/g, ''));
+    const nameIdx = cleanWords.findIndex((cw, i) => cw === 'name' && cleanWords.slice(i + 1, i + 4).some(w2 => w2.length >= 4 && w2.startsWith('facu')));
+    if (nameIdx !== -1) {
+      legendBoundaryY = Math.min(legendBoundaryY, sorted[nameIdx].bbox.y0);
+    }
+  });
+  if (isFinite(legendBoundaryY)) {
+    words = words.filter(w => w.cy < legendBoundaryY);
+  }
 
   // 1. Identify Day Tokens and Time Tokens with coordinates
   const { dayTokens, timeTokens } = detectDayAndTimeTokens(words);
@@ -1891,7 +2064,7 @@ function reconstructTimetable2DGrid(ocrData, existingSubjects = []) {
         const guardrailDeclinedSplit = cellRaw.includes('+') && !plusWasSplit;
 
         fragments.forEach(fragmentText => {
-          const norm = normalizeSubjectIdentity(fragmentText, existingSubjects);
+          const norm = normalizeSubjectIdentity(fragmentText, existingSubjects, null, facultyLegend);
           if (!norm.canonicalName || TIMETABLE_JUNK_TOKENS.has(norm.canonicalName.toLowerCase())) return;
 
           const isUncertainRow = !norm.canonicalName
@@ -1989,7 +2162,7 @@ function reconstructTimetable2DGrid(ocrData, existingSubjects = []) {
         const guardrailDeclinedSplit = cellRaw.includes('+') && !plusWasSplit;
 
         fragments.forEach(fragmentText => {
-          const norm = normalizeSubjectIdentity(fragmentText, existingSubjects);
+          const norm = normalizeSubjectIdentity(fragmentText, existingSubjects, null, facultyLegend);
           if (!norm.canonicalName || TIMETABLE_JUNK_TOKENS.has(norm.canonicalName.toLowerCase())) return;
 
           const isUncertainRow = !norm.canonicalName
@@ -2023,7 +2196,7 @@ function reconstructTimetable2DGrid(ocrData, existingSubjects = []) {
 }
 
 // ── Multi-Strategy Timetable Parser (2D Grid + Geometric Rows + Text Stream) ───
-function parseTimetableFromGrid(ocrData, existingSubjects = []) {
+function parseTimetableFromGrid(ocrData, existingSubjects = [], facultyLegend = {}) {
   if (!ocrData || !ocrData.words || ocrData.words.length === 0) {
     if (ocrData?.text) {
       const textFallback = parseTimetableFromTextStream(ocrData.text, existingSubjects);
@@ -2034,7 +2207,7 @@ function parseTimetableFromGrid(ocrData, existingSubjects = []) {
 
   // Strategy 1: Table-Aware 2D Grid Reconstructor (Layout A & Layout B)
   try {
-    const gridResult = reconstructTimetable2DGrid(ocrData, existingSubjects);
+    const gridResult = reconstructTimetable2DGrid(ocrData, existingSubjects, facultyLegend);
     if (gridResult.schedule && gridResult.schedule.length > 0) {
       return gridResult;
     }
@@ -2187,6 +2360,15 @@ async function extractTimetableFromImage(base64Data, mimeType) {
   const worker = await getTesseractWorker();
   const ocrResult = await worker.recognize(preprocessedDataUrl);
 
+  // Parsed once, up front, from the first pass's own word list: many real
+  // timetables print a "Name of the faculty" legend below the grid mapping
+  // short initials (e.g. "VAK") used inside cells to the actual faculty
+  // member's full name. See parseFacultyLegend's own comment for the
+  // detection/parsing details -- this is deliberately independent of
+  // Stage A/C/D's retries below, since the legend's physical position
+  // never depends on how the grid itself gets recovered.
+  const facultyLegend = parseFacultyLegend(ocrResult.data?.words);
+
   // Stage A: if the first pass found day labels but essentially no usable
   // time-range tokens, retry OCR on just the header band (cropped +
   // upscaled) before handing off to the deterministic parser. Only
@@ -2262,7 +2444,7 @@ async function extractTimetableFromImage(base64Data, mimeType) {
   updateTimetableLoadingModal("Reconstructing schedule rows and matching subjects...");
   let deterministicResult;
   try {
-    deterministicResult = parseTimetableFromGrid(ocrResult.data, existingSubjects);
+    deterministicResult = parseTimetableFromGrid(ocrResult.data, existingSubjects, facultyLegend);
   } catch (err) {
     console.error("[TimetableParser] Error in grid parser, falling back to text stream:", err);
     try {
@@ -2294,7 +2476,7 @@ async function extractTimetableFromImage(base64Data, mimeType) {
           improvedWords = [...improvedWords, ...recovered];
         }
       }
-      const retryResult = parseTimetableFromGrid({ ...ocrResult.data, words: improvedWords }, existingSubjects);
+      const retryResult = parseTimetableFromGrid({ ...ocrResult.data, words: improvedWords }, existingSubjects, facultyLegend);
       if ((retryResult?.schedule?.length || 0) >= (deterministicResult.schedule?.length || 0)) {
         deterministicResult = retryResult;
       }
