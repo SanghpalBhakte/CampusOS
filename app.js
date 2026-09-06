@@ -5848,6 +5848,11 @@ function renderTimetable() {
   const day        = state.ttDay;
   const liveTT     = loadTimetable();
   const classes    = liveTT[day] || [];
+  // "N classes" in the header must not count Recess/Break/Off slots as real
+  // classes -- those are non-teaching periods (see isBreakEntry()). The
+  // rendered list below still includes them so the student can see where
+  // recess falls in the day; only the summary count is corrected.
+  const teachingClassCount = classes.filter(c => !isBreakEntry(c)).length;
   const currentMin = currentTimeMinutes();
   const isCustom   = isCustomTimetableActive();
   const attendanceData = safeGetStorage(KEY_ATTENDANCE, {}) || {};
@@ -5939,7 +5944,7 @@ function renderTimetable() {
     <div class="page-header">
       <div>
         <div class="page-title">Timetable &amp; Schedule</div>
-        <div class="page-subtitle">${classes.length} class${classes.length!==1?'es':''} on ${DAY_NAMES[day]} ${isCustom ? '· Custom Schedule' : '· Regular Schedule'}</div>
+        <div class="page-subtitle">${teachingClassCount} class${teachingClassCount!==1?'es':''} on ${DAY_NAMES[day]} ${isCustom ? '· Custom Schedule' : '· Regular Schedule'}</div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn-primary" onclick="showTimetableEntryModal(${day}, null)" style="display:flex;align-items:center;gap:6px;font-size:0.8rem;padding:7px 14px">
