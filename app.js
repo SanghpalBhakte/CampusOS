@@ -3101,10 +3101,20 @@ function sanitizeTask(t) {
     }
   }
 
+  // Compute the final subject ONCE and reuse it for the code fallback --
+  // previously the code fallback re-checked the ORIGINAL t.subject
+  // (before the 'General' default was applied), so a task with a blank
+  // subject ended up as subject:'General' but code:'OTH': two different-
+  // looking labels for the exact same task, which is exactly the kind of
+  // "General" vs "Other" duplicate classification that showed up as
+  // confusing, redundant filter chips in the UI.
+  const finalSubject = String(t.subject || 'General');
+  const finalCode = String(t.code || (finalSubject === 'General' ? 'GEN' : finalSubject === 'Mission' ? 'MIS' : 'OTH'));
+
   return {
     id:          String(t.id || `c-${Date.now()}`),
-    subject:     String(t.subject || 'General'),
-    code:        String(t.code || (t.subject === 'General' ? 'GEN' : t.subject === 'Mission' ? 'MIS' : 'OTH')),
+    subject:     finalSubject,
+    code:        finalCode,
     title:       String(t.title || 'Untitled Task').slice(0, 150),
     taskType:    taskType,
     noDeadline:  isNoDeadline,
@@ -6042,8 +6052,17 @@ function getSubjectList(options = {}) {
   }
 
   // 2. Collect from Tasks
+  // 'General' (personal/desk tasks) and 'Mission' (long-term goals) are
+  // task CATEGORIES, not academic subjects -- and 'Other'/'OTH' is a
+  // legacy/fallback category with the same non-academic meaning. Subject
+  // Hub is meant to show only subjects that came from the timetable or
+  // were added manually (e.g. a Quick Links "Subject Vault"); a task
+  // merely being filed under one of these generic buckets should never
+  // spawn a phantom Subject Hub card for "General" or "Other".
+  const NON_SUBJECT_TASK_CATEGORIES = ['general', 'mission', 'other'];
   allTasks().forEach(t => {
-    if (t.subject && t.subject.trim()) {
+    const subj = (t.subject || '').trim();
+    if (subj && !NON_SUBJECT_TASK_CATEGORIES.includes(subj.toLowerCase())) {
       getOrCreateSubject(t.subject, t.code || t.subject, 'lecture');
     }
   });
@@ -8990,7 +9009,16 @@ function renderAssignments() {
 
   if (!state.assignTypeFilter) state.assignTypeFilter = 'all';
   const today = todayStr();
-  const subjects = ['all', ...new Set(all.map(a => a.code || a.subject))];
+  // Exclude the non-academic task categories ('General'/'GEN',
+  // 'Mission'/'MIS', and the legacy 'Other'/'OTH' fallback) from this
+  // per-subject filter row -- they're already their own chips in the
+  // Type filter below, so showing them again here as if they were
+  // subjects is redundant, confusing clutter (this is what produced the
+  // "General" and "Other" chips that look like duplicate categories).
+  const NON_SUBJECT_FILTER_VALUES = ['general', 'gen', 'mission', 'mis', 'other', 'oth'];
+  const subjects = ['all', ...new Set(
+    all.map(a => a.code || a.subject).filter(s => s && !NON_SUBJECT_FILTER_VALUES.includes(String(s).toLowerCase()))
+  )];
 
   const chipLabel = (iconSvg, text) => `<span style="display:inline-flex;align-items:center;gap:5px">${iconSvg}${text}</span>`;
 
