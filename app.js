@@ -1102,14 +1102,35 @@ function parseFacultyLegend(rawWords) {
 
     // Strip stray leading/trailing punctuation a real photo's OCR often
     // picks up from adjacent table borders (e.g. a leading "[" or "|").
-    const restText = sorted.slice(1).map(w => w.text).join(' ')
+    let restText = sorted.slice(1).map(w => w.text).join(' ')
       .replace(/^[^A-Za-z0-9]+/, '').replace(/[^A-Za-z0-9.]+$/, '').trim();
+
+    // A combined "code | subject name | faculty name" legend layout (real
+    // evidence: an FY-AIDS timetable) also glues on a 4th, unrelated
+    // column -- a student roll-number range, e.g. "...Prof. A. B. Nale
+    // 12506051-12506075". A run of 6+ digits (optionally a hyphenated
+    // pair of them) is never really part of a subject/faculty name, so
+    // strip it before validating instead of rejecting the whole row.
+    restText = restText.replace(/\s*\b\d{6,}(?:-\d{6,})?\b\s*$/, '').trim();
     if (!legendTitlePattern.test(restText)) return;
 
-    const fullName = restText.replace(/\s{2,}/g, ' ').trim();
+    // On that same combined layout the title sits partway through the
+    // row, after the subject-name prose, not at the start -- keep only
+    // from the title onward so that prose doesn't end up inside what's
+    // supposed to be just the teacher's name.
+    const titleMatch = restText.match(legendTitlePattern);
+    const fullName = (titleMatch.index > 0 ? restText.slice(titleMatch.index) : restText)
+      .replace(/\s{2,}/g, ' ').trim();
     const titleOccurrences = (fullName.match(/\b(?:Prof|Dr|Mr|Mrs|Ms|Adv|Shri|Smt)\b\.?/gi) || []).length;
     if (fullName.length < 5 || fullName.length > MAX_NAME_LENGTH) return;
-    if (/\d/.test(fullName)) return;
+    // A real name can still carry a single stray digit from a letter/
+    // digit OCR mix-up (real evidence: "S.D." misread as "5.0.", "S."
+    // misread as "8."), but genuine contamination (a roll-number range,
+    // or noise glued into the middle of the row) always shows up as a
+    // RUN of several digits together -- reject on that shape instead of
+    // any digit at all, so one isolated-digit typo doesn't cost the
+    // whole entry.
+    if (/\d{2,}/.test(fullName)) return;
     if (titleOccurrences > 1) return;
     if (!legend[cleanInitials]) {
       legend[cleanInitials] = fullName;

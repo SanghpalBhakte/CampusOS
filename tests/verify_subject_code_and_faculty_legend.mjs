@@ -218,7 +218,7 @@ check('D1. parseFacultyLegend extracts initials -> full name from a "Name of the
   return true;
 });
 
-check('D2. A garbled multi-column legend row (roll-number contamination) is rejected, not stored as a wrong mapping', () => {
+check('D2. A combined "code | subject name | faculty name" row (real FY-AIDS shape) resolves to just the teacher name, with the subject-name prose and a trailing student roll-number range both discarded', () => {
   const mod = createSandbox();
   const words = [
     w('Subject', 20, 100, 80, 120, 90), w('Name', 85, 100, 130, 120, 90), w('FacultyName', 200, 100, 300, 120, 90),
@@ -227,7 +227,53 @@ check('D2. A garbled multi-column legend row (roll-number contamination) is reje
     w('12506051-12506075', 450, 130, 600, 150, 90)
   ];
   const legend = mod.parseFacultyLegend(words);
-  if (legend.LADE) return `expected the digit-contaminated row to be rejected, got LADE='${legend.LADE}'`;
+  if (!legend.LADE || !/^Prof\.?\s*A\.?\s*Nale$/i.test(legend.LADE)) {
+    return `expected LADE to resolve to just 'Prof. A. Nale' (subject prose + roll-range stripped), got ${JSON.stringify(legend.LADE)}`;
+  }
+  return true;
+});
+
+check('D2b. A legend row with no recognizable title at all is still rejected outright (real evidence: OCR ate the "Prof V." entirely)', () => {
+  const mod = createSandbox();
+  // Real photo evidence: the "VJM" row's own initials OCR'd as "VIM", and
+  // what should have been "Prof V. J. Murambikar" came out as
+  // "157, VJ; Murambikar" -- no title token survives at all, so there is
+  // nothing safe to anchor a name extraction on. Correctly stays
+  // unresolved rather than guessing.
+  const words = [
+    w('Name', 20, 1120, 60, 1140, 90), w('of', 65, 1124, 85, 1142, 90),
+    w('the', 90, 1125, 120, 1144, 90), w('facul', 125, 1126, 180, 1147, 90),
+    w('VIM', 20, 1176, 78, 1225, 90), w('157,', 122, 1193, 199, 1213, 90),
+    w('VJ;', 207, 1194, 252, 1215, 90), w('Murambikar', 261, 1197, 391, 1221, 90)
+  ];
+  const legend = mod.parseFacultyLegend(words);
+  if (legend.VIM) return `expected the title-less garbled row to stay unresolved, got VIM='${legend.VIM}'`;
+  return true;
+});
+
+check('D2c. A single stray-digit OCR typo inside an otherwise valid name still resolves (real evidence: "S.D." misread as "5.0.")', () => {
+  const mod = createSandbox();
+  const words = [
+    w('Name', 20, 1120, 60, 1140, 90), w('of', 65, 1124, 85, 1142, 90),
+    w('the', 90, 1125, 120, 1144, 90), w('facul', 125, 1126, 180, 1147, 90),
+    w('SDJ', 28, 1211, 166, 1247, 90), w('Prof,', 173, 1225, 222, 1246, 90),
+    w('5.0.', 236, 1228, 276, 1248, 90), w('Jadhay', 281, 1230, 357, 1252, 90)
+  ];
+  const legend = mod.parseFacultyLegend(words);
+  if (!legend.SDJ || /\d{2,}/.test(legend.SDJ)) return `expected SDJ to resolve despite the isolated digit typo, got ${JSON.stringify(legend.SDJ)}`;
+  return true;
+});
+
+check('D2d. Digit contamination stuck in the middle of the name (not a trailing roll-range) is still rejected', () => {
+  const mod = createSandbox();
+  const words = [
+    w('Name', 20, 1120, 60, 1140, 90), w('of', 65, 1124, 85, 1142, 90),
+    w('the', 90, 1125, 120, 1144, 90), w('facul', 125, 1126, 180, 1147, 90),
+    w('XYZ', 20, 1160, 60, 1180, 90), w('Prof.', 70, 1160, 110, 1180, 90),
+    w('A.', 115, 1160, 130, 1180, 90), w('12506051', 135, 1160, 220, 1180, 90), w('Nale', 225, 1160, 270, 1180, 90)
+  ];
+  const legend = mod.parseFacultyLegend(words);
+  if (legend.XYZ) return `expected mid-string digit-run contamination to still be rejected, got XYZ='${legend.XYZ}'`;
   return true;
 });
 
