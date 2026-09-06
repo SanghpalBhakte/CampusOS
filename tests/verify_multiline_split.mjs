@@ -135,8 +135,11 @@ check('3. Unresolved code residue on one line + a confident subject on the other
     words: [
       w('Wed', 20, 100, 60, 130, 95),
       w('11:00 - 12:00', 150, 30, 280, 60, 95),
-      // Line 1: raw unresolved code (no existingSubjects to match against)
-      w('DS-AI-A2', 130, 100, 220, 120, 90),
+      // Line 1: raw unresolved code (no existingSubjects to match against) --
+      // a bare, never-mapped abbreviation, deliberately NOT using the
+      // "AI-<batch>" suffix shape, since that shape is now correctly
+      // resolved (Stage 11 fixed a real bug where it stayed unresolved).
+      w('XQZ', 130, 100, 220, 120, 90),
       // Line 2: a confidently-resolvable subject
       w('Web', 130, 125, 180, 145, 90), w('Development', 185, 125, 290, 145, 90)
     ]

@@ -137,8 +137,12 @@ check('3. Layout A: a grouped multi-batch cell (real production-style "+" text) 
   const ocrData = {
     words: [
       w('Mon', 20, 100, 60, 130, 95), w('10:00 - 11:00', 150, 30, 280, 60, 95),
-      w('DS-AI-A2', 150, 100, 210, 120), w('(VJM)', 213, 100, 250, 120), w('+', 253, 100, 260, 120),
-      w('DEMP-AI-C2', 263, 100, 320, 120), w('(VAK)', 323, 100, 360, 120),
+      // Bare, never-mapped abbreviations (not "DS"/"DEMP") -- Stage 11
+      // correctly resolves the "AI-<batch>" suffix shape now, so a
+      // genuinely-unresolvable fixture needs an abbreviation that stays
+      // unmapped regardless of that fix.
+      w('XQZ-AI-A2', 150, 100, 210, 120), w('(VJM)', 213, 100, 250, 120), w('+', 253, 100, 260, 120),
+      w('PQR-AI-C2', 263, 100, 320, 120), w('(VAK)', 323, 100, 360, 120),
     ]
   };
   const res = mod.reconstructTimetable2DGrid(ocrData, []);
