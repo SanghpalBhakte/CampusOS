@@ -1554,7 +1554,6 @@ function trySplitByIndependentLines(clusterWords, existingSubjects) {
 function looksLikeUnresolvedCodeResidue(canonicalName) {
   if (!canonicalName) return true;
   const trimmed = canonicalName.trim();
-  if (trimmed.length > 15) return false;
   return /^[A-Z0-9]+([\s-]+[A-Z0-9]+)*$/.test(trimmed);
 }
 
@@ -2209,6 +2208,55 @@ async function extractTimetableFromImage(base64Data, mimeType) {
     }
   } catch (err) {
     console.warn("[TimetableParser] Header-band retry OCR failed, continuing with first-pass data:", err);
+  }
+
+  // Stage D: if at least two day labels were found but the topmost one
+  // isn't Monday and no Monday token exists anywhere yet, a leading row
+  // may have been swallowed entirely -- this happens on real photos where
+  // Monday's row sits with no visual gap against the header band above it.
+  // A full-width crop of that band (like Stage A's) drags in the whole
+  // multi-column numeric header table alongside the lone day label and
+  // confuses PSM 6 into producing nothing usable there (verified
+  // empirically); cropping just the day-label column's own width for an
+  // estimated one-row-height band above the topmost known day avoids that
+  // and reliably recovers the label. Requires >=2 day tokens so a row
+  // spacing can be estimated; degrades to a no-op otherwise.
+  try {
+    const postHeaderWords = mapRawOcrWordsForDetection(ocrResult.data?.words);
+    const { dayTokens: postHeaderDayTokens } = detectDayAndTimeTokens(postHeaderWords);
+    if (postHeaderDayTokens.length >= 2 && !postHeaderDayTokens.some(d => d.stdDay === 'Mon')) {
+      const sortedDays = [...postHeaderDayTokens].sort((a, b) => a.cy - b.cy);
+      const topmost = sortedDays[0];
+      if (topmost.stdDay !== 'Mon') {
+        const rowSpacing = sortedDays[1].cy - sortedDays[0].cy;
+        if (rowSpacing > 10) {
+          const dayLabelWidth = Math.max(...postHeaderDayTokens.map(d => d.word.bbox.x1));
+          const candidateBbox = {
+            x0: 0,
+            y0: topmost.word.bbox.y0 - rowSpacing - 20,
+            x1: dayLabelWidth + 40,
+            y1: topmost.word.bbox.y0 - 10
+          };
+          if (candidateBbox.y0 >= 0 && candidateBbox.y1 > candidateBbox.y0) {
+            updateTimetableLoadingModal("Re-scanning for a missing leading day row...");
+            const recoveredDayWords = await reOcrCellRegion(preprocessedDataUrl, worker, candidateBbox);
+            const mondayWord = recoveredDayWords.find(w => {
+              const cleanWord = (w.text || '').toLowerCase().replace(/[^a-z]/g, '');
+              return standardizeTimetableDay(cleanWord) === 'Mon' && (w.confidence || 0) > 40;
+            });
+            if (mondayWord) {
+              // Prepended for the same reason Stage A prepends recovered
+              // time tokens: a clean, self-validating recovered word
+              // should never be at risk of an unrelated neighbor's
+              // lookahead window absorbing it.
+              ocrResult.data.words = [mondayWord, ...(ocrResult.data.words || [])];
+            }
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("[TimetableParser] Leading day-row retry OCR failed, continuing with prior data:", err);
   }
 
   updateTimetableLoadingModal("Reconstructing schedule rows and matching subjects...");
